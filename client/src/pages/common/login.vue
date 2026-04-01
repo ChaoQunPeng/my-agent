@@ -70,14 +70,12 @@ async function submit() {
 
     if (loginModel.type === 'account') {
       params = {
-        // identifier: '18000218161',
-        // password: '123456',
-        // operationDevice: 1,
-        // deviceModel: 'Apifox111',
-        // deviceUid: '12456fbas'
-        username: 'admin',
-        password: 'admin'
-      } as unknown as LoginParams;
+        identifier: loginModel.username,
+        password: loginModel.password,
+        operationDevice: 1,
+        deviceModel: 'Web Browser',
+        deviceUid: navigator.userAgent
+      } as LoginParams;
     } else {
       params = {
         mobile: loginModel.mobile,

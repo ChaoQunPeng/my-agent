@@ -1,25 +1,26 @@
 /// <reference types="vitest" />
 
-import type { ConfigEnv, UserConfig } from 'vite';
-import { resolve } from 'node:path';
-import * as process from 'node:process';
-import { fileURLToPath } from 'node:url';
-import { loadEnv } from 'vite';
-import { createVitePlugins } from './plugins';
-import { OUTPUT_DIR } from './plugins/constants';
-import { codeInspectorPlugin } from 'code-inspector-plugin';
+import type { ConfigEnv, UserConfig } from 'vite'
+import { resolve } from 'node:path'
+import * as process from 'node:process'
+import { fileURLToPath } from 'node:url'
+import { loadEnv } from 'vite'
+import { createVitePlugins } from './plugins'
+import { OUTPUT_DIR } from './plugins/constants'
+import { codeInspectorPlugin } from 'code-inspector-plugin'
 
-const baseSrc = fileURLToPath(new URL('./src', import.meta.url));
+const baseSrc = fileURLToPath(new URL('./src', import.meta.url))
 // https://vitejs.dev/config/
 export default ({ mode }: ConfigEnv): UserConfig => {
-  const env = loadEnv(mode, process.cwd());
-  const proxyObj = {};
+  const env = loadEnv(mode, process.cwd())
+  const proxyObj = {}
+  // 开发环境下，如果使用 mock，则不启用代理
   if (mode === 'development' && env.VITE_APP_BASE_API_DEV && env.VITE_APP_BASE_URL_DEV) {
     proxyObj[env.VITE_APP_BASE_API_DEV] = {
       target: env.VITE_APP_BASE_URL_DEV,
       changeOrigin: true,
       rewrite: path => path.replace(new RegExp(`^${env.VITE_APP_BASE_API_DEV}`), '')
-    };
+    }
   }
   return {
     plugins: [
@@ -44,10 +45,7 @@ export default ({ mode }: ConfigEnv): UserConfig => {
         },
         {
           find: 'vue-i18n',
-          replacement:
-            mode === 'development'
-              ? 'vue-i18n/dist/vue-i18n.esm-browser.js'
-              : 'vue-i18n/dist/vue-i18n.esm-bundler.js'
+          replacement: mode === 'development' ? 'vue-i18n/dist/vue-i18n.esm-browser.js' : 'vue-i18n/dist/vue-i18n.esm-bundler.js'
         },
         {
           find: /^ant-design-vue\/es$/,
@@ -140,5 +138,5 @@ export default ({ mode }: ConfigEnv): UserConfig => {
     //   globals: true,
     //   environment: 'jsdom',
     // },
-  };
-};
+  }
+}

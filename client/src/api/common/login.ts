@@ -15,40 +15,40 @@
 //     "deviceUid": "12456fbas"
 // }
 export interface LoginParams {
-  identifier: string;
-  password: string;
-  operationDevice?: 1;
-  deviceModel: string;
-  deviceUid: string;
+  identifier: string
+  password: string
+  operationDevice?: 1
+  deviceModel: string
+  deviceUid: string
 }
 
 export interface LoginMobileParams {
-  mobile: string;
-  code: string;
-  type: 'mobile';
+  mobile: string
+  code: string
+  type: 'mobile'
 }
 
 export interface LoginResultModel {
-  token: string;
+  token: string
 }
 
 export function loginApi(params: LoginParams | LoginMobileParams) {
-  return usePost<LoginResultModel, LoginParams | LoginMobileParams>('/user/login_psw', params, {
-    // 设置为false的时候不会携带token
+  return usePost<LoginResultModel, LoginParams | LoginMobileParams>('/api/user/login_psw', params, {
+    // 设置为 false 的时候不会携带 token
     token: false,
     // 开发模式下使用自定义的接口
     customDev: true,
-    // 是否开启全局请求loading
+    // 是否开启全局请求 loading
     loading: false
-  });
+  })
 }
 
 export function logoutApi() {
   return useGet(
-    '/logout',
+    '/api/logout',
     {},
     {
       customDev: true
     }
-  );
+  )
 }

@@ -14,15 +14,18 @@ export default defineEventHandler(async event => {
   
   if (type !== 'mobile') {
     // 账号密码登录模式
+    // 兼容 username 和 identifier 字段
+    const username = body.username || body.identifier;
+    
     // eslint-disable-next-line node/prefer-global/buffer
-    success.data.token = Buffer.from(body.username).toString('base64');
+    success.data.token = Buffer.from(username).toString('base64');
     
     // 验证用户名密码
-    if (body.username === 'admin' && body.password === 'admin') {
+    if (username === 'admin' && body.password === 'admin') {
       return success;
     }
     
-    if (body.username === 'user' && body.password === 'user') {
+    if (username === 'user' && body.password === 'user') {
       return success;
     }
     
