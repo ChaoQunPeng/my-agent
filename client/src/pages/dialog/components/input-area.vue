@@ -1,24 +1,18 @@
 <template>
   <div class="chat-input-wrap">
     <div class="chat-input-area">
-      <a-textarea
-        class="chat-input"
-        v-model:value="inputMessage"
-        placeholder="你好呀~"
-        auto-size
-        @pressEnter="handleSend"
-      />
+      <a-textarea class="chat-input" v-model:value="inputMessage" placeholder="你好呀~" auto-size @pressEnter="handleSend" />
     </div>
     <div class="chat-actions">
       <div class="chat-action-buttons flex">
-        <div class="mr-12">
+        <!-- <div class="mr-12">
           <RobotOutlined />
           深度思考
         </div>
         <div>
           <GlobalOutlined />
           联网搜索
-        </div>
+        </div> -->
       </div>
       <div class="send-btn rounded-full flex items-center justify-center cursor-pointer">
         <ArrowUpOutlined :style="{ fontSize: '16px', color: '#fff' }" />
@@ -28,25 +22,20 @@
 </template>
 
 <script setup lang="ts">
-import {
-  ArrowUpOutlined,
-  GlobalOutlined,
-  ApartmentOutlined,
-  RobotOutlined
-} from '@ant-design/icons-vue';
+import { ArrowUpOutlined, GlobalOutlined, ApartmentOutlined, RobotOutlined } from '@ant-design/icons-vue'
 
-const inputMessage = ref('');
+const inputMessage = ref('')
 
 const emits = defineEmits<{
-  send: [text: string];
-}>();
+  send: [text: string]
+}>()
 const handleSend = (e: Event) => {
-  e.preventDefault();
-  emits('send', inputMessage.value);
+  e.preventDefault()
+  emits('send', inputMessage.value)
   nextTick(() => {
-    inputMessage.value = '';
-  });
-};
+    inputMessage.value = ''
+  })
+}
 </script>
 
 <style lang="less" scoped>
