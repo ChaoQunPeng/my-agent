@@ -44,6 +44,7 @@ import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { message as antMessage } from 'ant-design-vue'
 // import UserAvatar from '@/components/user-avatar/index.vue';
 import InputArea from './components/input-area.vue'
+import { chatStreamApi } from '../../composables/chat-stream'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -57,8 +58,6 @@ const messages = ref<ChatMessage[]>([])
 
 const sending = ref(false)
 const messagesContainer = ref<HTMLDivElement | null>(null)
-const streamingMessage = ref('')
-const streamingMessageType = ref<'dialog' | 'thinking'>('dialog')
 
 // 格式化消息显示
 const formatMessage = (content: string) => {
@@ -70,8 +69,35 @@ const formatMessage = (content: string) => {
 const handleSend = async (text: string) => {
   if (!text.trim() || sending.value) return
 
+  sending.value = true
+
+  // 1. 添加用户消息
+  messages.value.push({ role: 'user', content: text })
   await nextTick()
   scrollToBottom()
+
+  // 2. 添加 AI 回复占位
+  messages.value.push({ role: 'assistant', content: '' })
+  const assistantIndex = messages.value.length - 1
+
+  try {
+    await chatStreamApi({
+      message: text,
+      onChunk: async (content: string) => {
+        messages.value[assistantIndex].content += content
+        await nextTick()
+        scrollToBottom()
+      },
+    })
+  } catch (e) {
+    antMessage.error('消息发送失败，请稍后重试')
+    // 移除空的 AI 占位消息
+    if (!messages.value[assistantIndex]?.content) {
+      messages.value.splice(assistantIndex, 1)
+    }
+  } finally {
+    sending.value = false
+  }
 }
 
 const scrollToBottom = () => {
@@ -91,7 +117,7 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
+<style lang="less" scoped>
 .chat-container {
   display: flex;
   flex-direction: column;

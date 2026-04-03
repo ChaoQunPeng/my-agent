@@ -22,7 +22,8 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowUpOutlined, GlobalOutlined, ApartmentOutlined, RobotOutlined } from '@ant-design/icons-vue'
+import { ref, nextTick } from 'vue'
+import { ArrowUpOutlined } from '@ant-design/icons-vue'
 
 const inputMessage = ref('')
 

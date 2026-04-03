@@ -12,6 +12,7 @@ declare global {
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const breakpointsEnum: typeof import('../src/composables/query-breakpoints')['breakpointsEnum']
+  const chatStreamApi: typeof import('../src/composables/chat-stream')['chatStreamApi']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
@@ -344,6 +345,9 @@ declare global {
   // @ts-ignore
   export type { MultiTabItem } from '../src/stores/multi-tab'
   import('../src/stores/multi-tab')
+  // @ts-ignore
+  export type { ChatStreamOptions } from '../src/composables/chat-stream'
+  import('../src/composables/chat-stream')
   // @ts-ignore
   export type { TablePaginationProps, TableRowSelectionsProps, TableQueryOptions } from '../src/composables/table-query'
   import('../src/composables/table-query')
