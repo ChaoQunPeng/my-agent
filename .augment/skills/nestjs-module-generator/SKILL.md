@@ -142,32 +142,32 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
 export class {Pascal}Controller {
   constructor(private readonly {camel}Service: {Pascal}Service) {}
 
-  @Post('get{Pascal}List')
+  @Post('get-{kebab}-list')
   async get{Pascal}List(@Body() params?: any) {
     const data = await this.{camel}Service.findAll(params);
     return ApiResponseDto.success(data);
   }
 
-  @Post('get{Pascal}ById')
+  @Post('get-{kebab}-by-id')
   async get{Pascal}ById(@Body() dto: { id: string }) {
     const data = await this.{camel}Service.findById(dto.id);
     return ApiResponseDto.success(data);
   }
 
-  @Post('create{Pascal}')
+  @Post('create-{kebab}')
   async create{Pascal}(@Body() dto: Create{Pascal}Dto) {
     const data = await this.{camel}Service.create(dto);
     return ApiResponseDto.success(data, '创建成功');
   }
 
-  @Post('update{Pascal}')
+  @Post('update-{kebab}')
   async update{Pascal}(@Body() dto: Update{Pascal}Dto & { id: string }) {
     const { id, ...data } = dto;
     const result = await this.{camel}Service.update(id, data);
     return ApiResponseDto.success(result, '更新成功');
   }
 
-  @Post('delete{Pascal}')
+  @Post('delete-{kebab}')
   async delete{Pascal}(@Body() dto: { id: string }) {
     await this.{camel}Service.delete(dto.id);
     return ApiResponseDto.success(null, '删除成功');

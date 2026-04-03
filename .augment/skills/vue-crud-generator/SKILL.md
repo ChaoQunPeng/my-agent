@@ -41,23 +41,23 @@ type {Pascal}Params = Partial<Omit<{Pascal}Model, 'id'>> & {
 };
 
 export async function get{Pascal}ListApi(params?: {Pascal}Params) {
-  return usePost<{ records: {Pascal}Model[]; total: number }>('/<route>/get{Pascal}List', params);
+  return usePost<{ records: {Pascal}Model[]; total: number }>('/<route>/get-{kebab}-list', params);
 }
 
 export async function get{Pascal}ByIdApi(id: string) {
-  return usePost<{Pascal}Model>('/<route>/get{Pascal}ById', { id });
+  return usePost<{Pascal}Model>('/<route>/get-{kebab}-by-id', { id });
 }
 
 export async function create{Pascal}Api(data: Omit<{Pascal}Model, 'id'>) {
-  return usePost<{Pascal}Model>('/<route>/create{Pascal}', data);
+  return usePost<{Pascal}Model>('/<route>/create-{kebab}', data);
 }
 
 export async function update{Pascal}Api(id: string, data: Partial<Omit<{Pascal}Model, 'id'>>) {
-  return usePost<{Pascal}Model>('/<route>/update{Pascal}', { id, ...data });
+  return usePost<{Pascal}Model>('/<route>/update-{kebab}', { id, ...data });
 }
 
 export async function delete{Pascal}Api(id: string) {
-  return usePost('/<route>/delete{Pascal}', { id });
+  return usePost('/<route>/delete-{kebab}', { id });
 }
 
 export type { {Pascal}Model, {Pascal}Params };
