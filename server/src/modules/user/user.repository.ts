@@ -14,8 +14,11 @@ export class UserRepository {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
-  async findAll(): Promise<UserDocument[]> {
-    return this.userModel.find().exec();
+  async findAll(params?: { current?: number; pageSize?: number }): Promise<UserDocument[]> {
+    const skip = params?.current && params?.pageSize ? (params.current - 1) * params.pageSize : 0;
+    const limit = params?.pageSize || 0;
+    
+    return this.userModel.find().skip(skip).limit(limit).exec();
   }
 
   async findById(id: string): Promise<UserDocument | null> {

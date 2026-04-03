@@ -10,8 +10,8 @@ import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 export class UserService {
   constructor(private readonly userRepository: UserRepository) {}
 
-  findAll() {
-    return this.userRepository.findAll();
+  findAll(params?: { current?: number; pageSize?: number }) {
+    return this.userRepository.findAll(params);
   }
 
   async findById(id: string) {

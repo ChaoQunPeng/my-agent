@@ -77,8 +77,9 @@ export class {Pascal}Repository {
   findAll(params?: any): Promise<{ records: {Pascal}Document[]; total: number }> {
     const { current = 1, pageSize = 10, ...filter } = params ?? {};
     const query = this.{camel}Model.find(filter);
+    const skip = (current - 1) * pageSize;
     return Promise.all([
-      query.skip((current - 1) * pageSize).limit(pageSize).exec(),
+      query.skip(skip).limit(pageSize).exec(),
       this.{camel}Model.countDocuments(filter)
     ]).then(([records, total]) => ({ records, total }));
   }
@@ -100,7 +101,9 @@ import { Create{Pascal}Dto, Update{Pascal}Dto } from './dto/<kebab>.dto';
 export class {Pascal}Service {
   constructor(private readonly {camel}Repository: {Pascal}Repository) {}
 
-  findAll(params?: any) { return this.{camel}Repository.findAll(params); }
+  findAll(params?: { current?: number; pageSize?: number; [key: string]: any }) {
+    return this.{camel}Repository.findAll(params);
+  }
 
   async findById(id: string) {
     const item = await this.{camel}Repository.findById(id);
@@ -124,7 +127,7 @@ export class {Pascal}Service {
 
 ### `<kebab>.controller.ts`
 ```typescript
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { {Pascal}Service } from './<kebab>.service';
 import { Create{Pascal}Dto, Update{Pascal}Dto } from './dto/<kebab>.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
@@ -133,30 +136,31 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
 export class {Pascal}Controller {
   constructor(private readonly {camel}Service: {Pascal}Service) {}
 
-  @Get()
-  async findAll(@Query() params: any) {
+  @Post('get{Pascal}List')
+  async get{Pascal}List(@Body() params?: any) {
     const data = await this.{camel}Service.findAll(params);
     return ApiResponseDto.success(data);
   }
 
-  @Get(':id')
-  async findById(@Param('id') id: string) {
-    return ApiResponseDto.success(await this.{camel}Service.findById(id));
+  @Post('get{Pascal}ById')
+  async get{Pascal}ById(@Body() dto: { id: string }) {
+    return ApiResponseDto.success(await this.{camel}Service.findById(dto.id));
   }
 
-  @Post()
-  async create(@Body() dto: Create{Pascal}Dto) {
+  @Post('create{Pascal}')
+  async create{Pascal}(@Body() dto: Create{Pascal}Dto) {
     return ApiResponseDto.success(await this.{camel}Service.create(dto), '创建成功');
   }
 
-  @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: Update{Pascal}Dto) {
-    return ApiResponseDto.success(await this.{camel}Service.update(id, dto), '更新成功');
+  @Post('update{Pascal}')
+  async update{Pascal}(@Body() dto: Update{Pascal}Dto & { id: string }) {
+    const { id, ...data } = dto;
+    return ApiResponseDto.success(await this.{camel}Service.update(id, data), '更新成功');
   }
 
-  @Delete(':id')
-  async delete(@Param('id') id: string) {
-    await this.{camel}Service.delete(id);
+  @Post('delete{Pascal}')
+  async delete{Pascal}(@Body() dto: { id: string }) {
+    await this.{camel}Service.delete(dto.id);
     return ApiResponseDto.success(null, '删除成功');
   }
 }
@@ -183,26 +187,35 @@ export class {Pascal}Module {}
 ## 第四步：生成前端文件（3个）
 
 ### `client/src/api/<kebab>/<kebab>.ts`
-```typescript
+``typescript
 interface {Pascal}Model {
   id?: string;
   name: string;
   // 根据用户字段生成
 }
+
 type {Pascal}Params = Partial<Omit<{Pascal}Model, 'id'>> & { current?: number; pageSize?: number };
 
 export async function get{Pascal}ListApi(params?: {Pascal}Params) {
-  return useGet<{ records: {Pascal}Model[]; total: number }>('/<route>', params);
+  return usePost<{ records: {Pascal}Model[]; total: number }>('/<route>/get{Pascal}List', params);
 }
+
+export async function get{Pascal}ByIdApi(id: string) {
+  return usePost<{Pascal}Model>('/<route>/get{Pascal}ById', { id });
+}
+
 export async function create{Pascal}Api(data: Omit<{Pascal}Model, 'id'>) {
-  return usePost<{Pascal}Model>('/<route>', data);
+  return usePost<{Pascal}Model>('/<route>/create{Pascal}', data);
 }
+
 export async function update{Pascal}Api(id: string, data: Partial<Omit<{Pascal}Model, 'id'>>) {
-  return usePut<{Pascal}Model>(`/<route>/${id}`, data);
+  return usePost<{Pascal}Model>('/<route>/update{Pascal}', { id, ...data });
 }
+
 export async function delete{Pascal}Api(id: string) {
-  return useDelete(`/<route>/${id}`);
+  return usePost(`/<route>/delete{Pascal}`, { id });
 }
+
 export type { {Pascal}Model, {Pascal}Params };
 ```
 

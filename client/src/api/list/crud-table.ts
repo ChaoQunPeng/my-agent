@@ -17,11 +17,11 @@ interface CrudTableModel {
 type CrudTableParams = Partial<Omit<CrudTableModel, 'id'>>;
 
 export async function getListApi(params?: CrudTableParams) {
-  return usePost<CrudTableModel[]>('/list/crud-table', params);
+  return usePost<CrudTableModel[]>('/list/getCrudTableList', params);
 }
 
 export async function deleteApi(id: string | number) {
-  return useDelete(`/list/${id}`);
+  return usePost(`/list/deleteCrudTable`, { id });
 }
 
 export type { CrudTableModel, CrudTableParams };

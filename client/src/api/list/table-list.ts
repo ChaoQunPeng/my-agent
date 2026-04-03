@@ -32,11 +32,11 @@ interface ConsultTableModel {
 type ConsultTableParams = Partial<Omit<ConsultTableModel, 'id'>>;
 
 export async function getListApi(params?: ConsultTableParams) {
-  return usePost<ConsultTableModel[]>('/list/consult-list', params);
+  return usePost<ConsultTableModel[]>('/list/getConsultList', params);
 }
 
 export async function deleteApi(id: string | number) {
-  return useDelete(`/list/${id}`);
+  return usePost(`/list/deleteConsult`, { id });
 }
 
 export type { ConsultTableModel, ConsultTableParams, STATUS };

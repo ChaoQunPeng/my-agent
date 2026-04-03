@@ -1,23 +1,23 @@
 export function test200() {
-  return useGet('/');
+  return usePost('/', {});
 }
 
 export function test401() {
-  return useGet('/401');
+  return usePost('/401', {});
 }
 
 export function test500() {
-  return useGet('/500');
+  return usePost('/500', {});
 }
 
 export function testPut() {
-  return usePut('/test');
+  return usePost('/test', {});
 }
 
 export function testPost() {
-  return usePost('/test');
+  return usePost('/test', {});
 }
 
 export function testDelete() {
-  return useDelete('/test');
+  return usePost('/test', {});
 }

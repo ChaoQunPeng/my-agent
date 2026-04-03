@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { OpenaiModule } from './shared/openai/openai.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { UserModule } from './modules/user/user.module';
+import { TaskModule } from './modules/task/task.module';
 
 @Module({
   imports: [
@@ -12,6 +14,8 @@ import { ChatModule } from './modules/chat/chat.module';
     }),
     OpenaiModule,
     ChatModule,
+    UserModule,
+    TaskModule,
   ],
   controllers: [AppController],
 })

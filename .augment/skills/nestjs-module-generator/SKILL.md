@@ -66,8 +66,15 @@ export class {Pascal}Repository {
     @InjectModel({Pascal}.name) private readonly {camel}Model: Model<{Pascal}Document>,
   ) {}
 
-  findAll(): Promise<{Pascal}Document[]> {
-    return this.{camel}Model.find().exec();
+  findAll(params?: { current?: number; pageSize?: number }): Promise<{ records: {Pascal}Document[]; total: number }> {
+    const query = this.{camel}Model.find();
+    const skip = params?.current && params?.pageSize ? (params.current - 1) * params.pageSize : 0;
+    const limit = params?.pageSize || 0;
+    
+    return Promise.all([
+      query.skip(skip).limit(limit).exec(),
+      this.{camel}Model.countDocuments()
+    ]).then(([records, total]) => ({ records, total }));
   }
 
   findById(id: string): Promise<{Pascal}Document | null> {
@@ -98,8 +105,8 @@ import { Create{Pascal}Dto, Update{Pascal}Dto } from './dto/<kebab>.dto';
 export class {Pascal}Service {
   constructor(private readonly {camel}Repository: {Pascal}Repository) {}
 
-  findAll() {
-    return this.{camel}Repository.findAll();
+  findAll(params?: { current?: number; pageSize?: number }) {
+    return this.{camel}Repository.findAll(params);
   }
 
   async findById(id: string) {
@@ -113,12 +120,12 @@ export class {Pascal}Service {
   }
 
   async update(id: string, dto: Update{Pascal}Dto) {
-    await this.findById(id);
+    await this.findById(id); // 确保任务存在
     return this.{camel}Repository.update(id, dto);
   }
 
   async delete(id: string) {
-    await this.findById(id);
+    await this.findById(id); // 确保任务存在
     return this.{camel}Repository.delete(id);
   }
 }
@@ -126,7 +133,7 @@ export class {Pascal}Service {
 
 ### 5. `<kebab>.controller.ts`
 ```typescript
-import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { {Pascal}Service } from './<kebab>.service';
 import { Create{Pascal}Dto, Update{Pascal}Dto } from './dto/<kebab>.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
@@ -135,33 +142,34 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
 export class {Pascal}Controller {
   constructor(private readonly {camel}Service: {Pascal}Service) {}
 
-  @Get()
-  async findAll() {
-    const data = await this.{camel}Service.findAll();
+  @Post('get{Pascal}List')
+  async get{Pascal}List(@Body() params?: any) {
+    const data = await this.{camel}Service.findAll(params);
     return ApiResponseDto.success(data);
   }
 
-  @Get(':id')
-  async findById(@Param('id') id: string) {
-    const data = await this.{camel}Service.findById(id);
+  @Post('get{Pascal}ById')
+  async get{Pascal}ById(@Body() dto: { id: string }) {
+    const data = await this.{camel}Service.findById(dto.id);
     return ApiResponseDto.success(data);
   }
 
-  @Post()
-  async create(@Body() dto: Create{Pascal}Dto) {
+  @Post('create{Pascal}')
+  async create{Pascal}(@Body() dto: Create{Pascal}Dto) {
     const data = await this.{camel}Service.create(dto);
     return ApiResponseDto.success(data, '创建成功');
   }
 
-  @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: Update{Pascal}Dto) {
-    const data = await this.{camel}Service.update(id, dto);
-    return ApiResponseDto.success(data, '更新成功');
+  @Post('update{Pascal}')
+  async update{Pascal}(@Body() dto: Update{Pascal}Dto & { id: string }) {
+    const { id, ...data } = dto;
+    const result = await this.{camel}Service.update(id, data);
+    return ApiResponseDto.success(result, '更新成功');
   }
 
-  @Delete(':id')
-  async delete(@Param('id') id: string) {
-    await this.{camel}Service.delete(id);
+  @Post('delete{Pascal}')
+  async delete{Pascal}(@Body() dto: { id: string }) {
+    await this.{camel}Service.delete(dto.id);
     return ApiResponseDto.success(null, '删除成功');
   }
 }
@@ -188,7 +196,7 @@ export class {Pascal}Module {}
 ## 最后一步
 
 生成完所有文件后，提示用户在 `server/src/app.module.ts` 中注册新模块：
-```typescript
+```
 import { {Pascal}Module } from './modules/<kebab>/<kebab>.module';
 // 在 imports 数组中加入: {Pascal}Module
 ```

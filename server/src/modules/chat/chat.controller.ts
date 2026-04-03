@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Sse, Query, MessageEvent } from '@nestjs/common';
+import { Controller, Post, Body, Query, Sse, MessageEvent } from '@nestjs/common';
 import { Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
 import OpenAI from 'openai';
@@ -10,34 +10,29 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
-  @Post('send')
-  async chatWithHistory(
-    @Body() dto: ChatWithHistoryDto,
-  ): Promise<ApiResponseDto<{ reply: string }>> {
-    const reply = await this.chatService.chatWithHistory(dto.message);
+  @Post('sendMessage')
+  async sendMessage(@Body() params: { message: string; conversationId?: string }) {
+    const reply = await this.chatService.chatWithHistory(params.message, params.conversationId);
     return ApiResponseDto.success({ reply });
   }
 
-  @Sse('stream')
-  chatStream(@Query('message') message: string): Observable<MessageEvent> {
-    const generator = this.chatService.chatWithHistoryStream(message);
-    return from(generator).pipe(
-      map((content) => ({ data: { content } }) as MessageEvent),
-    );
+  @Post('streamMessage')
+  async streamMessage(@Body() params: { message: string; conversationId?: string }) {
+    // 返回 SSE 流
+    return this.chatService.chatWithHistoryStream(params.message, params.conversationId);
   }
 
-  @Post('history')
-  getFullHistory(): ApiResponseDto<{
+  @Post('getChatHistory')
+  getChatHistory(): ApiResponseDto<{
     reply: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
   }> {
     const reply = this.chatService.getFullHistory();
     return ApiResponseDto.success({ reply });
   }
 
-  @Post('clear')
-  clearHistory(): ApiResponseDto<null> {
+  @Post('clearChatHistory')
+  clearChatHistory(): ApiResponseDto<null> {
     this.chatService.clearHistory();
     return ApiResponseDto.success(null, '会话已清空');
   }
 }
-

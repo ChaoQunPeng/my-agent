@@ -7,8 +7,8 @@ export interface UserInfo {
 }
 
 export function getUserInfoApi() {
-  return useGet<UserInfo>(
-    '/api/user/get_user_info',
+  return usePost<UserInfo>(
+    '/user/getUserInfo',
     {},
     {
       customDev: true
