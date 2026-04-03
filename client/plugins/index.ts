@@ -15,7 +15,7 @@ export function createVitePlugins(env: Record<string, string>) {
   const vitePluginList: (PluginOption | PluginOption[])[] = [
     vue(),
     vueJsx(),
-    mockH3(), // 使用默认配置
+    mockH3({ prefix: '/mockApi' }),
     VitePluginPreloadAll(),
     AutoImport({
       imports: ['vue', 'vue-router', 'vue-i18n', '@vueuse/core', 'pinia'],
