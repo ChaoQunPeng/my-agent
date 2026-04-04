@@ -27,21 +27,13 @@
     </div>
     <div class="flex-1 of-x-hidden of-y-auto scrollbar">
       <div class="menu-list">
-        <div class="menu-item" :class="resolveMenuCls('/main/agent')" @click="goViews('/main/agent')">
+        <div class="menu-item" :class="resolveMenuCls('/account/center')" @click="goViews('/account/center')">
           <RobotOutlined class="mr-2" />
-          <span>个人看板</span>
+          <span>个人中心</span>
         </div>
-        <!-- <div
-          class="menu-item"
-          :class="resolveMenuCls('/main/knowledge-base')"
-          @click="goViews('/main/knowledge-base')"
-        >
-          <DatabaseOutlined class="mr-2" />
-          <span>知识库</span>
-        </div> -->
-        <div class="menu-item" :class="resolveMenuCls('/main/my-team')" @click="goViews('/main/my-team')">
+        <div class="menu-item" :class="resolveMenuCls('/account/settings')" @click="goViews('/account/settings')">
           <TeamOutlined class="mr-2" />
-          <span>我的团队</span>
+          <span>个人设置</span>
         </div>
         <div class="mt-12 px-5">
           <a-button type="primary" block> 新建项目 </a-button>

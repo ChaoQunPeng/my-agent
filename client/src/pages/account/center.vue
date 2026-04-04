@@ -1,49 +1,44 @@
 <script setup lang="ts">
-import {
-  ApartmentOutlined,
-  AuditOutlined,
-  HomeOutlined,
-  PlusOutlined
-} from '@ant-design/icons-vue';
-import { nextTick, reactive, ref } from 'vue';
-import rightContent from './components/right-content.vue';
+import { ApartmentOutlined, AuditOutlined, HomeOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { nextTick, reactive, ref } from 'vue'
+import rightContent from './components/right-content.vue'
 
-const { t } = useI18n();
+const { t } = useI18n()
 
-const inputRef = ref();
+const inputRef = ref()
 const state = reactive({
   tags: ['专注', '坚持', '很有想法', '执行力强', '乐观'],
   inputVisible: false,
   inputValue: ''
-});
+})
 
 function handleClose(removedTag: string) {
-  const tags = state.tags.filter(tag => tag !== removedTag);
-  state.tags = tags;
+  const tags = state.tags.filter(tag => tag !== removedTag)
+  state.tags = tags
 }
 
 function showInput() {
-  state.inputVisible = true;
+  state.inputVisible = true
   nextTick(() => {
-    inputRef.value.focus();
-  });
+    inputRef.value.focus()
+  })
 }
 
 function handleInputConfirm() {
-  const inputValue = state.inputValue;
-  let tags = state.tags;
-  if (inputValue && !tags.includes(inputValue)) tags = [...tags, inputValue];
+  const inputValue = state.inputValue
+  let tags = state.tags
+  if (inputValue && !tags.includes(inputValue)) tags = [...tags, inputValue]
 
   Object.assign(state, {
     tags,
     inputVisible: false,
     inputValue: ''
-  });
+  })
 }
 
 interface ITeamDataItem {
-  name: string;
-  link: string;
+  name: string
+  link: string
 }
 
 const teamData = ref<ITeamDataItem[]>([
@@ -63,21 +58,18 @@ const teamData = ref<ITeamDataItem[]>([
     name: '设计团队',
     link: 'https://gw.alipayobjects.com/zos/rmsportal/kZzEzemZyKLKFsojXItE.png'
   }
-]);
+])
 </script>
 
 <template>
-  <div class="gutter-example">
+  <div class="gutter-example p-24">
     <a-row :gutter="24">
       <a-col :span="7">
         <a-card>
           <div class="flex justify-center">
             <a-avatar :size="86">
               <template #icon>
-                <img
-                  src="https://gw.alipayobjects.com/zos/rmsportal/BiazfanxmamNRoxxVxka.png"
-                  alt=""
-                />
+                <img src="https://gw.alipayobjects.com/zos/rmsportal/BiazfanxmamNRoxxVxka.png" alt="" />
               </template>
             </a-avatar>
           </div>
@@ -138,11 +130,7 @@ const teamData = ref<ITeamDataItem[]>([
               {{ t('account.cneter.team') }}
             </p>
             <div class="flex flex-wrap justify-between">
-              <span
-                v-for="(item, index) in teamData"
-                :key="index"
-                class="flex items-center w-120px mb-5"
-              >
+              <span v-for="(item, index) in teamData" :key="index" class="flex items-center w-120px mb-5">
                 <a-avatar :size="26" class="mr-2">
                   <template #icon>
                     <img :src="item.link" alt="" />
@@ -162,4 +150,8 @@ const teamData = ref<ITeamDataItem[]>([
   </div>
 </template>
 
-<style scoped lang="less"></style>
+<style scoped lang="less">
+.gutter-example {
+  background: #fafafa;
+}
+</style>

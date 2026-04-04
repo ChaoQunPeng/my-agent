@@ -61,7 +61,8 @@ function renderTitle(title: VNodeChild | (() => VNodeChild)) {
 
 <template>
   <div class="ant-pro-page-container">
-    <div class="bg-[var(--bg-color)]" :class="layoutSetting.multiTab ? 'pb-16px' : 'py-16px'" px-24px mb-24px mx--24px mt--24px>
+    <!-- class="bg-[var(--bg-color)]" :class="layoutSetting.multiTab ? 'pb-16px' : 'py-16px'" px-24px mb-24px mx--24px mt--24px -->
+    <div>
       <div v-if="slots.content || slots.extraContent" pt-12px>
         <div flex w-full>
           <div flex-auto>
