@@ -75,7 +75,7 @@ const handleSend = (e: Event) => {
 <style lang="less" scoped>
 .chat-input-wrap {
   border: 1px solid rgba(5, 5, 5, 0.08);
-  width: 900px;
+  width: 620px;
   margin: 0 auto 30px auto;
   border-radius: 12px;
   box-shadow:

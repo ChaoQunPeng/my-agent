@@ -33,7 +33,7 @@
           </div>
         </div>
 
-        <a-empty v-if="sessions.length === 0" description="暂无会话" />
+        <a-empty v-if="sessions.length === 0" description="暂无会话" class="mt-48" />
       </div>
     </div>
 
@@ -490,7 +490,7 @@ defineExpose({
   border-right: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
-  background: #fafafa;
+  // background: #fafafa;
 
   .sidebar-header {
     padding: 16px;
@@ -500,7 +500,7 @@ defineExpose({
   .session-list {
     flex: 1;
     overflow-y: auto;
-    padding: 8px;
+    padding: 16px;
 
     &::-webkit-scrollbar {
       width: 6px;
@@ -535,7 +535,7 @@ defineExpose({
     }
 
     &.active {
-      background: #bae7ff;
+      background: #e6f7ff;
     }
 
     .session-info {
@@ -590,7 +590,7 @@ defineExpose({
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 20px 5px;
   display: flex;
   flex-direction: column;
   gap: 24px;
