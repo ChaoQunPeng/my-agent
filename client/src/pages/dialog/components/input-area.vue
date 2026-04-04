@@ -14,7 +14,7 @@
           联网搜索
         </div> -->
       </div>
-      <div class="send-btn rounded-full flex items-center justify-center cursor-pointer">
+      <div class="send-btn rounded-full flex items-center justify-center cursor-pointer" @click="handleSend">
         <ArrowUpOutlined :style="{ fontSize: '16px', color: '#fff' }" />
       </div>
     </div>
