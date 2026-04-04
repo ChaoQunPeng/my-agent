@@ -8,10 +8,11 @@
  */
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-// import { MongooseModule } from '@nestjs/mongoose';
+import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { OpenaiModule } from './shared/openai/openai.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { SessionModule } from './modules/session/session.module';
 // import { TaskModule } from './modules/task/task.module';
 
 @Module({
@@ -20,14 +21,15 @@ import { ChatModule } from './modules/chat/chat.module';
       envFilePath: '.env.local',
       isGlobal: true,
     }),
-    // MongooseModule.forRootAsync({
-    //   inject: [ConfigService],
-    //   useFactory: (configService: ConfigService) => ({
-    //     uri: configService.getOrThrow<string>('MONGODB_URI'),
-    //   }),
-    // }),
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        uri: configService.getOrThrow<string>('MONGODB_URI'),
+      }),
+    }),
     OpenaiModule,
     ChatModule,
+    SessionModule,
     // UserModule,
     // TaskModule,
   ],
