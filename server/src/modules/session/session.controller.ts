@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
 import { SessionService } from './session.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { UpdateSessionDto } from './dto/update-session.dto';
@@ -64,7 +64,11 @@ export class SessionController {
     @Param('id') id: string,
     @Body() body: { role: string; content: string },
   ) {
-    const message = await this.sessionService.addMessage(id, body.role, body.content);
+    const message = await this.sessionService.addMessage(
+      id,
+      body.role,
+      body.content,
+    );
     return ApiResponseDto.success(message, '消息添加成功');
   }
 

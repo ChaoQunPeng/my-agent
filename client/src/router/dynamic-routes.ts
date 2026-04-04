@@ -4,13 +4,25 @@ import { basicRouteMap } from './router-modules'
 
 export default [
   {
-    path: '/dialog/writer-assistant',
+    path: '/writer-assistant',
     name: 'WriterAssistant',
-    component: () => import('~/pages/dialog/index.vue'),
+    redirect: '/writer-assistant/yiquanpotian',
     meta: {
       title: '写作助手',
-      icon: 'MessageOutlined'
-    }
+      icon: 'UserOutlined'
+    },
+    component: basicRouteMap.RouteView,
+    children: [
+      {
+        path: '/writer-assistant/yiquanpotian',
+        name: 'yiquanpotian',
+        component: () => import('~/pages/dialog/index.vue'),
+        meta: {
+          title: '一拳破天',
+          icon: 'MessageOutlined'
+        }
+      }
+    ]
   },
   {
     path: '/dialog/digital-human',
