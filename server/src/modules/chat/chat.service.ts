@@ -49,28 +49,50 @@ export class ChatService {
   }
 
   async *chatWithHistoryStream(userMessage: string): AsyncGenerator<string> {
-    const session = this.getOrCreateSession();
-    session.history.push({ role: 'user', content: userMessage });
-
-    const stream = await this.openaiService.client.chat.completions.create({
-      model: this.openaiService.model,
-      messages: session.history,
-      temperature: 0.2,
-      max_tokens: 2000,
-      stream: true,
-    });
-
-    let fullReply = '';
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || '';
-      if (content) {
-        fullReply += content;
-        yield content;
-      }
+    // 1. 严格校验输入
+    if (!userMessage?.trim()) {
+      throw new Error('Message content cannot be empty');
     }
 
-    session.history.push({ role: 'assistant', content: fullReply });
-    session.lastActiveAt = new Date();
+    const session = this.getOrCreateSession();
+
+    // 2. 确保推入的对象格式严格正确
+    session.history.push({ role: 'user', content: String(userMessage) });
+
+    // 3. 关键：过滤掉 history 中任何可能存在的脏数据
+    const validMessages = session.history.filter(
+      (msg) => msg.role && msg.content,
+    );
+
+    try {
+      const stream = await this.openaiService.client.chat.completions.create({
+        model: this.openaiService.model,
+        messages: validMessages, // 使用过滤后的合法数据
+        temperature: 0.2,
+        max_tokens: 2000,
+        stream: true,
+      });
+
+      let fullReply = '';
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          fullReply += content;
+          yield content;
+        }
+      }
+
+      // 4. 确保 AI 的回复也有内容才推入历史
+      if (fullReply.trim()) {
+        session.history.push({ role: 'assistant', content: fullReply });
+      }
+      session.lastActiveAt = new Date();
+    } catch (error) {
+      // 如果 OpenAI 调用失败，记得从历史记录中移除最后一条刚才发出的 userMessage
+      // 否则下次请求时，历史记录里就会多出一条“只有用户提问没有 AI 回复”的内容
+      session.history.pop();
+      throw error;
+    }
   }
 
   getHistory(): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
@@ -99,4 +121,3 @@ export class ChatService {
     };
   }
 }
-

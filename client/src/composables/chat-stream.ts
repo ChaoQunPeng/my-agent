@@ -2,54 +2,162 @@ const BASE_PREFIX = import.meta.env.VITE_APP_BASE_API_DEV ?? ''
 
 export interface ChatStreamOptions {
   message: string
-  onChunk: (content: string) => void
+  onChunk: (content: string) => void | Promise<void>
+  onError?: (error: Error) => void
+  onComplete?: () => void
   signal?: AbortSignal
 }
 
+export interface SSEMessage {
+  data?: string
+  event?: string
+  id?: string
+  retry?: number
+}
+
 /**
- * 流式对话接口（SSE）
- * 通过 Vite 代理转发至后端 NestJS /chatStream
+ * 解析 SSE 消息行
+ */
+function parseSSELine(line: string): Partial<SSEMessage> {
+  if (!line.startsWith('data: ') && line !== 'data:') {
+    return {}
+  }
+
+  const content = line.slice(6)
+
+  // 检查是否是结束标记
+  if (content === '[DONE]') {
+    return { data: '[DONE]' }
+  }
+
+  return { data: content }
+}
+
+/**
+ * 流式对话接口(SSE)
+ * 通过 Vite 代理转发至后端 NestJS /chat/stream-message
  */
 export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
-  const { message, onChunk, signal } = options
+  const { message, onChunk, onError, onComplete, signal } = options
 
-  const response = await fetch(
-    `${BASE_PREFIX}/chatStream?message=${encodeURIComponent(message)}`,
-    {
-      headers: { Accept: 'text/event-stream' },
-      signal,
-    },
-  )
+  let response: Response
 
-  if (!response.ok || !response.body) {
-    throw new Error(`请求失败: ${response.status}`)
+  try {
+    response = await fetch(`${BASE_PREFIX}/chat/stream-message?message=${encodeURIComponent(message)}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'text/event-stream',
+        'Cache-Control': 'no-cache'
+      },
+      signal
+    })
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw error
+    }
+    const err = new Error(`网络连接失败: ${error.message}`)
+    onError?.(err)
+    throw err
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '')
+    const err = new Error(`请求失败 (${response.status}): ${errorText || response.statusText}`)
+    onError?.(err)
+    throw err
+  }
+
+  if (!response.body) {
+    const err = new Error('响应体为空')
+    onError?.(err)
+    throw err
   }
 
   const reader = response.body.getReader()
-  const decoder = new TextDecoder()
+  const decoder = new TextDecoder('utf-8')
   let buffer = ''
+  let hasReceivedData = false
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
 
-    buffer += decoder.decode(value, { stream: true })
+      if (done) {
+        // 处理剩余的 buffer
+        if (buffer.trim()) {
+          processBuffer(buffer, onChunk)
+        }
+        break
+      }
 
-    // SSE 每条消息以 \n\n 分隔
-    const parts = buffer.split('\n\n')
-    buffer = parts.pop() ?? ''
+      hasReceivedData = true
+      buffer += decoder.decode(value, { stream: true })
 
-    for (const part of parts) {
-      for (const line of part.split('\n')) {
-        if (!line.startsWith('data: ')) continue
-        try {
-          const parsed = JSON.parse(line.slice(6).trim())
-          if (parsed.content) onChunk(parsed.content)
-        } catch {
-          // 忽略非 JSON 行（如心跳）
+      // SSE 每条消息以 \n\n 分隔
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() ?? ''
+
+      for (const part of parts) {
+        const shouldStop = processBuffer(part, onChunk)
+        if (shouldStop) {
+          return
         }
       }
     }
+
+    onComplete?.()
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw error
+    }
+
+    const err = new Error(`读取数据失败: ${error.message}`)
+    onError?.(err)
+    throw err
+  } finally {
+    reader.releaseLock()
   }
 }
 
+/**
+ * 处理 buffer 中的数据
+ * @returns 是否应该停止处理
+ */
+function processBuffer(buffer: string, onChunk: (content: string) => void | Promise<void>): boolean {
+  const lines = buffer.split('\n')
+
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+    if (!trimmedLine) continue
+
+    const parsed = parseSSELine(trimmedLine)
+
+    if (!parsed.data) continue
+
+    // 检查是否是结束标记
+    if (parsed.data === '[DONE]') {
+      return true
+    }
+
+    try {
+      // 尝试解析 JSON
+      const jsonData = JSON.parse(parsed.data)
+
+      // 支持多种数据格式
+      if (jsonData.data) {
+        onChunk(jsonData.data)
+      } else if (jsonData.content) {
+        onChunk(jsonData.content)
+      } else if (typeof jsonData === 'string') {
+        onChunk(jsonData)
+      }
+    } catch {
+      // 如果不是 JSON,直接使用原始数据
+      if (parsed.data) {
+        onChunk(parsed.data)
+      }
+    }
+  }
+
+  return false
+}

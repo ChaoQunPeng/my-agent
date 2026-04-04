@@ -1,7 +1,14 @@
 <template>
   <div class="chat-input-wrap">
     <div class="chat-input-area">
-      <a-textarea class="chat-input" v-model:value="inputMessage" placeholder="你好呀~" auto-size @pressEnter="handleSend" />
+      <a-textarea
+        class="chat-input"
+        v-model:value="inputMessage"
+        placeholder="说点什么~"
+        :disabled="sending"
+        auto-size
+        @pressEnter="handleSend"
+      />
     </div>
     <div class="chat-actions">
       <div class="chat-action-buttons flex">
@@ -14,8 +21,11 @@
           联网搜索
         </div> -->
       </div>
-      <div class="send-btn rounded-full flex items-center justify-center cursor-pointer" @click="handleSend">
-        <ArrowUpOutlined :style="{ fontSize: '16px', color: '#fff' }" />
+      <div class="send-btn rounded-full flex items-center justify-center cursor-pointer" :class="{ sending: sending }" @click="handleClick">
+        <!-- 发送中显示停止按钮 -->
+        <StopOutlined v-if="sending" :style="{ fontSize: '16px', color: '#fff' }" />
+        <!-- 否则显示发送按钮 -->
+        <ArrowUpOutlined v-else :style="{ fontSize: '16px', color: '#fff' }" />
       </div>
     </div>
   </div>
@@ -23,15 +33,38 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
-import { ArrowUpOutlined } from '@ant-design/icons-vue'
+import { ArrowUpOutlined, StopOutlined } from '@ant-design/icons-vue'
+
+interface Props {
+  sending?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  sending: false
+})
 
 const inputMessage = ref('')
 
 const emits = defineEmits<{
   send: [text: string]
+  stop: []
 }>()
+
+const handleClick = () => {
+  if (props.sending) {
+    // 如果正在发送,点击则停止
+    emits('stop')
+  } else {
+    // 否则正常发送
+    handleSend(new Event('click'))
+  }
+}
+
 const handleSend = (e: Event) => {
   e.preventDefault()
+
+  if (props.sending || !inputMessage.value.trim()) return
+
   emits('send', inputMessage.value)
   nextTick(() => {
     inputMessage.value = ''
@@ -42,13 +75,21 @@ const handleSend = (e: Event) => {
 <style lang="less" scoped>
 .chat-input-wrap {
   border: 1px solid rgba(5, 5, 5, 0.08);
-  width: 800px;
+  width: 900px;
   margin: 0 auto 30px auto;
   border-radius: 12px;
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.02),
     0 2px 2px rgba(72, 104, 178, 0.01),
     0 30px 60px rgba(72, 104, 178, 0.03);
+  transition: all 0.3s;
+
+  &:hover {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.04),
+      0 2px 2px rgba(72, 104, 178, 0.02),
+      0 30px 60px rgba(72, 104, 178, 0.06);
+  }
 }
 
 .chat-input-area {
@@ -63,6 +104,11 @@ const handleSend = (e: Event) => {
   &:focus {
     border: none;
     box-shadow: none;
+  }
+
+  &:disabled {
+    background: transparent;
+    cursor: not-allowed;
   }
 }
 
@@ -91,6 +137,26 @@ const handleSend = (e: Event) => {
     height: 34px;
     background: #1677ff;
     color: #fff;
+    transition: all 0.3s;
+
+    &:hover {
+      background: #4096ff;
+      transform: scale(1.05);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    &.sending {
+      background: #ff4d4f;
+      cursor: pointer;
+
+      &:hover {
+        background: #ff7875;
+        transform: scale(1.05);
+      }
+    }
   }
 }
 
@@ -107,5 +173,12 @@ const handleSend = (e: Event) => {
 
 .info {
   display: flex;
+}
+
+@media (max-width: 768px) {
+  .chat-input-wrap {
+    width: calc(100% - 32px);
+    margin: 0 16px 20px 16px;
+  }
 }
 </style>

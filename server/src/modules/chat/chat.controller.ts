@@ -6,10 +6,11 @@
  * @FilePath: /my-agent/server/src/modules/chat/chat.controller.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Sse, Query } from '@nestjs/common';
 import OpenAI from 'openai';
 import { ChatService } from './chat.service';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
+import { Observable } from 'rxjs';
 
 @Controller('chat')
 export class ChatController {
@@ -23,10 +24,26 @@ export class ChatController {
     return ApiResponseDto.success({ reply });
   }
 
-  @Post('stream-message')
-  streamMessage(@Body() params: { message: string }) {
-    // 返回 SSE 流
-    return this.chatService.chatWithHistoryStream(params.message);
+  @Sse('stream-message')
+  streamMessage(
+    @Query('message') message: string,
+  ): Observable<{ data: string }> {
+    console.log(`message`, message);
+
+    const asyncGen = this.chatService.chatWithHistoryStream(message);
+
+    return new Observable((observer) => {
+      void (async () => {
+        try {
+          for await (const chunk of asyncGen) {
+            observer.next({ data: chunk });
+          }
+          observer.complete();
+        } catch (error) {
+          observer.error(error);
+        }
+      })();
+    });
   }
 
   @Post('get-chat-history')

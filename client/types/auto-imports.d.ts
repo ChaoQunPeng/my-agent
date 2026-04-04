@@ -346,7 +346,7 @@ declare global {
   export type { MultiTabItem } from '../src/stores/multi-tab'
   import('../src/stores/multi-tab')
   // @ts-ignore
-  export type { ChatStreamOptions } from '../src/composables/chat-stream'
+  export type { ChatStreamOptions, SSEMessage } from '../src/composables/chat-stream'
   import('../src/composables/chat-stream')
   // @ts-ignore
   export type { TablePaginationProps, TableRowSelectionsProps, TableQueryOptions } from '../src/composables/table-query'
