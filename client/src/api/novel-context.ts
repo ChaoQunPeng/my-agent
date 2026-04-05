@@ -12,18 +12,18 @@ export interface NovelConfig {
   _id?: string;
   novelCode: string;
   synopsis: string;
-  world_background: string;
-  world_logic_rules: string;
-  world_geography: string;
-  main_outline: string;
-  characters_list: Character[];
-  writing_perspective: string;
-  writing_tone: string;
-  target_word_count: number;
-  avoid_plots: string[];
-  forbidden_words: string[];
-  logic_redlines: string;
-  updated_at?: string;
+  worldBackground: string;
+  worldLogicRules: string;
+  worldGeography: string;
+  mainOutline: string;
+  charactersList: Character[];
+  writingPerspective: string;
+  writingTone: string;
+  targetWordCount: number;
+  avoidPlots: string[];
+  forbiddenWords: string[];
+  logicRedlines: string;
+  updatedAt?: string;
 }
 
 /**

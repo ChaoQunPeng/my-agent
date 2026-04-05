@@ -4,11 +4,10 @@ import { Document } from 'mongoose';
 export type NovelConfigDocument = NovelConfig & Document;
 
 @Schema({
-  timestamps: { updatedAt: 'updated_at' },
+  timestamps: { updatedAt: 'updatedAt' },
   collection: 'novel_configs',
 })
 export class NovelConfig {
-  // --- 基础关联 ---
   @Prop({
     required: true,
     index: true,
@@ -16,21 +15,20 @@ export class NovelConfig {
   })
   novelCode: string;
 
-  // --- 黄金四角 (核心设定) ---
   @Prop({ required: false, comment: '故事简介：核心梗、主要冲突与看点' })
   synopsis: string;
 
   @Prop({ comment: '时代背景：如古代修仙、高魔奇幻、赛博朋克等' })
-  world_background: string;
+  worldBackground: string;
 
   @Prop({ comment: '力量与逻辑体系：如灵气等级、魔法咒语、物理常数、社会规则' })
-  world_logic_rules: string;
+  worldLogicRules: string;
 
   @Prop({ comment: '地理与势力分布：如大陆板块、国家领土、宗门家族分布' })
-  world_geography: string;
+  worldGeography: string;
 
   @Prop({ required: false, comment: '全书粗纲：从开端到结局的核心剧情脉络' })
-  main_outline: string;
+  mainOutline: string;
 
   @Prop({
     type: [
@@ -51,7 +49,7 @@ export class NovelConfig {
     default: [],
     comment: '核心角色库',
   })
-  characters_list: Array<{
+  charactersList: Array<{
     name: string;
     identity?: string;
     personality?: string;
@@ -65,38 +63,36 @@ export class NovelConfig {
     default: '第三人称有限视角',
     comment: '叙事视角：控制 AI 观察故事的角度',
   })
-  writing_perspective: string;
+  writingPerspective: string;
 
   @Prop({
     default: '通俗网文风格',
     comment: '文风基调：如幽默风趣、硬核冷峻、古风雅致',
   })
-  writing_tone: string;
+  writingTone: string;
 
   @Prop({ default: 2000, comment: '单章建议字数：引导 AI 生成内容的长度控制' })
-  target_word_count: number;
+  targetWordCount: number;
 
-  // --- 禁止事项 (约束红线) ---
   @Prop({
     type: [String],
     default: [],
     comment: '避雷剧情：明确禁止 AI 生成的桥段（如虐主、绿帽等）',
   })
-  avoid_plots: string[];
+  avoidPlots: string[];
 
   @Prop({
     type: [String],
     default: [],
     comment: '禁忌词汇：严禁在生成文本中出现的特定敏感词',
   })
-  forbidden_words: string[];
-
-  @Prop({ comment: '逻辑红线：AI 必须遵守的硬性逻辑，如“主角绝对不能杀人”' })
-  logic_redlines: string;
+  forbiddenWords: string[];
+  @Prop({ comment: '逻辑红线：AI 必须遵守的硬性逻辑，如"主角绝对不能杀人"' })
+  logicRedlines: string;
 
   // --- 系统元数据 ---
   @Prop({ default: Date.now, comment: '最后一次同步或更新设定的时间' })
-  updated_at: Date;
+  updatedAt: Date;
 }
 
 export const NovelConfigSchema = SchemaFactory.createForClass(NovelConfig);
