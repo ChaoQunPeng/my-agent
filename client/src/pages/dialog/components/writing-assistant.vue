@@ -2,8 +2,8 @@
   <div class="writing-assistant">
     <div class="assistant-header">
       <a-tabs v-model:activeKey="activeTab" class="assistant-tabs">
-        <a-tab-pane key="basic" tab="基础设定" />
         <a-tab-pane key="current" tab="当前章节" />
+        <a-tab-pane key="basic" tab="基础设定" />
       </a-tabs>
     </div>
 
@@ -217,7 +217,7 @@ const props = defineProps<{
 }>()
 
 // Tab 激活状态
-const activeTab = ref('basic')
+const activeTab = ref('current')
 
 // 当前会话相关
 const chapterSummary = ref('')

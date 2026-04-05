@@ -1,3 +1,11 @@
+/**
+ * ChatService - AI 对话服务
+ *
+ * 提供与 OpenAI 的交互能力,支持:
+ * - 非流式对话
+ * - 流式对话(SSE)
+ * - 自定义历史消息
+ */
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import { OpenaiService } from '../../shared/openai/openai.service';
@@ -18,6 +26,9 @@ export class ChatService {
 
   constructor(private readonly openaiService: OpenaiService) {}
 
+  /**
+   * 获取或创建临时调试会话
+   */
   private getOrCreateSession(): Session {
     if (!this.session) {
       this.session = {
@@ -31,7 +42,35 @@ export class ChatService {
     return this.session;
   }
 
-  async chatWithHistory(userMessage: string): Promise<string> {
+  /**
+   * 非流式对话
+   * @param userMessage 用户消息
+   * @param customHistory 可选的自定义历史消息,如果提供则使用此历史而非内部会话
+   */
+  async chatWithHistory(
+    userMessage: string,
+    customHistory?: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  ): Promise<string> {
+    // 如果提供了自定义历史,直接使用
+    if (customHistory) {
+      const messages = [
+        { role: 'system' as const, content: tplContent1 },
+        ...customHistory,
+        { role: 'user' as const, content: userMessage },
+      ];
+
+      const completion =
+        await this.openaiService.client.chat.completions.create({
+          model: this.openaiService.model,
+          messages,
+          temperature: 0.2,
+          max_tokens: 2000,
+        });
+
+      return completion.choices[0].message.content || '';
+    }
+
+    // 否则使用内部临时会话
     const session = this.getOrCreateSession();
     session.history.push({ role: 'user', content: userMessage });
 
@@ -48,26 +87,44 @@ export class ChatService {
     return reply;
   }
 
-  async *chatWithHistoryStream(userMessage: string): AsyncGenerator<string> {
+  /**
+   * 流式对话(SSE)
+   * @param userMessage 用户消息
+   * @param customHistory 可选的自定义历史消息
+   */
+  async *chatWithHistoryStream(
+    userMessage: string,
+    customHistory?: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  ): AsyncGenerator<string> {
     // 1. 严格校验输入
     if (!userMessage?.trim()) {
       throw new Error('Message content cannot be empty');
     }
 
-    const session = this.getOrCreateSession();
+    // 构建消息列表
+    let messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+    let session: Session | null = null;
 
-    // 2. 确保推入的对象格式严格正确
-    session.history.push({ role: 'user', content: String(userMessage) });
+    if (customHistory) {
+      // 使用自定义历史
+      messages = [
+        { role: 'system', content: tplContent1 },
+        ...customHistory,
+        { role: 'user', content: String(userMessage) },
+      ];
+    } else {
+      // 使用内部临时会话
+      session = this.getOrCreateSession();
+      session.history.push({ role: 'user', content: String(userMessage) });
 
-    // 3. 关键：过滤掉 history 中任何可能存在的脏数据
-    const validMessages = session.history.filter(
-      (msg) => msg.role && msg.content,
-    );
+      // 过滤脏数据
+      messages = session.history.filter((msg) => msg.role && msg.content);
+    }
 
     try {
       const stream = await this.openaiService.client.chat.completions.create({
         model: this.openaiService.model,
-        messages: validMessages, // 使用过滤后的合法数据
+        messages,
         temperature: 0.2,
         max_tokens: 2000,
         stream: true,
@@ -82,32 +139,45 @@ export class ChatService {
         }
       }
 
-      // 4. 确保 AI 的回复也有内容才推入历史
-      if (fullReply.trim()) {
+      // 如果使用内部会话,保存 AI 回复
+      if (session && fullReply.trim()) {
         session.history.push({ role: 'assistant', content: fullReply });
+        session.lastActiveAt = new Date();
       }
-      session.lastActiveAt = new Date();
     } catch (error) {
-      // 如果 OpenAI 调用失败，记得从历史记录中移除最后一条刚才发出的 userMessage
-      // 否则下次请求时，历史记录里就会多出一条“只有用户提问没有 AI 回复”的内容
-      session.history.pop();
+      // 如果使用内部会话且调用失败,移除最后一条用户消息
+      if (session) {
+        session.history.pop();
+      }
       throw error;
     }
   }
 
+  /**
+   * 获取临时会话的历史(不含 system prompt)
+   */
   getHistory(): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
     if (!this.session) return [];
     return this.session.history.slice(1);
   }
 
+  /**
+   * 获取完整历史(含 system prompt)
+   */
   getFullHistory(): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
     return this.session?.history || [];
   }
 
+  /**
+   * 清空临时会话
+   */
   clearHistory(): void {
     this.session = null;
   }
 
+  /**
+   * 获取临时会话信息
+   */
   getSessionInfo() {
     if (!this.session) return null;
     return {

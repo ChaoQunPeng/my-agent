@@ -36,12 +36,7 @@
 
     <!-- 素材区域 -->
     <div class="material-area">
-      <WritingAssistant 
-        v-if="currentSessionId" 
-        :session-id="currentSessionId" 
-        :session-category="sessionCategory"
-        :novel-code="currentNovelCode"
-      />
+      <WritingAssistant :session-id="currentSessionId" :session-category="sessionCategory" :novel-code="currentNovelCode" />
     </div>
 
     <!-- 编辑会话对话框 -->
@@ -134,7 +129,7 @@ const fetchSessions = async () => {
 // 创建新会话
 const handleCreateSession = async () => {
   try {
-    const res = await createSession({ category: sessionCategory.value })
+    const res = await createSession({ category: sessionCategory.value, novelCode: currentNovelCode.value })
     const newSession = res.data
 
     // 添加到列表顶部

@@ -39,7 +39,7 @@ export function getSessions(category?: string, novelCode?: string) {
 /**
  * 创建新会话
  */
-export function createSession(data?: { title?: string; summary?: string; category?: string }) {
+export function createSession(data?: { title?: string; summary?: string; category?: string; novelCode?: string }) {
   return request.post<Session>('/sessions/create', data || {})
 }
 

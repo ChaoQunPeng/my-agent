@@ -22,7 +22,10 @@ export class SessionController {
    */
   @Post('list')
   async findAll(@Body() params?: { category?: string; novelCode?: string }) {
-    const sessions = await this.sessionService.findAll(params?.category, params?.novelCode);
+    const sessions = await this.sessionService.findAll(
+      params?.category,
+      params?.novelCode,
+    );
     return ApiResponseDto.success(sessions);
   }
 

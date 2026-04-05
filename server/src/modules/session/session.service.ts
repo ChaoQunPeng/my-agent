@@ -34,6 +34,7 @@ export class SessionService {
       title: createSessionDto.title || '新会话',
       summary: createSessionDto.summary || '',
       category: createSessionDto.category || '',
+      novelCode: createSessionDto.novelCode || '',
     });
 
     return createdSession.save();

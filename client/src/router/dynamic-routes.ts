@@ -32,7 +32,7 @@ export default [
           title: '龙族',
           icon: 'MessageOutlined',
           sessionCategory: 'writing',
-          novelCode: 'yi_quan_po_tian'
+          novelCode: 'longzu'
         }
       }
     ]
