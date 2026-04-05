@@ -11,9 +11,6 @@ export interface Character {
 export interface NovelConfig {
   _id?: string;
   novelCode: string;
-  sessionId?: string;
-  sessionCategory?: string;
-  title: string;
   synopsis: string;
   world_background: string;
   world_logic_rules: string;
@@ -26,10 +23,7 @@ export interface NovelConfig {
   avoid_plots: string[];
   forbidden_words: string[];
   logic_redlines: string;
-  volume_goal: string;
-  chapter_goal: string;
-  createdAt?: string;
-  updatedAt?: string;
+  updated_at?: string;
 }
 
 /**

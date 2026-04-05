@@ -26,7 +26,7 @@
           </div>
 
           <div class="field-item">
-            <label class="field-label">小说简介</label>
+            <label class="field-label">简介</label>
             <a-textarea v-model:value="formData.synopsis" :rows="3" placeholder="一句话核心梗/冲突" class="field-input" />
             <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('synopsis')"> 保存 </a-button>
           </div>
@@ -163,25 +163,6 @@
             <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('logic_redlines')"> 保存 </a-button>
           </div>
         </div>
-
-        <!-- 阶段性目标 -->
-        <div class="config-section">
-          <div class="section-title">阶段性目标（选填）</div>
-
-          <div class="field-item">
-            <label class="field-label">本卷核心任务</label>
-            <a-textarea v-model:value="formData.volume_goal" :rows="2" placeholder="当前阶段要达到的高潮" class="field-input" />
-            <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('volume_goal')"> 保存 </a-button>
-          </div>
-
-          <div class="field-item">
-            <label class="field-label">本章具体目标</label>
-            <a-textarea v-model:value="formData.chapter_goal" :rows="2" placeholder="这章必须写到的关键转折点" class="field-input" />
-            <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('chapter_goal')"> 保存 </a-button>
-          </div>
-
-          <div h-4></div>
-        </div>
       </div>
 
       <!-- 当前会话 Tab -->
@@ -209,10 +190,10 @@
             <a-empty v-if="!generatedChapterContent" description="暂无生成的章节内容" />
             <div v-else class="chapter-preview">
               <div class="chapter-header">
-                <h3>{{ formData.title || '未命名章节' }}</h3>
+                <h3>{{ formData.novelCode || '未命名章节' }}</h3>
                 <div class="chapter-meta">
-                  <span>字数：{{ chapterWordCount }}</span>
-                  <span>生成时间：{{ generationTime }}</span>
+                  <span>字数:{{ chapterWordCount }}</span>
+                  <span>生成时间:{{ generationTime }}</span>
                 </div>
               </div>
               <div class="chapter-body">{{ generatedChapterContent }}</div>
@@ -253,8 +234,6 @@ const chapterWordCount = ref(0)
 // 表单数据
 const formData = ref<NovelConfig>({
   novelCode: props.novelCode || '',
-  sessionId: props.sessionId,
-  title: '',
   synopsis: '',
   world_background: '',
   world_logic_rules: '',
@@ -266,9 +245,7 @@ const formData = ref<NovelConfig>({
   target_word_count: 2000,
   avoid_plots: [],
   forbidden_words: [],
-  logic_redlines: '',
-  volume_goal: '',
-  chapter_goal: ''
+  logic_redlines: ''
 })
 
 // 用于文本域显示的数组字段（换行分隔）
@@ -360,11 +337,7 @@ const handleSaveField = async (field: keyof NovelConfig) => {
   }
 
   try {
-    await createOrUpdateNovelConfig({
-      ...formData.value,
-      sessionId: props.sessionId,
-      sessionCategory: props.sessionCategory
-    })
+    await createOrUpdateNovelConfig(formData.value)
     antMessage.success('保存成功')
   } catch (error) {
     console.error('保存失败:', error)
@@ -380,9 +353,7 @@ const handleSaveArrayField = async (field: 'avoid_plots' | 'forbidden_words') =>
 
     await createOrUpdateNovelConfig({
       ...formData.value,
-      [field]: array,
-      sessionId: props.sessionId,
-      sessionCategory: props.sessionCategory
+      [field]: array
     })
     antMessage.success('保存成功')
   } catch (error) {
@@ -413,12 +384,7 @@ const removeCharacter = (index: number) => {
 // 保存角色
 const handleSaveCharacters = async () => {
   try {
-    await createOrUpdateNovelConfig({
-      ...formData.value,
-      sessionId: props.sessionId,
-      sessionCategory: props.sessionCategory,
-      novelCode: props.novelCode
-    })
+    await createOrUpdateNovelConfig(formData.value)
     antMessage.success('保存成功')
   } catch (error) {
     console.error('保存失败:', error)
@@ -477,12 +443,10 @@ const generateFullChapter = async () => {
   }
 }
 
-// 监听 sessionId, sessionCategory 和 novelCode 变化
+// 监听 sessionId 和 novelCode 变化
 watch(
-  [() => props.sessionId, () => props.sessionCategory, () => props.novelCode],
-  ([newSessionId, newSessionCategory, newNovelCode]) => {
-    formData.value.sessionId = newSessionId
-    formData.value.sessionCategory = newSessionCategory
+  [() => props.sessionId, () => props.novelCode],
+  ([newSessionId, newNovelCode]) => {
     formData.value.novelCode = newNovelCode || ''
     loadConfig()
   },
@@ -517,6 +481,8 @@ onMounted(() => {
   }
 
   .assistant-content {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     overflow-y: auto;
     padding: 16px;
