@@ -52,31 +52,31 @@ type CreateTaskParams = Omit<TaskModel, 'id' | 'createdAt' | 'updatedAt'>;
 type UpdateTaskParams = Partial<Omit<TaskModel, 'id' | 'createdAt' | 'updatedAt'>>;
 
 export async function getTaskListApi(params?: Partial<TaskModel>) {
-  return usePost<TaskModel[]>('/task/getTaskList', params);
+  return usePost<TaskModel[]>('/task/get-task-list', params);
 }
 
 export async function getTaskByIdApi(id: string) {
-  return usePost<TaskModel>(`/task/getTaskById`, { id });
+  return usePost<TaskModel>(`/task/get-task-by-id`, { id });
 }
 
 export async function createTaskApi(data: CreateTaskParams) {
-  return usePost<TaskModel>('/task/createTask', data);
+  return usePost<TaskModel>('/task/create-task', data);
 }
 
 export async function updateTaskApi(id: string, data: UpdateTaskParams) {
-  return usePost<TaskModel>(`/task/updateTask`, { id, ...data });
+  return usePost<TaskModel>(`/task/update-task`, { id, ...data });
 }
 
 export async function deleteTaskApi(id: string) {
-  return usePost(`/task/deleteTask`, { id });
+  return usePost(`/task/delete-task`, { id });
 }
 
 export async function getTasksByStatusApi(status: TaskStatus) {
-  return usePost<TaskModel[]>(`/task/getTasksByStatus`, { status });
+  return usePost<TaskModel[]>(`/task/get-tasks-by-status`, { status });
 }
 
 export async function getTasksByAssigneeApi(assignee: string) {
-  return usePost<TaskModel[]>(`/task/getTasksByAssignee`, { assignee });
+  return usePost<TaskModel[]>(`/task/get-tasks-by-assignee`, { assignee });
 }
 
 export type { TaskModel, CreateTaskParams, UpdateTaskParams };

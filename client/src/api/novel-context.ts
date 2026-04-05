@@ -32,26 +32,26 @@ export interface NovelConfig {
  * 创建或更新小说配置
  */
 export function createOrUpdateNovelConfig(data: NovelConfig) {
-  return request.post<NovelConfig>('/novel-context', data)
+  return request.post<NovelConfig>('/novel-context/create-or-update', data)
 }
 
 /**
  * 根据 sessionId 获取小说配置
  */
 export function getNovelConfig(sessionId: string) {
-  return request.get<NovelConfig | null>(`/novel-context/${sessionId}`)
+  return request.post<NovelConfig | null>('/novel-context/find-by-session-id', { sessionId })
 }
 
 /**
  * 更新小说配置
  */
 export function updateNovelConfig(sessionId: string, data: Partial<NovelConfig>) {
-  return request.post<NovelConfig>(`/novel-context/${sessionId}`, data)
+  return request.post<NovelConfig>('/novel-context/update', { sessionId, ...data })
 }
 
 /**
  * 删除小说配置
  */
 export function deleteNovelConfig(sessionId: string) {
-  return request.delete(`/novel-context/${sessionId}`)
+  return request.post('/novel-context/delete', { sessionId })
 }

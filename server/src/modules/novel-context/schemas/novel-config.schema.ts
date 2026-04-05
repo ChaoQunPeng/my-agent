@@ -9,15 +9,11 @@ export type NovelConfigDocument = NovelConfig & Document;
 })
 export class NovelConfig {
   // 必须关联一个会话
-  @Prop({ required: true, index: true })
+  @Prop({ required: false, index: true })
   sessionId: string;
 
-  // --- 1. 基础信息 ---
-  @Prop({ required: true, index: true })
-  title: string;
-
   // --- 2. 黄金四角 (核心盘) ---
-  @Prop({ required: true })
+  @Prop({ required: false })
   synopsis: string;
 
   @Prop()
@@ -29,7 +25,7 @@ export class NovelConfig {
   @Prop()
   world_geography: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   main_outline: string;
 
   @Prop({ default: '通俗网文风格' })
@@ -38,7 +34,7 @@ export class NovelConfig {
   @Prop({
     type: [
       {
-        name: { type: String, required: true },
+        name: { type: String, required: false },
         identity: String,
         personality: String,
         goals: String,

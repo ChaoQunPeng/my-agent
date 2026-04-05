@@ -8,92 +8,57 @@
       <!-- 基础信息 -->
       <div class="config-section">
         <div class="section-title">基础信息</div>
-        
+
         <div class="field-item">
-          <label class="field-label">简介 <span class="required">*</span></label>
-          <a-textarea
-            v-model:value="formData.synopsis"
-            :rows="3"
-            placeholder="一句话核心梗/冲突"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('synopsis')">
-            保存
-          </a-button>
+          <label class="field-label">简介</label>
+          <a-textarea v-model:value="formData.synopsis" :rows="3" placeholder="一句话核心梗/冲突" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('synopsis')"> 保存 </a-button>
         </div>
       </div>
 
       <!-- 世界观 -->
       <div class="config-section">
         <div class="section-title">世界观</div>
-        
+
         <div class="field-item">
           <label class="field-label">时代背景</label>
-          <a-textarea
-            v-model:value="formData.world_background"
-            :rows="2"
-            placeholder="如修仙、科幻、现代"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('world_background')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="formData.world_background" :rows="2" placeholder="如修仙、科幻、现代" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('world_background')"> 保存 </a-button>
         </div>
 
         <div class="field-item">
           <label class="field-label">力量/逻辑规则</label>
-          <a-textarea
-            v-model:value="formData.world_logic_rules"
-            :rows="2"
-            placeholder="如灵气等级、魔法代价"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('world_logic_rules')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="formData.world_logic_rules" :rows="2" placeholder="如灵气等级、魔法代价" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('world_logic_rules')"> 保存 </a-button>
         </div>
 
         <div class="field-item">
           <label class="field-label">势力/地理分布</label>
-          <a-textarea
-            v-model:value="formData.world_geography"
-            :rows="2"
-            placeholder="地图或宗门分布"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('world_geography')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="formData.world_geography" :rows="2" placeholder="地图或宗门分布" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('world_geography')"> 保存 </a-button>
         </div>
       </div>
 
       <!-- 粗纲 -->
       <div class="config-section">
-        <div class="section-title">粗纲 <span class="required">*</span></div>
-        
+        <div class="section-title">粗纲</div>
+
         <div class="field-item">
-          <a-textarea
-            v-model:value="formData.main_outline"
-            :rows="4"
-            placeholder="故事从起因到结局的主脉络"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('main_outline')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="formData.main_outline" :rows="4" placeholder="故事从起因到结局的主脉络" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('main_outline')"> 保存 </a-button>
         </div>
       </div>
 
       <!-- 角色设定 -->
       <div class="config-section">
         <div class="section-title">
-          角色设定 <span class="required">*</span>
+          角色设定
           <a-button type="link" size="small" @click="addCharacter">
             <template #icon><PlusOutlined /></template>
             添加角色
           </a-button>
         </div>
-        
+
         <div v-for="(char, index) in formData.characters_list" :key="index" class="character-card">
           <div class="character-header">
             <span class="character-name">{{ char.name || `角色 ${index + 1}` }}</span>
@@ -101,9 +66,9 @@
               <template #icon><DeleteOutlined /></template>
             </a-button>
           </div>
-          
+
           <div class="field-item">
-            <label class="field-label">姓名 <span class="required">*</span></label>
+            <label class="field-label">姓名</label>
             <a-input v-model:value="char.name" placeholder="角色姓名" />
           </div>
 
@@ -127,9 +92,7 @@
             <a-input v-model:value="char.traits" placeholder="外貌、特定口癖或标志性动作" />
           </div>
 
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveCharacters">
-            保存角色
-          </a-button>
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveCharacters"> 保存角色 </a-button>
         </div>
 
         <a-empty v-if="!formData.characters_list || formData.characters_list.length === 0" description="暂无角色" class="mt-16" />
@@ -138,119 +101,67 @@
       <!-- 写作指令 -->
       <div class="config-section">
         <div class="section-title">写作指令</div>
-        
+
         <div class="field-item">
-          <label class="field-label">叙事人称 <span class="required">*</span></label>
+          <label class="field-label">叙事人称 </label>
           <a-select v-model:value="formData.writing_perspective" class="field-input">
             <a-select-option value="第一人称">第一人称</a-select-option>
             <a-select-option value="第三人称有限视角">第三人称有限视角</a-select-option>
             <a-select-option value="第三人称上帝视角">第三人称上帝视角</a-select-option>
           </a-select>
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('writing_perspective')">
-            保存
-          </a-button>
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('writing_perspective')"> 保存 </a-button>
         </div>
 
         <div class="field-item">
-          <label class="field-label">文风基调 <span class="required">*</span></label>
-          <a-textarea
-            v-model:value="formData.writing_tone"
-            :rows="2"
-            placeholder="如幽默、沉重、干练"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('writing_tone')">
-            保存
-          </a-button>
+          <label class="field-label">文风基调</label>
+          <a-textarea v-model:value="formData.writing_tone" :rows="2" placeholder="如幽默、沉重、干练" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('writing_tone')"> 保存 </a-button>
         </div>
 
         <div class="field-item">
-          <label class="field-label">单章建议生成字数 <span class="required">*</span></label>
-          <a-input-number
-            v-model:value="formData.target_word_count"
-            :min="500"
-            :max="10000"
-            :step="100"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('target_word_count')">
-            保存
-          </a-button>
+          <label class="field-label">单章建议生成字数</label>
+          <a-input-number v-model:value="formData.target_word_count" :min="500" :max="10000" :step="100" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('target_word_count')"> 保存 </a-button>
         </div>
       </div>
 
       <!-- 禁止事项 -->
       <div class="config-section">
         <div class="section-title">禁止事项（选填）</div>
-        
+
         <div class="field-item">
           <label class="field-label">避雷剧情</label>
-          <a-textarea
-            v-model:value="avoidPlotsText"
-            :rows="2"
-            placeholder="每行一个，如：禁止绿帽&#10;禁止降智"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveArrayField('avoid_plots')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="avoidPlotsText" :rows="2" placeholder="每行一个，如：禁止绿帽&#10;禁止降智" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveArrayField('avoid_plots')"> 保存 </a-button>
         </div>
 
         <div class="field-item">
           <label class="field-label">禁忌词/敏感词库</label>
-          <a-textarea
-            v-model:value="forbiddenWordsText"
-            :rows="2"
-            placeholder="每行一个禁忌词"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveArrayField('forbidden_words')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="forbiddenWordsText" :rows="2" placeholder="每行一个禁忌词" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveArrayField('forbidden_words')"> 保存 </a-button>
         </div>
 
         <div class="field-item">
           <label class="field-label">逻辑红线</label>
-          <a-textarea
-            v-model:value="formData.logic_redlines"
-            :rows="2"
-            placeholder="绝对禁止发生的逻辑错误"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('logic_redlines')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="formData.logic_redlines" :rows="2" placeholder="绝对禁止发生的逻辑错误" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('logic_redlines')"> 保存 </a-button>
         </div>
       </div>
 
       <!-- 阶段性目标 -->
       <div class="config-section">
         <div class="section-title">阶段性目标（选填）</div>
-        
+
         <div class="field-item">
           <label class="field-label">本卷核心任务</label>
-          <a-textarea
-            v-model:value="formData.volume_goal"
-            :rows="2"
-            placeholder="当前阶段要达到的高潮"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('volume_goal')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="formData.volume_goal" :rows="2" placeholder="当前阶段要达到的高潮" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('volume_goal')"> 保存 </a-button>
         </div>
 
         <div class="field-item">
           <label class="field-label">本章具体目标</label>
-          <a-textarea
-            v-model:value="formData.chapter_goal"
-            :rows="2"
-            placeholder="这章必须写到的关键转折点"
-            class="field-input"
-          />
-          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('chapter_goal')">
-            保存
-          </a-button>
+          <a-textarea v-model:value="formData.chapter_goal" :rows="2" placeholder="这章必须写到的关键转折点" class="field-input" />
+          <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('chapter_goal')"> 保存 </a-button>
         </div>
       </div>
     </div>
@@ -297,7 +208,7 @@ const loadConfig = async () => {
     const config = await getNovelConfig(props.sessionId)
     if (config) {
       formData.value = { ...formData.value, ...config }
-      
+
       // 将数组转换为文本
       avoidPlotsText.value = (config.avoid_plots || []).join('\n')
       forbiddenWordsText.value = (config.forbidden_words || []).join('\n')
@@ -326,7 +237,7 @@ const handleSaveArrayField = async (field: 'avoid_plots' | 'forbidden_words') =>
   try {
     const text = field === 'avoid_plots' ? avoidPlotsText.value : forbiddenWordsText.value
     const array = text.split('\n').filter(item => item.trim())
-    
+
     await createOrUpdateNovelConfig({
       ...formData.value,
       [field]: array,
@@ -373,10 +284,14 @@ const handleSaveCharacters = async () => {
 }
 
 // 监听 sessionId 变化
-watch(() => props.sessionId, () => {
-  formData.value.sessionId = props.sessionId
-  loadConfig()
-}, { immediate: true })
+watch(
+  () => props.sessionId,
+  () => {
+    formData.value.sessionId = props.sessionId
+    loadConfig()
+  },
+  { immediate: true }
+)
 
 onMounted(() => {
   loadConfig()
@@ -443,11 +358,6 @@ onMounted(() => {
       font-size: 13px;
       color: #595959;
       margin-bottom: 8px;
-
-      .required {
-        color: #ff4d4f;
-        margin-left: 2px;
-      }
     }
 
     .field-input {
