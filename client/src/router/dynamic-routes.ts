@@ -21,7 +21,7 @@ export default [
           title: '一拳破天',
           icon: 'MessageOutlined',
           sessionCategory: 'writing',
-          novelName: '一拳破天'
+          novelCode: '一拳破天'
         }
       }
     ]

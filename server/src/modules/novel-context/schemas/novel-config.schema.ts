@@ -12,6 +12,10 @@ export class NovelConfig {
   @Prop({ required: false, index: true })
   sessionId: string;
 
+  // 会话分类（与路由的 sessionCategory 对应）
+  @Prop({ required: false, index: true })
+  sessionCategory: string;
+
   // --- 2. 黄金四角 (核心盘) ---
   @Prop({ required: false })
   synopsis: string;

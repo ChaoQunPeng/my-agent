@@ -10,6 +10,7 @@ export interface Character {
 
 export interface NovelConfig {
   sessionId: string
+  sessionCategory?: string
   title: string
   synopsis: string
   world_background?: string

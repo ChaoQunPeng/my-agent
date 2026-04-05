@@ -1,10 +1,15 @@
 <template>
   <div class="writing-assistant">
     <div class="assistant-header">
-      <h3 class="title">小说配置</h3>
+      <a-tabs v-model:activeKey="activeTab" class="assistant-tabs">
+        <a-tab-pane key="basic" tab="基础资料" />
+        <a-tab-pane key="current" tab="当前会话" />
+      </a-tabs>
     </div>
 
     <div class="assistant-content">
+      <!-- 基础资料 Tab -->
+      <div v-show="activeTab === 'basic'" class="tab-content">
       <!-- 基础信息 -->
       <div class="config-section">
         <div class="section-title">基础信息</div>
@@ -164,6 +169,47 @@
           <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('chapter_goal')"> 保存 </a-button>
         </div>
       </div>
+      </div>
+
+      <!-- 当前会话 Tab -->
+      <div v-show="activeTab === 'current'" class="tab-content">
+        <div class="config-section">
+          <div class="section-title">当前章节总结</div>
+          
+          <div class="field-item">
+            <label class="field-label">章节摘要</label>
+            <a-textarea 
+              v-model:value="chapterSummary" 
+              :rows="6" 
+              placeholder="自动总结当前会话的核心内容和关键情节..." 
+              class="field-input"
+              disabled
+            />
+            <a-button type="primary" size="small" class="save-btn" @click="generateChapterSummary">
+              生成总结
+            </a-button>
+          </div>
+        </div>
+
+        <div class="config-section">
+          <div class="section-title">完整预览</div>
+          
+          <div class="preview-content">
+            <a-empty v-if="!sessionMessages || sessionMessages.length === 0" description="暂无对话内容" />
+            <div v-else class="message-list">
+              <div 
+                v-for="(msg, index) in sessionMessages" 
+                :key="index" 
+                class="message-item"
+                :class="msg.role"
+              >
+                <div class="message-role">{{ msg.role === 'user' ? '我' : 'AI' }}</div>
+                <div class="message-content">{{ msg.content }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -173,10 +219,19 @@ import { ref, watch, onMounted } from 'vue'
 import { message as antMessage } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import { getNovelConfig, createOrUpdateNovelConfig, type NovelConfig, type Character } from '@/api/novel-context'
+import { getSessionDetail } from '@/api/session'
 
 const props = defineProps<{
   sessionId: string
+  sessionCategory?: string
 }>()
+
+// Tab 激活状态
+const activeTab = ref('basic')
+
+// 当前会话相关
+const chapterSummary = ref('')
+const sessionMessages = ref<Array<{ role: string; content: string }>>([])
 
 // 表单数据
 const formData = ref<NovelConfig>({
@@ -205,7 +260,9 @@ const forbiddenWordsText = ref('')
 // 加载配置
 const loadConfig = async () => {
   try {
-    const config = await getNovelConfig(props.sessionId)
+    const res = await getNovelConfig(props.sessionId)
+    const config = res.data
+    
     if (config) {
       formData.value = { ...formData.value, ...config }
 
@@ -213,8 +270,50 @@ const loadConfig = async () => {
       avoidPlotsText.value = (config.avoid_plots || []).join('\n')
       forbiddenWordsText.value = (config.forbidden_words || []).join('\n')
     }
+    
+    // 加载会话消息
+    await loadSessionMessages()
   } catch (error) {
     console.error('加载小说配置失败:', error)
+  }
+}
+
+// 加载会话消息
+const loadSessionMessages = async () => {
+  try {
+    const res = await getSessionDetail(props.sessionId)
+    const { messages } = res.data
+    
+    sessionMessages.value = messages.map((msg: any) => ({
+      role: msg.role,
+      content: msg.content
+    }))
+  } catch (error) {
+    console.error('加载会话消息失败:', error)
+  }
+}
+
+// 生成章节总结
+const generateChapterSummary = async () => {
+  if (!sessionMessages.value || sessionMessages.value.length === 0) {
+    antMessage.warning('当前会话暂无对话内容')
+    return
+  }
+  
+  try {
+    // TODO: 调用 AI 接口生成章节总结
+    // 这里暂时使用简单的拼接逻辑
+    const userMessages = sessionMessages.value
+      .filter(msg => msg.role === 'user')
+      .map(msg => msg.content)
+      .join('\n\n')
+    
+    chapterSummary.value = `本章节共 ${sessionMessages.value.length} 条对话，其中用户消息 ${userMessages.split('\n\n').length} 条。\n\n核心内容摘要：\n${userMessages.substring(0, 500)}...`
+    
+    antMessage.success('章节总结生成成功')
+  } catch (error) {
+    console.error('生成章节总结失败:', error)
+    antMessage.error('生成章节总结失败')
   }
 }
 
@@ -223,7 +322,8 @@ const handleSaveField = async (field: keyof NovelConfig) => {
   try {
     await createOrUpdateNovelConfig({
       ...formData.value,
-      sessionId: props.sessionId
+      sessionId: props.sessionId,
+      sessionCategory: props.sessionCategory
     })
     antMessage.success('保存成功')
   } catch (error) {
@@ -241,7 +341,8 @@ const handleSaveArrayField = async (field: 'avoid_plots' | 'forbidden_words') =>
     await createOrUpdateNovelConfig({
       ...formData.value,
       [field]: array,
-      sessionId: props.sessionId
+      sessionId: props.sessionId,
+      sessionCategory: props.sessionCategory
     })
     antMessage.success('保存成功')
   } catch (error) {
@@ -274,7 +375,8 @@ const handleSaveCharacters = async () => {
   try {
     await createOrUpdateNovelConfig({
       ...formData.value,
-      sessionId: props.sessionId
+      sessionId: props.sessionId,
+      sessionCategory: props.sessionCategory
     })
     antMessage.success('保存成功')
   } catch (error) {
@@ -283,11 +385,12 @@ const handleSaveCharacters = async () => {
   }
 }
 
-// 监听 sessionId 变化
+// 监听 sessionId 和 sessionCategory 变化
 watch(
-  () => props.sessionId,
-  () => {
-    formData.value.sessionId = props.sessionId
+  [() => props.sessionId, () => props.sessionCategory],
+  ([newSessionId, newSessionCategory]) => {
+    formData.value.sessionId = newSessionId
+    formData.value.sessionCategory = newSessionCategory
     loadConfig()
   },
   { immediate: true }
@@ -306,18 +409,23 @@ onMounted(() => {
   background: #fff;
 
   .assistant-header {
-    padding: 16px;
+    padding: 0 16px;
     border-bottom: 1px solid #f0f0f0;
 
-    .title {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 600;
-      color: #262626;
+    .assistant-tabs {
+      :deep(.ant-tabs-nav) {
+        margin: 0;
+        
+        &::before {
+          border-bottom: none;
+        }
+      }
     }
   }
 
   .assistant-content {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     overflow-y: auto;
     padding: 16px;
@@ -334,6 +442,10 @@ onMounted(() => {
         background: #bfbfbf;
       }
     }
+  }
+
+  .tab-content {
+    height: 100%;
   }
 
   .config-section {
@@ -358,6 +470,11 @@ onMounted(() => {
       font-size: 13px;
       color: #595959;
       margin-bottom: 8px;
+
+      .required {
+        color: #ff4d4f;
+        margin-left: 2px;
+      }
     }
 
     .field-input {
@@ -387,6 +504,65 @@ onMounted(() => {
         font-size: 13px;
         font-weight: 500;
         color: #262626;
+      }
+    }
+  }
+
+  .preview-content {
+    background: #fafafa;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    padding: 16px;
+    max-height: 500px;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #d9d9d9;
+      border-radius: 3px;
+    }
+
+    .message-list {
+      .message-item {
+        margin-bottom: 16px;
+        padding: 12px;
+        border-radius: 8px;
+
+        &.user {
+          background: #e6f7ff;
+          margin-left: 40px;
+
+          .message-role {
+            color: #1890ff;
+            text-align: right;
+          }
+        }
+
+        &.assistant {
+          background: #f6ffed;
+          margin-right: 40px;
+
+          .message-role {
+            color: #52c41a;
+          }
+        }
+
+        .message-role {
+          font-size: 12px;
+          font-weight: 600;
+          margin-bottom: 4px;
+        }
+
+        .message-content {
+          font-size: 13px;
+          line-height: 1.6;
+          color: #262626;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
       }
     }
   }

@@ -27,6 +27,10 @@ export class CreateNovelConfigDto {
   sessionId: string;
 
   @IsString()
+  @IsOptional()
+  sessionCategory?: string;
+
+  @IsString()
   title: string;
 
   @IsString()
@@ -89,6 +93,10 @@ export class CreateNovelConfigDto {
 }
 
 export class UpdateNovelConfigDto {
+  @IsString()
+  @IsOptional()
+  sessionCategory?: string;
+
   @IsString()
   @IsOptional()
   title?: string;

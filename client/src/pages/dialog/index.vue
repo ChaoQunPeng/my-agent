@@ -36,7 +36,7 @@
 
     <!-- 素材区域 -->
     <div class="material-area">
-      <WritingAssistant v-if="currentSessionId" :session-id="currentSessionId" />
+      <WritingAssistant v-if="currentSessionId" :session-id="currentSessionId" :session-category="sessionCategory" />
     </div>
 
     <!-- 编辑会话对话框 -->
@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
@@ -86,6 +86,9 @@ const loading = ref(false)
 // 获取当前路由信息
 const route = useRoute()
 
+// 从路由meta中获取sessionCategory
+const sessionCategory = computed(() => (route.meta?.sessionCategory as string) || '')
+
 // 消息相关
 const messages = ref<ChatMessage[]>([])
 const sending = ref(false)
@@ -102,9 +105,7 @@ const editForm = ref({
 // 获取会话列表
 const fetchSessions = async () => {
   try {
-    // 从路由meta中获取sessionCategory
-    const sessionCategory = (route.meta?.sessionCategory as string) || ''
-    const res = await getSessions(sessionCategory)
+    const res = await getSessions(sessionCategory.value)
     sessions.value = res.data || []
   } catch (error: any) {
     antMessage.error('获取会话列表失败')
@@ -114,10 +115,7 @@ const fetchSessions = async () => {
 // 创建新会话
 const handleCreateSession = async () => {
   try {
-    // 从路由meta中获取sessionCategory
-    const sessionCategory = (route.meta?.sessionCategory as string) || ''
-
-    const res = await createSession({ category: sessionCategory })
+    const res = await createSession({ category: sessionCategory.value })
     const newSession = res.data
 
     // 添加到列表顶部
@@ -510,7 +508,7 @@ defineExpose({
 }
 
 .material-area {
-  width: 340px;
+  width: 380px;
   border-left: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
