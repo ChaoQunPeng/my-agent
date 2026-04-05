@@ -21,7 +21,18 @@ export default [
           title: '一拳破天',
           icon: 'MessageOutlined',
           sessionCategory: 'writing',
-          novelCode: '一拳破天'
+          novelCode: 'yi_quan_po_tian'
+        }
+      },
+      {
+        path: '/writer-assistant/longzu',
+        name: 'longzu',
+        component: () => import('~/pages/dialog/index.vue'),
+        meta: {
+          title: '龙族',
+          icon: 'MessageOutlined',
+          sessionCategory: 'writing',
+          novelCode: 'yi_quan_po_tian'
         }
       }
     ]

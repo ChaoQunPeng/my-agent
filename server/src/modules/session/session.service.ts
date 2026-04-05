@@ -42,9 +42,16 @@ export class SessionService {
   /**
    * 获取所有会话列表（按更新时间倒序）
    * @param category 可选的分类筛选条件
+   * @param novelCode 可选的小说代码筛选条件
    */
-  async findAll(category?: string): Promise<Session[]> {
-    const query = category ? { category } : {};
+  async findAll(category?: string, novelCode?: string): Promise<Session[]> {
+    const query: Record<string, string> = {};
+    if (category) {
+      query.category = category;
+    }
+    if (novelCode) {
+      query.novelCode = novelCode;
+    }
     return this.sessionModel.find(query).sort({ updatedAt: -1 }).exec();
   }
 

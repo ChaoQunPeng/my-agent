@@ -23,9 +23,17 @@ export interface Message {
 /**
  * 获取所有会话列表
  * @param category 可选的分类筛选条件
+ * @param novelCode 可选的小说代码筛选条件
  */
-export function getSessions(category?: string) {
-  return request.post<Session[]>('/sessions/list', category ? { category } : {})
+export function getSessions(category?: string, novelCode?: string) {
+  const params: any = {};
+  if (category) {
+    params.category = category;
+  }
+  if (novelCode) {
+    params.novelCode = novelCode;
+  }
+  return request.post<Session[]>('/sessions/list', params)
 }
 
 /**

@@ -94,8 +94,16 @@ const route = useRoute()
 // 从路由meta中获取sessionCategory
 const sessionCategory = computed(() => (route.meta?.sessionCategory as string) || '')
 
-// 获取当前会话的 novelCode
+// 从路由meta中获取novelCode
+const routeNovelCode = computed(() => (route.meta?.novelCode as string) || '')
+
+// 获取当前会话的 novelCode（优先使用路由中的值）
 const currentNovelCode = computed(() => {
+  // 如果路由中有 novelCode，优先使用
+  if (routeNovelCode.value) {
+    return routeNovelCode.value
+  }
+  // 否则从会话列表中获取
   const currentSession = sessions.value.find(s => s.sessionId === currentSessionId.value)
   return currentSession?.novelCode || ''
 })
@@ -116,7 +124,7 @@ const editForm = ref({
 // 获取会话列表
 const fetchSessions = async () => {
   try {
-    const res = await getSessions(sessionCategory.value)
+    const res = await getSessions(sessionCategory.value, currentNovelCode.value)
     sessions.value = res.data || []
   } catch (error: any) {
     antMessage.error('获取会话列表失败')
@@ -400,9 +408,9 @@ onMounted(() => {
   fetchSessions()
 })
 
-// 监听路由变化，当sessionCategory改变时重新获取会话列表
+// 监听路由变化，当sessionCategory或novelCode改变时重新获取会话列表
 watch(
-  () => route.meta?.sessionCategory,
+  () => [route.meta?.sessionCategory, route.meta?.novelCode],
   () => {
     // 清空当前选中的会话和消息
     currentSessionId.value = ''

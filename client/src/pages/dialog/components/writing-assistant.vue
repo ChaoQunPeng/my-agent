@@ -14,20 +14,15 @@
         <div class="config-section">
           <div class="section-title">基础信息</div>
 
-          <div class="field-item">
-            <label class="field-label"> 小说编码 <span class="required">*</span> </label>
-            <a-input
-              v-model:value="formData.novelCode"
-              placeholder="请输入小说唯一编码（如：novel_001）"
-              class="field-input"
-              :disabled="!!formData._id"
-            />
+          <!-- <div class="field-item">
+            <label class="field-label"> 小说编码</label>
+            <a-input v-model:value="formData.novelCode" placeholder="" class="field-input" :disabled="true" />
             <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('novelCode')"> 保存 </a-button>
-          </div>
+          </div> -->
 
           <div class="field-item">
             <label class="field-label">简介</label>
-            <a-textarea v-model:value="formData.synopsis" :rows="3" placeholder="一句话核心梗/冲突" class="field-input" />
+            <a-textarea v-model:value="formData.synopsis" :rows="3" placeholder="故事简介,100字左右" class="field-input" />
             <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('synopsis')"> 保存 </a-button>
           </div>
         </div>
@@ -147,13 +142,13 @@
 
           <div class="field-item">
             <label class="field-label">避雷剧情</label>
-            <a-textarea v-model:value="avoidPlotsText" :rows="2" placeholder="每行一个，如：禁止绿帽&#10;禁止降智" class="field-input" />
+            <a-textarea v-model:value="avoidPlotsText" :rows="2" placeholder="如：禁止绿帽&#10;禁止降智" class="field-input" />
             <a-button type="primary" size="small" class="save-btn" @click="handleSaveArrayField('avoid_plots')"> 保存 </a-button>
           </div>
 
           <div class="field-item">
             <label class="field-label">禁忌词/敏感词库</label>
-            <a-textarea v-model:value="forbiddenWordsText" :rows="2" placeholder="每行一个禁忌词" class="field-input" />
+            <a-textarea v-model:value="forbiddenWordsText" :rows="2" placeholder="禁忌词" class="field-input" />
             <a-button type="primary" size="small" class="save-btn" @click="handleSaveArrayField('forbidden_words')"> 保存 </a-button>
           </div>
 
@@ -510,7 +505,6 @@ onMounted(() => {
   .config-section {
     display: flex;
     flex-direction: column;
-    margin-bottom: 8px;
 
     .section-title {
       font-size: 14px;
@@ -526,7 +520,7 @@ onMounted(() => {
   }
 
   .field-item {
-    margin-bottom: 4px;
+    margin-bottom: 16px;
 
     .field-label {
       display: block;
