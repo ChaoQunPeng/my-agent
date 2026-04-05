@@ -4,6 +4,7 @@ export interface Session {
   sessionId: string
   title: string
   summary: string
+  category?: string
   createdAt: string
   updatedAt: string
 }
@@ -20,15 +21,16 @@ export interface Message {
 
 /**
  * 获取所有会话列表
+ * @param category 可选的分类筛选条件
  */
-export function getSessions() {
-  return request.get<Session[]>('/sessions')
+export function getSessions(category?: string) {
+  return request.get<Session[]>('/sessions', { params: category ? { category } : {} })
 }
 
 /**
  * 创建新会话
  */
-export function createSession(data?: { title?: string; summary?: string }) {
+export function createSession(data?: { title?: string; summary?: string; category?: string }) {
   return request.post<Session>('/sessions', data || {})
 }
 
@@ -42,7 +44,7 @@ export function getSessionDetail(sessionId: string) {
 /**
  * 更新会话信息
  */
-export function updateSession(sessionId: string, data: { title?: string; summary?: string }) {
+export function updateSession(sessionId: string, data: { title?: string; summary?: string; category?: string }) {
   return request.post<Session>(`/sessions/${sessionId}`, data)
 }
 

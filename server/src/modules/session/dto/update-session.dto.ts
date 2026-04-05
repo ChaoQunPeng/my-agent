@@ -8,4 +8,8 @@ export class UpdateSessionDto {
   @IsOptional()
   @IsString()
   summary?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 }

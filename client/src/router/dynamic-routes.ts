@@ -6,7 +6,7 @@ export default [
   {
     path: '/writer-assistant',
     name: 'WriterAssistant',
-    redirect: 'yiquanpotian',
+    redirect: '/writer-assistant/writer-assistan',
     meta: {
       title: '写作助手',
       icon: 'UserOutlined'
@@ -14,12 +14,13 @@ export default [
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/writer-assistant/yiquanpotian',
+        path: '/writer-assistant/writer-assistant',
         name: 'yiquanpotian',
-        component: () => import('~/pages/dialog/index.vue'),
+        component: () => import('~/pages/writer-assistant/writer-assistant.vue'),
         meta: {
           title: '一拳破天',
-          icon: 'MessageOutlined'
+          icon: 'MessageOutlined',
+          sessionCategory: 'writing'
         }
       }
     ]
@@ -30,7 +31,8 @@ export default [
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
       title: '数字人对话',
-      icon: 'MessageOutlined'
+      icon: 'MessageOutlined',
+      sessionCategory: 'digital'
     }
   },
   {
@@ -39,7 +41,8 @@ export default [
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
       title: '我的日记',
-      icon: 'MessageOutlined'
+      icon: 'MessageOutlined',
+      sessionCategory: 'diary'
     }
   },
   {

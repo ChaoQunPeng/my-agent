@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { SessionService } from './session.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { UpdateSessionDto } from './dto/update-session.dto';
@@ -21,8 +29,8 @@ export class SessionController {
    * 获取所有会话列表
    */
   @Get()
-  async findAll() {
-    const sessions = await this.sessionService.findAll();
+  async findAll(@Query('category') category?: string) {
+    const sessions = await this.sessionService.findAll(category);
     return ApiResponseDto.success(sessions);
   }
 

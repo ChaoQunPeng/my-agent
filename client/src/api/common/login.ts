@@ -7,13 +7,6 @@
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 
-// {
-//     "identifier": "18000218161",
-//     "password":"123456",
-//     "operationDevice": 1,
-//     "deviceModel": "Apifox111",
-//     "deviceUid": "12456fbas"
-// }
 export interface LoginParams {
   identifier: string
   password: string

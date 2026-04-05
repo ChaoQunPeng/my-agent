@@ -78,6 +78,8 @@
       <input-area @send="handleSend" :sending="sending" @stop="stopGeneration"></input-area>
     </div>
 
+    <div class="material-area"></div>
+
     <!-- 编辑会话对话框 -->
     <a-modal v-model:open="editModalVisible" title="编辑会话" @ok="handleUpdateSession" @cancel="editModalVisible = false">
       <a-form :model="editForm" layout="vertical">
@@ -94,7 +96,7 @@ import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { CopyOutlined, ReloadOutlined, UserOutlined, PlusOutlined, MoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
-import InputArea from './components/input-area.vue'
+import InputArea from '@/components/input-area/input-area.vue'
 import { chatStreamApi } from '../../composables/chat-stream'
 import {
   getSessions,
@@ -507,10 +509,11 @@ defineExpose({
 
 // 左侧会话列表
 .session-sidebar {
-  width: 280px;
+  width: 240px;
   border-right: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   // background: #fafafa;
 
   .sidebar-header {
@@ -587,12 +590,21 @@ defineExpose({
   }
 }
 
+.material-area {
+  width: 340px;
+  border-left: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
 // 右侧聊天区域
 .chat-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   position: relative;
+  padding: 24px;
 
   .loading-overlay {
     position: absolute;
@@ -683,12 +695,12 @@ defineExpose({
 }
 
 .message-content {
-  border-radius: 12px;
+  border-radius: 8px;
   line-height: 1.75;
   font-size: 15px;
   white-space: pre-wrap;
   word-break: break-word;
-  padding: 12px 16px;
+  padding: 10px 12px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 

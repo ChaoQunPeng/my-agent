@@ -33,6 +33,7 @@ export class SessionService {
       sessionId,
       title: createSessionDto.title || '新会话',
       summary: createSessionDto.summary || '',
+      category: createSessionDto.category || '',
     });
 
     return createdSession.save();
@@ -40,9 +41,11 @@ export class SessionService {
 
   /**
    * 获取所有会话列表（按更新时间倒序）
+   * @param category 可选的分类筛选条件
    */
-  async findAll(): Promise<Session[]> {
-    return this.sessionModel.find().sort({ updatedAt: -1 }).exec();
+  async findAll(category?: string): Promise<Session[]> {
+    const query = category ? { category } : {};
+    return this.sessionModel.find(query).sort({ updatedAt: -1 }).exec();
   }
 
   /**
