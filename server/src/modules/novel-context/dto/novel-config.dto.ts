@@ -24,7 +24,11 @@ export class CharacterDto {
 
 export class CreateNovelConfigDto {
   @IsString()
-  sessionId: string;
+  novelCode: string;
+
+  @IsString()
+  @IsOptional()
+  sessionId?: string;
 
   @IsString()
   @IsOptional()

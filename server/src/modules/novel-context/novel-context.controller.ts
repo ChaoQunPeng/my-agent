@@ -16,11 +16,22 @@ export class NovelContextController {
   @Post('create-or-update')
   async createOrUpdate(@Body() createDto: CreateNovelConfigDto) {
     const result = await this.novelContextService.createOrUpdate(createDto);
-    return ApiResponseDto.success(result, '保存成功');
+    return ApiResponseDto.success(result);
   }
 
   /**
-   * 根据 sessionId 获取小说配置
+   * 根据 novelCode 获取小说配置
+   */
+  @Post('find-by-novel-code')
+  async findByNovelCode(@Body() params: { novelCode: string }) {
+    const result = await this.novelContextService.findByNovelCode(
+      params.novelCode,
+    );
+    return ApiResponseDto.success(result);
+  }
+
+  /**
+   * 根据 sessionId 获取小说配置（兼容旧接口）
    */
   @Post('find-by-session-id')
   async findBySessionId(@Body() params: { sessionId: string }) {

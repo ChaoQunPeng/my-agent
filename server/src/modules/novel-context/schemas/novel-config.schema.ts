@@ -8,13 +8,17 @@ export type NovelConfigDocument = NovelConfig & Document;
   collection: 'novel_configs',
 })
 export class NovelConfig {
-  // 必须关联一个会话
-  @Prop({ required: false, index: true })
-  sessionId: string;
+  // 小说编码（唯一标识一部小说）
+  @Prop({ required: true, index: true })
+  novelCode: string;
 
   // 会话分类（与路由的 sessionCategory 对应）
   @Prop({ required: false, index: true })
   sessionCategory: string;
+
+  // 可选关联的会话ID（用于追踪最后编辑的会话）
+  @Prop({ required: false })
+  sessionId?: string;
 
   // --- 2. 黄金四角 (核心盘) ---
   @Prop({ required: false })

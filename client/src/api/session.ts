@@ -5,6 +5,7 @@ export interface Session {
   title: string
   summary: string
   category?: string
+  novelCode?: string
   createdAt: string
   updatedAt: string
 }

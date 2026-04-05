@@ -16,6 +16,9 @@ export class Session {
 
   @Prop({ default: '' })
   category: string;
+
+  @Prop({ default: '' })
+  novelCode: string;
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);

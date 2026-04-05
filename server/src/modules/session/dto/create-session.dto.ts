@@ -12,4 +12,8 @@ export class CreateSessionDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @IsString()
+  novelCode?: string;
 }

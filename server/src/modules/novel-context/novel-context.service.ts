@@ -18,18 +18,18 @@ export class NovelContextService {
   ) {}
 
   /**
-   * 创建或更新小说配置(基于 sessionId)
+   * 创建或更新小说配置(基于 novelCode)
    */
   async createOrUpdate(createDto: CreateNovelConfigDto): Promise<NovelConfig> {
     const existing = await this.novelConfigModel
-      .findOne({ sessionId: createDto.sessionId })
+      .findOne({ novelCode: createDto.novelCode })
       .exec();
 
     if (existing) {
       // 更新现有配置
       return (await this.novelConfigModel
         .findOneAndUpdate(
-          { sessionId: createDto.sessionId },
+          { novelCode: createDto.novelCode },
           { $set: createDto },
           { new: true },
         )
@@ -42,7 +42,15 @@ export class NovelContextService {
   }
 
   /**
-   * 根据 sessionId 获取小说配置
+   * 根据 novelCode 获取小说配置
+   */
+  async findByNovelCode(novelCode: string): Promise<NovelConfig | null> {
+    const config = await this.novelConfigModel.findOne({ novelCode }).exec();
+    return config;
+  }
+
+  /**
+   * 根据 sessionId 获取小说配置（兼容旧接口）
    */
   async findBySessionId(sessionId: string): Promise<NovelConfig | null> {
     const config = await this.novelConfigModel.findOne({ sessionId }).exec();

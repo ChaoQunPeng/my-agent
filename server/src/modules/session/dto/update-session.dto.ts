@@ -12,4 +12,8 @@ export class UpdateSessionDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @IsString()
+  novelCode?: string;
 }

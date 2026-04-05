@@ -36,7 +36,12 @@
 
     <!-- 素材区域 -->
     <div class="material-area">
-      <WritingAssistant v-if="currentSessionId" :session-id="currentSessionId" :session-category="sessionCategory" />
+      <WritingAssistant 
+        v-if="currentSessionId" 
+        :session-id="currentSessionId" 
+        :session-category="sessionCategory"
+        :novel-code="currentNovelCode"
+      />
     </div>
 
     <!-- 编辑会话对话框 -->
@@ -88,6 +93,12 @@ const route = useRoute()
 
 // 从路由meta中获取sessionCategory
 const sessionCategory = computed(() => (route.meta?.sessionCategory as string) || '')
+
+// 获取当前会话的 novelCode
+const currentNovelCode = computed(() => {
+  const currentSession = sessions.value.find(s => s.sessionId === currentSessionId.value)
+  return currentSession?.novelCode || ''
+})
 
 // 消息相关
 const messages = ref<ChatMessage[]>([])
