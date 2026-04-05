@@ -4,7 +4,7 @@ import { basicRouteMap } from './router-modules'
 
 export default [
   {
-    path: '/writer-assistant',
+    path: '/dialog',
     name: 'WriterAssistant',
     redirect: '/writer-assistant/writer-assistan',
     meta: {
@@ -14,13 +14,14 @@ export default [
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/writer-assistant/writer-assistant',
+        path: '/writer-assistant/yiquanpotian',
         name: 'yiquanpotian',
-        component: () => import('~/pages/writer-assistant/writer-assistant.vue'),
+        component: () => import('~/pages/dialog/index.vue'),
         meta: {
           title: '一拳破天',
           icon: 'MessageOutlined',
-          sessionCategory: 'writing'
+          sessionCategory: 'writing',
+          bookName: '一拳破天'
         }
       }
     ]

@@ -68,7 +68,6 @@ declare module 'vue' {
     FooterToolBar: typeof import('./../src/components/footer-tool-bar/index.vue')['default']
     GiteeLink: typeof import('./../src/components/gitee-link/index.vue')['default']
     GithubLink: typeof import('./../src/components/github-link/index.vue')['default']
-    InputArea: typeof import('./../src/components/input-area/input-area.vue')['default']
     PageContainer: typeof import('./../src/components/page-container/index.vue')['default']
     PlaneSpin: typeof import('./../src/components/base-loading/spin/plane-spin.vue')['default']
     PreloaderSpin: typeof import('./../src/components/base-loading/spin/preloader-spin.vue')['default']
