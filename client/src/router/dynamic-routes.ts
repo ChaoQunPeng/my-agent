@@ -6,7 +6,7 @@ export default [
   {
     path: '/writer-assistant',
     name: 'WriterAssistant',
-    redirect: '/writer-assistant/yiquanpotian',
+    redirect: 'yiquanpotian',
     meta: {
       title: '写作助手',
       icon: 'UserOutlined'
@@ -30,6 +30,15 @@ export default [
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
       title: '数字人对话',
+      icon: 'MessageOutlined'
+    }
+  },
+  {
+    path: '/dialog/diary',
+    name: 'diary',
+    component: () => import('~/pages/dialog/index.vue'),
+    meta: {
+      title: '我的日记',
       icon: 'MessageOutlined'
     }
   },
