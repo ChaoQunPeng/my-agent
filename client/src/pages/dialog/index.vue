@@ -35,7 +35,9 @@
     </div>
 
     <!-- 素材区域 -->
-    <div class="material-area"></div>
+    <div class="material-area">
+      <WritingAssistant v-if="currentSessionId" :session-id="currentSessionId" />
+    </div>
 
     <!-- 编辑会话对话框 -->
     <a-modal v-model:open="editModalVisible" title="编辑会话" @ok="handleUpdateSession" @cancel="editModalVisible = false">
@@ -56,6 +58,7 @@ import { PlusOutlined } from '@ant-design/icons-vue'
 import InputArea from './components/input-area.vue'
 import SessionItem from './components/session-item.vue'
 import MessageList from './components/message-list.vue'
+import WritingAssistant from './components/writing-assistant.vue'
 import { chatStreamApi } from '../../composables/chat-stream'
 import {
   getSessions,

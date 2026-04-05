@@ -21,7 +21,7 @@ export default [
           title: '一拳破天',
           icon: 'MessageOutlined',
           sessionCategory: 'writing',
-          bookName: '一拳破天'
+          novelName: '一拳破天'
         }
       }
     ]
@@ -31,7 +31,7 @@ export default [
     name: 'DigitalHuman',
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
-      title: '数字人对话',
+      title: '人物对话',
       icon: 'MessageOutlined',
       sessionCategory: 'digital'
     }

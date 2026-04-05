@@ -13,6 +13,7 @@ import { AppController } from './app.controller';
 import { OpenaiModule } from './shared/openai/openai.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { SessionModule } from './modules/session/session.module';
+import { NovelContextModule } from './modules/novel-context/novel-context.module';
 // import { TaskModule } from './modules/task/task.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { SessionModule } from './modules/session/session.module';
     OpenaiModule,
     ChatModule,
     SessionModule,
+    NovelContextModule,
     // UserModule,
     // TaskModule,
   ],
