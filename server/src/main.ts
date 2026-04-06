@@ -11,7 +11,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // 自动移除未声明的参数
-      forbidNonWhitelisted: true, // 如果遇到未声明的参数则抛出错误
+      forbidNonWhitelisted: false, // 允许未声明的参数，但会被自动移除
       transform: true, // 自动转换载荷为 ES6 类实例
       stopAtFirstError: true, // 发现第一个错误就停止校验
     }),

@@ -265,26 +265,8 @@ const loadConfig = async () => {
       avoidPlotsText.value = (config.avoidPlots || []).join('\n')
       forbiddenWordsText.value = (config.forbiddenWords || []).join('\n')
     }
-
-    // 加载会话消息
-    await loadSessionMessages()
   } catch (error) {
     console.error('加载小说配置失败:', error)
-  }
-}
-
-// 加载会话消息
-const loadSessionMessages = async () => {
-  try {
-    const res = await getSessionDetail(props.sessionId)
-    const { messages } = res.data
-
-    sessionMessages.value = messages.map((msg: any) => ({
-      role: msg.role,
-      content: msg.content
-    }))
-  } catch (error) {
-    console.error('加载会话消息失败:', error)
   }
 }
 
