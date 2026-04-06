@@ -1,123 +1,126 @@
 <template>
   <div class="character-selector">
     <!-- Tab切换 -->
-    <div class="character-tabs">
-      <a-tabs v-model:activeKey="activeTab">
+    <div class="selector-header">
+      <a-tabs v-model:activeKey="activeTab" class="selector-tabs">
         <!-- 第一个Tab：人物管理 -->
-        <a-tab-pane key="manage" tab="人物管理">
-          <div class="tab-content">
-            <!-- 新建人物按钮 -->
-            <div class="action-bar">
-              <a-button type="primary" @click="handleCreateCharacter">
-                <PlusOutlined />
-                新建人物
-              </a-button>
-            </div>
-
-            <!-- 人物列表 -->
-            <div class="character-list">
-              <div
-                v-for="character in characters"
-                :key="character.characterId"
-                class="character-item"
-                @click="handleEditCharacter(character)"
-              >
-                <div class="character-info">
-                  <div class="character-name">{{ character.name }}</div>
-                  <div class="character-meta">
-                    <span class="gender-tag" :class="getGenderClass(character.gender)">
-                      {{ getGenderText(character.gender) }}
-                    </span>
-                    <span class="age-text">{{ character.age }}岁</span>
-                    <span class="profession-text">{{ character.profession }}</span>
-                  </div>
-                </div>
-                <a-button type="text" size="small" @click.stop="handleDeleteCharacter(character.characterId)">
-                  <DeleteOutlined />
-                </a-button>
-              </div>
-
-              <a-empty v-if="characters.length === 0" description="暂无人物" class="mt-24" />
-            </div>
-          </div>
-        </a-tab-pane>
-
+        <a-tab-pane key="manage" tab="人物管理" />
         <!-- 第二个Tab：当前会话 -->
-        <a-tab-pane key="current" tab="当前会话">
-          <div class="tab-content">
-            <!-- 如果已经绑定了人物，显示人物详情 -->
-            <div v-if="boundCharacter" class="bound-character">
-              <a-alert message="当前会话已绑定人物，无法更改" type="info" show-icon class="mb-16" />
+        <a-tab-pane key="current" tab="当前会话" />
+      </a-tabs>
+    </div>
 
-              <div class="character-detail">
-                <div class="detail-item">
-                  <label>姓名：</label>
-                  <span>{{ boundCharacter.name }}</span>
-                </div>
-                <div class="detail-item">
-                  <label>性别：</label>
-                  <span>{{ getGenderText(boundCharacter.gender) }}</span>
-                </div>
-                <div class="detail-item">
-                  <label>年龄：</label>
-                  <span>{{ boundCharacter.age }}岁</span>
-                </div>
-                <div class="detail-item">
-                  <label>外貌：</label>
-                  <span>{{ boundCharacter.appearance || '未填写' }}</span>
-                </div>
-                <div class="detail-item">
-                  <label>职业：</label>
-                  <span>{{ boundCharacter.profession }}</span>
-                </div>
-                <div class="detail-item full-width">
-                  <label>性格概述：</label>
-                  <span>{{ boundCharacter.personalityOverview }}</span>
-                </div>
-                <div class="detail-item full-width">
-                  <label>性格标签：</label>
-                  <div class="tags-container">
-                    <a-tag v-for="tag in boundCharacter.personalityTags" :key="tag" color="blue">
-                      {{ tag }}
-                    </a-tag>
-                  </div>
-                </div>
-                <div class="detail-item full-width">
-                  <label>行为描述：</label>
-                  <div class="behavior-list">
-                    <div v-for="(desc, index) in boundCharacter.behaviorDescriptions" :key="index" class="behavior-item">
-                      {{ index + 1 }}. {{ desc }}
-                    </div>
-                    <span v-if="!boundCharacter.behaviorDescriptions || boundCharacter.behaviorDescriptions.length === 0"> 未填写 </span>
-                  </div>
-                </div>
+    <div class="selector-content">
+      <!-- 人物管理 Tab -->
+      <div v-show="activeTab === 'manage'" class="tab-content">
+        <!-- 新建人物按钮 -->
+        <div class="action-bar">
+          <a-button type="primary" @click="handleCreateCharacter">
+            <PlusOutlined />
+            新建人物
+          </a-button>
+        </div>
+
+        <!-- 人物列表 -->
+        <div class="character-list">
+          <div
+            v-for="character in characters"
+            :key="character.characterId"
+            class="character-item"
+            @click="handleEditCharacter(character)"
+          >
+            <div class="character-info">
+              <div class="character-name">{{ character.name }}</div>
+              <div class="character-meta">
+                <span class="gender-tag" :class="getGenderClass(character.gender)">
+                  {{ getGenderText(character.gender) }}
+                </span>
+                <span class="age-text">{{ character.age }}岁</span>
+                <span class="profession-text">{{ character.profession }}</span>
               </div>
             </div>
+            <a-button type="text" size="small" @click.stop="handleDeleteCharacter(character.characterId)">
+              <DeleteOutlined />
+            </a-button>
+          </div>
 
-            <!-- 如果未绑定人物，显示选择器 -->
-            <div v-else class="bind-character">
-              <a-select
-                v-model:value="selectedCharacterId"
-                placeholder="请选择人物"
-                style="width: 100%; margin-bottom: 16px"
-                show-search
-                :filter-option="filterCharacterOption"
-              >
-                <a-select-option v-for="character in characters" :key="character.characterId" :value="character.characterId">
-                  <div class="select-option">
-                    <span class="option-name">{{ character.name }}</span>
-                    <span class="option-meta">
-                      {{ getGenderText(character.gender) }} · {{ character.age }}岁 · {{ character.profession }}
-                    </span>
-                  </div>
-                </a-select-option>
-              </a-select>
+          <a-empty v-if="characters.length === 0" description="暂无人物" class="mt-24" />
+        </div>
+      </div>
 
-              <a-button type="primary" block :disabled="!selectedCharacterId" @click="handleBindCharacter"> 确定绑定 </a-button>
+      <!-- 当前会话 Tab -->
+      <div v-show="activeTab === 'current'" class="tab-content">
+        <!-- 如果已经绑定了人物，显示人物详情 -->
+        <div v-if="boundCharacter" class="bound-character">
+          <a-alert message="当前会话已绑定人物，无法更改" type="info" show-icon class="mb-16" />
+
+          <div class="character-detail">
+            <div class="detail-item">
+              <label>姓名：</label>
+              <span>{{ boundCharacter.name }}</span>
+            </div>
+            <div class="detail-item">
+              <label>性别：</label>
+              <span>{{ getGenderText(boundCharacter.gender) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>年龄：</label>
+              <span>{{ boundCharacter.age }}岁</span>
+            </div>
+            <div class="detail-item">
+              <label>外貌：</label>
+              <span>{{ boundCharacter.appearance || '未填写' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>职业：</label>
+              <span>{{ boundCharacter.profession }}</span>
+            </div>
+            <div class="detail-item full-width">
+              <label>性格概述：</label>
+              <span>{{ boundCharacter.personalityOverview }}</span>
+            </div>
+            <div class="detail-item full-width">
+              <label>性格标签：</label>
+              <div class="tags-container">
+                <a-tag v-for="tag in boundCharacter.personalityTags" :key="tag" color="blue">
+                  {{ tag }}
+                </a-tag>
+              </div>
+            </div>
+            <div class="detail-item full-width">
+              <label>行为描述：</label>
+              <div class="behavior-list">
+                <div v-for="(desc, index) in boundCharacter.behaviorDescriptions" :key="index" class="behavior-item">
+                  {{ index + 1 }}. {{ desc }}
+                </div>
+                <span v-if="!boundCharacter.behaviorDescriptions || boundCharacter.behaviorDescriptions.length === 0"> 未填写 </span>
+              </div>
             </div>
           </div>
-        </a-tab-pane>
-      </a-tabs>
+        </div>
+
+        <!-- 如果未绑定人物，显示选择器 -->
+        <div v-else class="bind-character">
+          <a-select
+            v-model:value="selectedCharacterId"
+            placeholder="请选择人物"
+            style="width: 100%; margin-bottom: 16px"
+            show-search
+            :filter-option="filterCharacterOption"
+          >
+            <a-select-option v-for="character in characters" :key="character.characterId" :value="character.characterId">
+              <div class="select-option">
+                <span class="option-name">{{ character.name }}</span>
+                <span class="option-meta">
+                  {{ getGenderText(character.gender) }} · {{ character.age }}岁 · {{ character.profession }}
+                </span>
+              </div>
+            </a-select-option>
+          </a-select>
+
+          <a-button type="primary" block :disabled="!selectedCharacterId" @click="handleBindCharacter"> 确定绑定 </a-button>
+        </div>
+      </div>
     </div>
 
     <!-- 编辑/新建人物对话框 -->
@@ -463,153 +466,178 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background: #fff;
 
-  padding: 0 16px;
-  border-bottom: 1px solid #f0f0f0;
+  .selector-header {
+    padding: 0 16px;
+    border-bottom: 1px solid #f0f0f0;
 
-  .character-tabs {
-    flex: 1;
+    .selector-tabs {
+      :deep(.ant-tabs-nav) {
+        margin: 0;
+
+        &::before {
+          border-bottom: none;
+        }
+      }
+    }
+  }
+
+  .selector-content {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
 
-    :deep(.ant-tabs-content) {
-      flex: 1;
-      overflow-y: auto;
+    &::-webkit-scrollbar {
+      width: 6px;
     }
 
-    .tab-content {
-      padding: 16px;
+    &::-webkit-scrollbar-thumb {
+      background: #d9d9d9;
+      border-radius: 3px;
 
-      .action-bar {
-        margin-bottom: 16px;
+      &:hover {
+        background: #bfbfbf;
       }
+    }
+  }
 
-      .character-list {
-        .character-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px;
-          margin-bottom: 8px;
-          border: 1px solid #f0f0f0;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.3s;
+  .tab-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 
-          &:hover {
-            background: #e6f7ff;
-            border-color: #91d5ff;
+    .action-bar {
+      margin-bottom: 16px;
+    }
+
+    .character-list {
+      .character-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px;
+        margin-bottom: 8px;
+        border: 1px solid #f0f0f0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+
+        &:hover {
+          background: #e6f7ff;
+          border-color: #91d5ff;
+        }
+
+        .character-info {
+          flex: 1;
+          min-width: 0;
+
+          .character-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #262626;
+            margin-bottom: 4px;
           }
 
-          .character-info {
-            flex: 1;
-            min-width: 0;
+          .character-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #8c8c8c;
 
-            .character-name {
-              font-size: 14px;
-              font-weight: 500;
-              color: #262626;
+            .gender-tag {
+              padding: 2px 6px;
+              border-radius: 4px;
+              font-size: 11px;
+
+              &.gender-male {
+                background: #e6f7ff;
+                color: #1890ff;
+              }
+
+              &.gender-female {
+                background: #fff0f6;
+                color: #eb2f96;
+              }
+
+              &.gender-unknown {
+                background: #f5f5f5;
+                color: #8c8c8c;
+              }
+            }
+
+            .age-text {
+              white-space: nowrap;
+            }
+
+            .profession-text {
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+          }
+        }
+      }
+    }
+
+    .bound-character {
+      .character-detail {
+        .detail-item {
+          display: flex;
+          margin-bottom: 12px;
+          font-size: 14px;
+
+          label {
+            min-width: 80px;
+            font-weight: 500;
+            color: #595959;
+          }
+
+          span {
+            flex: 1;
+            color: #262626;
+          }
+
+          &.full-width {
+            flex-direction: column;
+
+            label {
               margin-bottom: 4px;
             }
 
-            .character-meta {
+            .tags-container {
               display: flex;
-              align-items: center;
+              flex-wrap: wrap;
               gap: 8px;
-              font-size: 12px;
-              color: #8c8c8c;
+            }
 
-              .gender-tag {
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 11px;
-
-                &.gender-male {
-                  background: #e6f7ff;
-                  color: #1890ff;
-                }
-
-                &.gender-female {
-                  background: #fff0f6;
-                  color: #eb2f96;
-                }
-
-                &.gender-unknown {
-                  background: #f5f5f5;
-                  color: #8c8c8c;
-                }
-              }
-
-              .age-text {
-                white-space: nowrap;
-              }
-
-              .profession-text {
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+            .behavior-list {
+              .behavior-item {
+                margin-bottom: 8px;
+                line-height: 1.6;
               }
             }
           }
         }
       }
+    }
 
-      .bound-character {
-        .character-detail {
-          .detail-item {
-            display: flex;
-            margin-bottom: 12px;
-            font-size: 14px;
+    .bind-character {
+      .select-option {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
 
-            label {
-              min-width: 80px;
-              font-weight: 500;
-              color: #595959;
-            }
-
-            span {
-              flex: 1;
-              color: #262626;
-            }
-
-            &.full-width {
-              flex-direction: column;
-
-              label {
-                margin-bottom: 4px;
-              }
-
-              .tags-container {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-              }
-
-              .behavior-list {
-                .behavior-item {
-                  margin-bottom: 8px;
-                  line-height: 1.6;
-                }
-              }
-            }
-          }
+        .option-name {
+          font-weight: 500;
         }
-      }
 
-      .bind-character {
-        .select-option {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-
-          .option-name {
-            font-weight: 500;
-          }
-
-          .option-meta {
-            font-size: 12px;
-            color: #8c8c8c;
-          }
+        .option-meta {
+          font-size: 12px;
+          color: #8c8c8c;
         }
       }
     }
