@@ -186,8 +186,10 @@ const handleSelectSession = async (sessionId: string) => {
       loading: false
     }))
 
-    // 获取当前会话绑定的角色ID
-    await fetchCurrentCharacterId(sessionId)
+    if (sessionCategory.value === 'digital') {
+      // 获取当前会话绑定的角色ID
+      await fetchCurrentCharacterId(sessionId)
+    }
 
     await nextTick()
     messageListRef.value?.scrollToBottom()
