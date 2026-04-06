@@ -2,6 +2,7 @@
  * ChatController - 聊天接口控制器
  *
  * 提供流式和非流式的 AI 对话接口
+ * 支持场景标识和角色ID，用于动态构建 System Prompt
  * 会话管理由 SessionModule 负责
  */
 import { Controller, Post, Body, Sse, Query } from '@nestjs/common';
@@ -19,72 +20,31 @@ export class ChatController {
   ) {}
 
   /**
-   * 发送消息(非流式)
-   * @param params.message 用户消息内容
-   * @param params.sessionId 可选的会话ID,提供则使用持久化会话
-   */
-  @Post('send-message')
-  async sendMessage(@Body() params: { message: string; sessionId?: string }) {
-    // 如果提供了 sessionId，使用 Session Service
-    if (params.sessionId) {
-      // 保存用户消息
-      await this.sessionService.addMessage(
-        params.sessionId,
-        'user',
-        params.message,
-      );
-
-      // 获取历史消息
-      const history = await this.sessionService.getMessageHistory(
-        params.sessionId,
-      );
-
-      // 调用 AI（传入历史消息）
-      const reply = await this.chatService.chatWithHistory(
-        params.message,
-        history,
-      );
-
-      // 保存 AI 回复
-      await this.sessionService.addMessage(
-        params.sessionId,
-        'assistant',
-        reply,
-      );
-
-      return ApiResponseDto.success({ reply, sessionId: params.sessionId });
-    }
-
-    // 否则使用临时的调试会话
-    const reply = await this.chatService.chatWithHistory(params.message);
-    return ApiResponseDto.success({ reply });
-  }
-
-  /**
    * 流式发送消息(SSE)
    * @param message 用户消息内容
    * @param sessionId 可选的会话ID
+   * @param scene 可选的场景标识
+   * @param characterId 可选的角色ID，用于动态构建 System Prompt
    */
   @Sse('stream-message')
   streamMessage(
     @Query('message') message: string,
     @Query('sessionId') sessionId?: string,
+    @Query('scene') scene?: string,
+    @Query('characterId') characterId?: string,
   ): Observable<{ data: string }> {
-    console.log(`收到流式请求 - message: ${message}, sessionId: ${sessionId}`);
-
-    // 如果提供了 sessionId,获取历史消息并传入
-    const streamGenerator = async () => {
-      if (sessionId) {
-        const history = await this.sessionService.getMessageHistory(sessionId);
-        return this.chatService.chatWithHistoryStream(message, history);
-      }
-      return this.chatService.chatWithHistoryStream(message);
-    };
+    console.log(
+      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, scene: ${scene}, characterId: ${characterId}`,
+    );
 
     return new Observable((observer) => {
       void (async () => {
         try {
-          const asyncGen = await streamGenerator();
+          const asyncGen = this.chatService.chatWithHistoryStream(
+            message,
+            sessionId,
+            characterId,
+          );
           for await (const chunk of asyncGen) {
             observer.next({ data: chunk });
           }

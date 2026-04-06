@@ -2,6 +2,9 @@ const BASE_PREFIX = import.meta.env.VITE_APP_BASE_API_DEV ?? ''
 
 export interface ChatStreamOptions {
   message: string
+  sessionId?: string
+  scene?: string
+  characterId?: string
   onChunk: (content: string) => void | Promise<void>
   onError?: (error: Error) => void
   onComplete?: () => void
@@ -36,14 +39,31 @@ function parseSSELine(line: string): Partial<SSEMessage> {
 /**
  * 流式对话接口(SSE)
  * 通过 Vite 代理转发至后端 NestJS /chat/stream-message
+ * @param options.message 用户消息
+ * @param options.sessionId 可选的会话ID
+ * @param options.scene 可选的场景标识（如 "digital"、"writing"）
+ * @param options.characterId 可选的角色ID，用于动态构建 System Prompt
  */
 export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
-  const { message, onChunk, onError, onComplete, signal } = options
+  const { message, sessionId, scene, characterId, onChunk, onError, onComplete, signal } = options
+
+  // 构建查询参数
+  const queryParams = new URLSearchParams()
+  queryParams.append('message', message)
+  if (sessionId) {
+    queryParams.append('sessionId', sessionId)
+  }
+  if (scene) {
+    queryParams.append('scene', scene)
+  }
+  if (characterId) {
+    queryParams.append('characterId', characterId)
+  }
 
   let response: Response
 
   try {
-    response = await fetch(`${BASE_PREFIX}/chat/stream-message?message=${encodeURIComponent(message)}`, {
+    response = await fetch(`${BASE_PREFIX}/chat/stream-message?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
         Accept: 'text/event-stream',
@@ -151,11 +171,9 @@ function processBuffer(buffer: string, onChunk: (content: string) => void | Prom
       } else if (typeof jsonData === 'string') {
         onChunk(jsonData)
       }
-    } catch {
-      // 如果不是 JSON,直接使用原始数据
-      if (parsed.data) {
-        onChunk(parsed.data)
-      }
+    } catch (e) {
+      // 如果不是 JSON，直接作为文本处理
+      onChunk(parsed.data)
     }
   }
 

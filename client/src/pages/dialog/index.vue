@@ -37,7 +37,12 @@
     <!-- 素材区域 -->
     <div class="material-area">
       <!-- 人物选择组件 -->
-      <CharacterSelector v-if="sessionCategory == 'digital' && currentSessionId" :session-id="currentSessionId" />
+      <CharacterSelector 
+        v-if="sessionCategory == 'digital' && currentSessionId" 
+        :session-id="currentSessionId"
+        @character-bound="handleCharacterBound"
+        @character-unbound="handleCharacterUnbound"
+      />
 
       <!-- 写作助手（仅在writing分类下显示） -->
       <WritingAssistant
@@ -80,6 +85,8 @@ import {
   type Session,
   type Message
 } from '@/api/session'
+// 导入获取会话绑定角色的 API
+import { getCharacterBySessionId } from '@/api/character'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -112,6 +119,9 @@ const currentNovelCode = computed(() => {
   const currentSession = sessions.value.find(s => s.sessionId === currentSessionId.value)
   return currentSession?.novelCode || ''
 })
+
+// 当前会话绑定的角色ID
+const currentCharacterId = ref<string>('')
 
 // 消息相关
 const messages = ref<ChatMessage[]>([])
@@ -177,6 +187,9 @@ const handleSelectSession = async (sessionId: string) => {
       loading: false
     }))
 
+    // 获取当前会话绑定的角色ID
+    await fetchCurrentCharacterId(sessionId)
+
     await nextTick()
     messageListRef.value?.scrollToBottom()
   } catch (error: any) {
@@ -184,6 +197,39 @@ const handleSelectSession = async (sessionId: string) => {
   } finally {
     loading.value = false
   }
+}
+
+/**
+ * 获取当前会话绑定的角色ID
+ */
+const fetchCurrentCharacterId = async (sessionId: string) => {
+  try {
+    const res = await getCharacterBySessionId(sessionId)
+    if (res.data) {
+      currentCharacterId.value = res.data.characterId
+    } else {
+      currentCharacterId.value = ''
+    }
+  } catch (error) {
+    console.error('获取会话绑定角色失败', error)
+    currentCharacterId.value = ''
+  }
+}
+
+/**
+ * 处理角色绑定事件
+ */
+const handleCharacterBound = (characterId: string) => {
+  currentCharacterId.value = characterId
+  antMessage.success('角色绑定成功，后续对话将使用该角色')
+}
+
+/**
+ * 处理角色解绑事件
+ */
+const handleCharacterUnbound = () => {
+  currentCharacterId.value = ''
+  antMessage.info('角色已解绑，后续对话将使用默认设置')
 }
 
 // 会话操作（编辑、删除）
@@ -342,7 +388,11 @@ const handleSend = async (text: string, isRegenerate = false) => {
   try {
     await chatStreamApi({
       message: text,
+      sessionId: currentSessionId.value,
+      scene: sessionCategory.value,
+      characterId: currentCharacterId.value,
       signal: abortController.value.signal,
+
       onChunk: async (content: string) => {
         // 检查是否已中止
         if (!abortController.value) return

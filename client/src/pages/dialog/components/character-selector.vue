@@ -52,7 +52,13 @@
       <div v-show="activeTab === 'current'" class="tab-content">
         <!-- 如果已经绑定了人物，显示人物详情 -->
         <div v-if="boundCharacter" class="bound-character">
-          <a-alert message="当前会话已绑定人物，无法更改" type="info" show-icon class="mb-16" />
+          <a-alert 
+            message="当前会话已绑定人物" 
+            description="您可以查看角色详情或解绑角色"
+            type="info" 
+            show-icon 
+            class="mb-16" 
+          />
 
           <div class="character-detail">
             <div class="detail-item">
@@ -96,6 +102,14 @@
                 <span v-if="!boundCharacter.behaviorDescriptions || boundCharacter.behaviorDescriptions.length === 0"> 未填写 </span>
               </div>
             </div>
+          </div>
+
+          <!-- 解绑按钮 -->
+          <div class="unbind-action">
+            <a-button danger @click="handleUnbindCharacter">
+              <DeleteOutlined />
+              解绑角色
+            </a-button>
           </div>
         </div>
 
@@ -183,8 +197,8 @@
         <!-- 行为描述 -->
         <a-form-item label="行为描述">
           <div class="behavior-input">
-            <div v-for="(desc, index) in editForm.behaviorDescriptions" :key="index" class="behavior-item-input">
-              <a-input v-model:value="editForm.behaviorDescriptions[index]" placeholder="描述解决问题的逻辑、应对压力的反应" />
+            <div v-for="(desc, index) in (editForm.behaviorDescriptions || [])" :key="index" class="behavior-item-input">
+              <a-input v-model:value="editForm.behaviorDescriptions![index]" placeholder="描述解决问题的逻辑、应对压力的反应" />
               <a-button type="text" danger @click="removeBehaviorDescription(index)">
                 <DeleteOutlined />
               </a-button>
@@ -210,6 +224,7 @@ import {
   updateCharacter,
   deleteCharacter,
   bindCharacterToSession,
+  unbindCharacterFromSession,
   getCharacterBySessionId,
   type Character
 } from '@/api/character'
@@ -217,6 +232,12 @@ import {
 // Props
 const props = defineProps<{
   sessionId: string
+}>()
+
+// Emits
+const emit = defineEmits<{
+  (e: 'characterBound', characterId: string): void
+  (e: 'characterUnbound'): void
 }>()
 
 // 激活的Tab
@@ -440,10 +461,45 @@ const handleBindCharacter = async () => {
     await bindCharacterToSession(selectedCharacterId.value, props.sessionId)
     antMessage.success('人物绑定成功')
     await fetchBoundCharacter()
+    
+    // 通知父组件角色已绑定
+    emit('characterBound', selectedCharacterId.value)
+    
     selectedCharacterId.value = ''
   } catch (error: any) {
     antMessage.error('绑定人物失败')
   }
+}
+
+/**
+ * 解绑当前会话的人物
+ */
+const handleUnbindCharacter = async () => {
+  if (!boundCharacter.value || !props.sessionId) {
+    return
+  }
+
+  Modal.confirm({
+    title: '确认解绑',
+    content: `确定要解绑角色「${boundCharacter.value.name}」吗？`,
+    okText: '确定',
+    cancelText: '取消',
+    okType: 'danger',
+    onOk: async () => {
+      try {
+        await unbindCharacterFromSession(boundCharacter.value!.characterId, props.sessionId)
+        antMessage.success('解绑成功')
+        
+        // 重新获取绑定状态
+        await fetchBoundCharacter()
+        
+        // 通知父组件角色已解绑
+        emit('characterUnbound')
+      } catch (error: any) {
+        antMessage.error('解绑失败')
+      }
+    }
+  })
 }
 
 // 监听sessionId变化，重新获取绑定的人物
@@ -622,6 +678,11 @@ onMounted(() => {
             }
           }
         }
+      }
+
+      .unbind-action {
+        display: flex;
+        justify-content: flex-end;
       }
     }
 
