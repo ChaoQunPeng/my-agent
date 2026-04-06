@@ -40,21 +40,21 @@ export default [
     name: 'DigitalHuman',
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
-      title: '模拟对话',
+      title: '人物对话',
       icon: 'CommentOutlined',
       sessionCategory: 'digital'
     }
   },
-  {
-    path: '/dialog/diary',
-    name: 'diary',
-    component: () => import('~/pages/dialog/index.vue'),
-    meta: {
-      title: '我的日记',
-      icon: 'InsertRowAboveOutlined',
-      sessionCategory: 'diary'
-    }
-  },
+  // {
+  //   path: '/dialog/diary',
+  //   name: 'diary',
+  //   component: () => import('~/pages/dialog/index.vue'),
+  //   meta: {
+  //     title: '我的日记',
+  //     icon: 'InsertRowAboveOutlined',
+  //     sessionCategory: 'diary'
+  //   }
+  // },
   {
     path: '/dialog/pet',
     name: 'pet',
@@ -68,15 +68,15 @@ export default [
   /*
    * 任务管理路由
    */
-  {
-    path: '/task',
-    name: 'Task',
-    component: () => import('~/pages/task/task-list.vue'),
-    meta: {
-      title: '任务管理',
-      icon: 'CheckSquareOutlined'
-    }
-  },
+  // {
+  //   path: '/task',
+  //   name: 'Task',
+  //   component: () => import('~/pages/task/task-list.vue'),
+  //   meta: {
+  //     title: '任务管理',
+  //     icon: 'CheckSquareOutlined'
+  //   }
+  // },
   {
     path: '/account',
     redirect: '/account/center',
