@@ -37,8 +37,8 @@
     <!-- 素材区域 -->
     <div class="material-area">
       <!-- 人物选择组件 -->
-      <CharacterSelector 
-        v-if="sessionCategory == 'digital' && currentSessionId" 
+      <CharacterSelector
+        v-if="sessionCategory == 'digital' && currentSessionId"
         :session-id="currentSessionId"
         @character-bound="handleCharacterBound"
         @character-unbound="handleCharacterUnbound"
@@ -410,15 +410,6 @@ const handleSend = async (text: string, isRegenerate = false) => {
         messageListRef.value?.scrollToBottom()
       }
     })
-
-    // 完成后保存 AI 回复到后端
-    if (fullReply) {
-      try {
-        await addMessage(currentSessionId.value, 'assistant', fullReply)
-      } catch (error) {
-        console.error('保存AI消息失败', error)
-      }
-    }
 
     // 完成后移除加载状态(如果还没有内容)
     if (messages.value[assistantIndex]?.loading) {

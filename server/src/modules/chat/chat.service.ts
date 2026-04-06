@@ -66,9 +66,17 @@ export class ChatService {
     if (characterId) {
       try {
         const character = await this.characterService.findOne(characterId);
-
+        console.log(`character`, character);
         // 构建角色信息字符串
         const characterInfo = `
+
+你将扮演一个优秀的演员, 这是人物设定, 我会提供一些人物资料, 你需要根据这些资料来分析这个人物的性格特点和行为模式,
+并且根据这些分析来推断这个人物的内心世界和可能的行为倾向。并且模拟他的方式与用户进行对话.
+
+请深入分析【行为描述】中的决策逻辑。
+
+角色在对话中的所有观点和反应，要尽可能符合其【行为描述】中展现出的处理问题的风格。如果性格标签与行为逻辑发生冲突，以行为逻辑为准。
+
 # 当前扮演角色
 
 姓名: ${character.name}
@@ -101,8 +109,6 @@ ${character.behaviorDescriptions.map((desc, index) => `${index + 1}. ${desc}`).j
         // 如果获取角色信息失败，使用基础 System Prompt
       }
     }
-
-    console.log(`systemPrompt`, systemPrompt);
 
     return systemPrompt;
   }
@@ -165,15 +171,13 @@ ${character.behaviorDescriptions.map((desc, index) => `${index + 1}. ${desc}`).j
       }
     }
 
-    // 流式响应结束后，保存用户消息和 AI 回复到会话历史
+    // 流式响应结束后，只保存 AI 回复到数据库
+    // 用户消息由前端负责保存
     if (sessionId && fullReply) {
       try {
-        // 保存用户消息
-        await this.sessionService.addMessage(sessionId, 'user', cleanMessage);
-        // 保存 AI 回复
         await this.sessionService.addMessage(sessionId, 'assistant', fullReply);
       } catch (error) {
-        console.error('保存会话历史失败:', error);
+        console.error('保存AI回复失败:', error);
         // 不抛出错误，避免影响已返回的流式响应
       }
     }

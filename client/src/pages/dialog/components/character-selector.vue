@@ -3,10 +3,8 @@
     <!-- Tab切换 -->
     <div class="selector-header">
       <a-tabs v-model:activeKey="activeTab" class="selector-tabs">
-        <!-- 第一个Tab：人物管理 -->
-        <a-tab-pane key="manage" tab="人物管理" />
-        <!-- 第二个Tab：当前会话 -->
         <a-tab-pane key="current" tab="当前会话" />
+        <a-tab-pane key="manage" tab="人物管理" />
       </a-tabs>
     </div>
 
@@ -23,12 +21,7 @@
 
         <!-- 人物列表 -->
         <div class="character-list">
-          <div
-            v-for="character in characters"
-            :key="character.characterId"
-            class="character-item"
-            @click="handleEditCharacter(character)"
-          >
+          <div v-for="character in characters" :key="character.characterId" class="character-item" @click="handleEditCharacter(character)">
             <div class="character-info">
               <div class="character-name">{{ character.name }}</div>
               <div class="character-meta">
@@ -52,13 +45,7 @@
       <div v-show="activeTab === 'current'" class="tab-content">
         <!-- 如果已经绑定了人物，显示人物详情 -->
         <div v-if="boundCharacter" class="bound-character">
-          <a-alert 
-            message="当前会话已绑定人物" 
-            description="您可以查看角色详情或解绑角色"
-            type="info" 
-            show-icon 
-            class="mb-16" 
-          />
+          <a-alert message="当前会话已绑定人物" description="您可以查看角色详情或解绑角色" type="info" show-icon class="mb-16" />
 
           <div class="character-detail">
             <div class="detail-item">
@@ -126,7 +113,7 @@
               <div class="select-option">
                 <span class="option-name">{{ character.name }}</span>
                 <span class="option-meta">
-                  {{ getGenderText(character.gender) }} · {{ character.age }}岁 · {{ character.profession }}
+                  · {{ getGenderText(character.gender) }} · {{ character.age }}岁 · {{ character.profession }}
                 </span>
               </div>
             </a-select-option>
@@ -197,7 +184,7 @@
         <!-- 行为描述 -->
         <a-form-item label="行为描述">
           <div class="behavior-input">
-            <div v-for="(desc, index) in (editForm.behaviorDescriptions || [])" :key="index" class="behavior-item-input">
+            <div v-for="(desc, index) in editForm.behaviorDescriptions || []" :key="index" class="behavior-item-input">
               <a-input v-model:value="editForm.behaviorDescriptions![index]" placeholder="描述解决问题的逻辑、应对压力的反应" />
               <a-button type="text" danger @click="removeBehaviorDescription(index)">
                 <DeleteOutlined />
@@ -241,7 +228,7 @@ const emit = defineEmits<{
 }>()
 
 // 激活的Tab
-const activeTab = ref('manage')
+const activeTab = ref('current')
 
 // 人物列表
 const characters = ref<Character[]>([])
@@ -461,10 +448,10 @@ const handleBindCharacter = async () => {
     await bindCharacterToSession(selectedCharacterId.value, props.sessionId)
     antMessage.success('人物绑定成功')
     await fetchBoundCharacter()
-    
+
     // 通知父组件角色已绑定
     emit('characterBound', selectedCharacterId.value)
-    
+
     selectedCharacterId.value = ''
   } catch (error: any) {
     antMessage.error('绑定人物失败')
@@ -489,10 +476,10 @@ const handleUnbindCharacter = async () => {
       try {
         await unbindCharacterFromSession(boundCharacter.value!.characterId, props.sessionId)
         antMessage.success('解绑成功')
-        
+
         // 重新获取绑定状态
         await fetchBoundCharacter()
-        
+
         // 通知父组件角色已解绑
         emit('characterUnbound')
       } catch (error: any) {
