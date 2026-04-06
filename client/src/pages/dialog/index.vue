@@ -36,8 +36,12 @@
 
     <!-- 素材区域 -->
     <div class="material-area">
+      <!-- 人物选择组件 -->
+      <CharacterSelector v-if="sessionCategory == 'digital' && currentSessionId" :session-id="currentSessionId" />
+
+      <!-- 写作助手（仅在writing分类下显示） -->
       <WritingAssistant
-        v-if="sessionCategory == 'writing'"
+        v-if="sessionCategory == 'writing' && currentSessionId"
         :session-id="currentSessionId"
         :session-category="sessionCategory"
         :novel-code="currentNovelCode"
@@ -64,6 +68,7 @@ import InputArea from './components/input-area.vue'
 import SessionItem from './components/session-item.vue'
 import MessageList from './components/message-list.vue'
 import WritingAssistant from './components/writing-assistant.vue'
+import CharacterSelector from './components/character-selector.vue'
 import { chatStreamApi } from '../../composables/chat-stream'
 import {
   getSessions,
