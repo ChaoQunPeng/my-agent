@@ -158,6 +158,11 @@
             <a-button type="primary" size="small" class="save-btn" @click="handleSaveField('logicRedlines')"> 保存 </a-button>
           </div>
         </div>
+
+        <!-- 底部固定保存按钮 -->
+        <div class="fixed-footer">
+          <a-button type="primary" ghost size="large" block @click="handleSaveAll"> 全部保存 </a-button>
+        </div>
       </div>
 
       <!-- 当前会话 Tab -->
@@ -314,7 +319,13 @@ const handleSaveField = async (field: keyof NovelConfig) => {
   }
 
   try {
-    await createOrUpdateNovelConfig(formData.value)
+    // 只提交 novelCode 和当前字段
+    const dataToSave: any = {
+      novelCode: formData.value.novelCode,
+      [field]: formData.value[field]
+    }
+
+    await createOrUpdateNovelConfig(dataToSave)
     antMessage.success('保存成功')
   } catch (error) {
     console.error('保存失败:', error)
@@ -324,14 +335,27 @@ const handleSaveField = async (field: keyof NovelConfig) => {
 
 // 保存数组字段（从文本转换为数组）
 const handleSaveArrayField = async (field: 'avoidPlots' | 'forbiddenWords') => {
+  // 验证 novelCode
+  if (!formData.value.novelCode || !formData.value.novelCode.trim()) {
+    antMessage.error('请先填写并保存小说编码')
+    return
+  }
+
   try {
     const text = field === 'avoidPlots' ? avoidPlotsText.value : forbiddenWordsText.value
     const array = text.split('\n').filter(item => item.trim())
 
-    await createOrUpdateNovelConfig({
-      ...formData.value,
+    // 只提交 novelCode 和当前字段
+    const dataToSave: any = {
+      novelCode: formData.value.novelCode,
       [field]: array
-    })
+    }
+
+    await createOrUpdateNovelConfig(dataToSave)
+
+    // 同步更新 formData 中的对应字段
+    formData.value[field] = array
+
     antMessage.success('保存成功')
   } catch (error) {
     console.error('保存失败:', error)
@@ -365,6 +389,35 @@ const handleSaveCharacters = async () => {
   try {
     await createOrUpdateNovelConfig(formData.value)
     antMessage.success('保存成功')
+  } catch (error) {
+    console.error('保存失败:', error)
+    antMessage.error('保存失败')
+  }
+}
+
+// 保存全部字段
+const handleSaveAll = async () => {
+  // 验证 novelCode
+  if (!formData.value.novelCode || !formData.value.novelCode.trim()) {
+    antMessage.error('请先填写并保存小说编码')
+    return
+  }
+
+  try {
+    // 同步数组字段的最新值
+    const dataToSave = {
+      ...formData.value,
+      avoidPlots: avoidPlotsText.value.split('\n').filter(item => item.trim()),
+      forbiddenWords: forbiddenWordsText.value.split('\n').filter(item => item.trim())
+    }
+
+    await createOrUpdateNovelConfig(dataToSave)
+
+    // 更新 formData 中的数组字段
+    formData.value.avoidPlots = dataToSave.avoidPlots
+    formData.value.forbiddenWords = dataToSave.forbiddenWords
+
+    antMessage.success('全部保存成功')
   } catch (error) {
     console.error('保存失败:', error)
     antMessage.error('保存失败')
@@ -654,6 +707,16 @@ onMounted(() => {
 
   .mt-16 {
     margin-top: 16px;
+  }
+
+  .fixed-footer {
+    position: sticky;
+    bottom: -16px;
+    background: #fff;
+    padding: 16px 0;
+    border-top: 1px solid #f0f0f0;
+    margin-top: auto;
+    z-index: 10;
   }
 }
 </style>

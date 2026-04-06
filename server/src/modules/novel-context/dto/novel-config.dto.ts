@@ -44,7 +44,8 @@ export class CreateNovelConfigDto {
   sessionCategory?: string; // 会话分类
 
   @IsString()
-  synopsis: string; // 小说简介/梗概
+  @IsOptional()
+  synopsis?: string; // 小说简介/梗概（改为可选，支持部分更新）
 
   @IsString()
   @IsOptional()
@@ -59,7 +60,8 @@ export class CreateNovelConfigDto {
   worldGeography?: string; // 世界地理环境
 
   @IsString()
-  mainOutline: string; // 主要故事大纲
+  @IsOptional()
+  mainOutline?: string; // 主要故事大纲（改为可选，支持部分更新）
 
   @IsString()
   @IsOptional()
