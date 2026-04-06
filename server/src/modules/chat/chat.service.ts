@@ -60,7 +60,7 @@ export class ChatService {
     characterId?: string,
   ): Promise<string> {
     // 基础 System Prompt
-    let systemPrompt = tplContent1;
+    let systemPrompt = '';
 
     // 如果提供了 characterId，获取角色信息并拼接到 System Prompt
     if (characterId) {
@@ -95,12 +95,14 @@ ${character.behaviorDescriptions.map((desc, index) => `${index + 1}. ${desc}`).j
 `;
 
         // 将角色信息追加到基础 System Prompt
-        systemPrompt = systemPrompt + '\n\n' + characterInfo;
+        systemPrompt = characterInfo;
       } catch (error) {
         console.error(`获取角色 ${characterId} 信息失败:`, error);
         // 如果获取角色信息失败，使用基础 System Prompt
       }
     }
+
+    console.log(`systemPrompt`, systemPrompt);
 
     return systemPrompt;
   }
@@ -126,13 +128,13 @@ ${character.behaviorDescriptions.map((desc, index) => `${index + 1}. ${desc}`).j
     const systemPrompt = await this.buildDynamicSystemPrompt(characterId);
 
     // 构建消息列表
-    let messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
-    let session: Session | null = null;
+    let messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
     // 如果提供了 sessionId，从 SessionService 获取历史消息
     let customHistory:
       | OpenAI.Chat.Completions.ChatCompletionMessageParam[]
       | undefined;
+
     if (sessionId) {
       customHistory = await this.sessionService.getMessageHistory(sessionId);
     }
@@ -146,35 +148,34 @@ ${character.behaviorDescriptions.map((desc, index) => `${index + 1}. ${desc}`).j
       ];
     }
 
-    try {
-      const stream = await this.openaiService.client.chat.completions.create({
-        model: this.openaiService.model,
-        messages,
-        temperature: 0.2,
-        max_tokens: 2000,
-        stream: true,
-      });
+    const stream = await this.openaiService.client.chat.completions.create({
+      model: this.openaiService.model,
+      messages,
+      temperature: 0.2,
+      max_tokens: 2000,
+      stream: true,
+    });
 
-      let fullReply = '';
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          fullReply += content;
-          yield content;
-        }
+    let fullReply = '';
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        fullReply += content;
+        yield content;
       }
+    }
 
-      // 如果使用内部会话,保存 AI 回复
-      if (session && fullReply.trim()) {
-        session.history.push({ role: 'assistant', content: fullReply });
-        session.lastActiveAt = new Date();
+    // 流式响应结束后，保存用户消息和 AI 回复到会话历史
+    if (sessionId && fullReply) {
+      try {
+        // 保存用户消息
+        await this.sessionService.addMessage(sessionId, 'user', cleanMessage);
+        // 保存 AI 回复
+        await this.sessionService.addMessage(sessionId, 'assistant', fullReply);
+      } catch (error) {
+        console.error('保存会话历史失败:', error);
+        // 不抛出错误，避免影响已返回的流式响应
       }
-    } catch (error) {
-      // 如果使用内部会话且调用失败,移除最后一条用户消息
-      if (session) {
-        session.history.pop();
-      }
-      throw error;
     }
   }
 
