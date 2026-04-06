@@ -3,7 +3,7 @@
     <!-- 左侧会话列表 -->
     <div class="session-sidebar">
       <div class="sidebar-header">
-        <a-button type="primary" block @click="handleCreateSession"> <PlusOutlined /> 新建会话 </a-button>
+        <a-button type="primary" block @click="handleCreateSession"> <PlusOutlined /> 新建对话 </a-button>
       </div>
 
       <div class="session-list">
@@ -36,7 +36,12 @@
 
     <!-- 素材区域 -->
     <div class="material-area">
-      <WritingAssistant :session-id="currentSessionId" :session-category="sessionCategory" :novel-code="currentNovelCode" />
+      <WritingAssistant
+        v-if="sessionCategory == 'writing'"
+        :session-id="currentSessionId"
+        :session-category="sessionCategory"
+        :novel-code="currentNovelCode"
+      />
     </div>
 
     <!-- 编辑会话对话框 -->

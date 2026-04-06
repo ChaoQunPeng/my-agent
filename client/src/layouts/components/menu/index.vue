@@ -7,25 +7,15 @@
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
 <script setup lang="ts">
-import { useLayoutState } from '../../basic-layout/context';
-import SubMenu from './sub-menu.vue';
+import { useLayoutState } from '../../basic-layout/context'
+import SubMenu from './sub-menu.vue'
 
-const {
-  theme,
-  collapsed,
-  layout,
-  isMobile,
-  selectedMenus,
-  selectedKeys,
-  openKeys,
-  handleOpenKeys,
-  handleSelectedKeys,
-  handleMenuSelect
-} = useLayoutState();
+const { theme, collapsed, layout, isMobile, selectedMenus, selectedKeys, openKeys, handleOpenKeys, handleSelectedKeys, handleMenuSelect } =
+  useLayoutState()
 const menuTheme = computed(() => {
-  if (theme.value === 'inverted') return 'dark';
-  return theme.value;
-});
+  if (theme.value === 'inverted') return 'dark'
+  return theme.value
+})
 </script>
 
 <template>
@@ -47,3 +37,15 @@ const menuTheme = computed(() => {
     </template>
   </a-menu>
 </template>
+
+<style lang="less" scoped>
+.ant-pro-sider-menu {
+  /deep/ .ant-menu {
+    background: #fff !important;
+  }
+
+  /deep/ .ant-menu-submenu-title {
+    margin-bottom: 0;
+  }
+}
+</style>

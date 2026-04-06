@@ -60,55 +60,6 @@
           </div>
         </div>
 
-        <!-- 角色设定 -->
-        <div class="config-section">
-          <div class="section-title">
-            角色设定
-            <a-button type="link" size="small" @click="addCharacter">
-              <template #icon><PlusOutlined /></template>
-              添加角色
-            </a-button>
-          </div>
-
-          <div v-for="(char, index) in formData.charactersList" :key="index" class="character-card">
-            <div class="character-header">
-              <span class="character-name">{{ char.name || `角色 ${index + 1}` }}</span>
-              <a-button type="text" size="small" danger @click="removeCharacter(index)">
-                <template #icon><DeleteOutlined /></template>
-              </a-button>
-            </div>
-
-            <div class="field-item">
-              <label class="field-label">姓名</label>
-              <a-input v-model:value="char.name" placeholder="角色姓名" />
-            </div>
-
-            <div class="field-item">
-              <label class="field-label">身份</label>
-              <a-input v-model:value="char.identity" placeholder="如落魄少年、隐世高手" />
-            </div>
-
-            <div class="field-item">
-              <label class="field-label">性格</label>
-              <a-input v-model:value="char.personality" placeholder="如腹黑、稳健、果断" />
-            </div>
-
-            <div class="field-item">
-              <label class="field-label">核心动机</label>
-              <a-input v-model:value="char.goals" placeholder="他最终想要达成什么" />
-            </div>
-
-            <div class="field-item">
-              <label class="field-label">特征</label>
-              <a-input v-model:value="char.traits" placeholder="外貌、特定口癖或标志性动作" />
-            </div>
-
-            <a-button type="primary" size="small" class="save-btn" @click="handleSaveCharacters"> 保存角色 </a-button>
-          </div>
-
-          <a-empty v-if="!formData.charactersList || formData.charactersList.length === 0" description="暂无角色" class="mt-16" />
-        </div>
-
         <!-- 写作指令 -->
         <div class="config-section">
           <div class="section-title">写作指令</div>

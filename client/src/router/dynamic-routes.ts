@@ -9,7 +9,7 @@ export default [
     redirect: '/writer-assistant/writer-assistan',
     meta: {
       title: '写作助手',
-      icon: 'UserOutlined'
+      icon: 'EditOutlined'
     },
     component: basicRouteMap.RouteView,
     children: [
@@ -19,7 +19,6 @@ export default [
         component: () => import('~/pages/dialog/index.vue'),
         meta: {
           title: '一拳破天',
-          icon: 'MessageOutlined',
           sessionCategory: 'writing',
           novelCode: 'yi_quan_po_tian'
         }
@@ -30,7 +29,6 @@ export default [
         component: () => import('~/pages/dialog/index.vue'),
         meta: {
           title: '龙族',
-          icon: 'MessageOutlined',
           sessionCategory: 'writing',
           novelCode: 'longzu'
         }
@@ -42,8 +40,8 @@ export default [
     name: 'DigitalHuman',
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
-      title: '人物对话',
-      icon: 'MessageOutlined',
+      title: '模拟对话',
+      icon: 'CommentOutlined',
       sessionCategory: 'digital'
     }
   },
@@ -53,7 +51,7 @@ export default [
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
       title: '我的日记',
-      icon: 'MessageOutlined',
+      icon: 'InsertRowAboveOutlined',
       sessionCategory: 'diary'
     }
   },
@@ -63,7 +61,8 @@ export default [
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
       title: '电子宠物',
-      icon: 'MessageOutlined'
+      icon: 'SmileOutlined',
+      sessionCategory: 'pet'
     }
   },
   /*

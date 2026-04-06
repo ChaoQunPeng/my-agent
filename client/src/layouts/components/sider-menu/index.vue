@@ -28,15 +28,15 @@
     <div class="flex-1 of-x-hidden of-y-auto scrollbar">
       <div class="menu-list">
         <div class="menu-item" :class="resolveMenuCls('/account/center')" @click="goViews('/account/center')">
-          <RobotOutlined class="mr-2" />
+          <RobotOutlined class="mr-4" />
           <span>个人中心</span>
         </div>
         <div class="menu-item" :class="resolveMenuCls('/account/settings')" @click="goViews('/account/settings')">
-          <TeamOutlined class="mr-2" />
+          <SettingOutlined class="mr-4" />
           <span>个人设置</span>
         </div>
         <div class="mt-12 px-5">
-          <a-button type="primary" block> 新建项目 </a-button>
+          <a-button type="primary" block> 新建对话 </a-button>
         </div>
       </div>
       <div class="px-5">
@@ -66,7 +66,7 @@ import type { CSSProperties } from 'vue'
 // import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue';
 import { useLayoutState } from '../../basic-layout/context'
 import Menu from '../menu/index.vue'
-import { RobotOutlined, DatabaseOutlined, TeamOutlined } from '@ant-design/icons-vue'
+import { RobotOutlined, DatabaseOutlined, TeamOutlined, SettingOutlined } from '@ant-design/icons-vue'
 const router = useRouter()
 
 const { currentRoute } = useCurrentRoute()
