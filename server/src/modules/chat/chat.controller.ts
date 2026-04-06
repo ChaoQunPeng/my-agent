@@ -5,12 +5,12 @@
  * 支持场景标识和角色ID，用于动态构建 System Prompt
  * 会话管理由 SessionModule 负责
  */
-import { Controller, Post, Body, Sse, Query } from '@nestjs/common';
+import { Controller, Post, Body, Res } from '@nestjs/common';
 import OpenAI from 'openai';
+import type { Response } from 'express';
 import { ChatService } from './chat.service';
 import { SessionService } from '../session/session.service';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
-import { Observable } from 'rxjs';
 
 @Controller('chat')
 export class ChatController {
@@ -20,40 +20,59 @@ export class ChatController {
   ) {}
 
   /**
-   * 流式发送消息(SSE)
-   * @param message 用户消息内容
-   * @param sessionId 可选的会话ID
-   * @param scene 可选的场景标识
-   * @param characterId 可选的角色ID，用于动态构建 System Prompt
+   * 流式发送消息(SSE) - 使用 POST 请求 + 手动 SSE 响应
+   * 前端使用 @microsoft/fetch-event-source 进行消费
+   * @param body.message 用户消息内容
+   * @param body.sessionId 可选的会话ID
+   * @param body.scene 可选的场景标识
+   * @param body.characterId 可选的角色ID，用于动态构建 System Prompt
    */
-  @Sse('stream-message')
-  streamMessage(
-    @Query('message') message: string,
-    @Query('sessionId') sessionId?: string,
-    @Query('scene') scene?: string,
-    @Query('characterId') characterId?: string,
-  ): Observable<{ data: string }> {
+  @Post('stream-message')
+  async streamMessage(
+    @Body()
+    body: {
+      message: string;
+      sessionId?: string;
+      scene?: string;
+      characterId?: string;
+    },
+    @Res() res: Response,
+  ): Promise<void> {
+    const { message, sessionId, scene, characterId } = body;
+
     console.log(
       `收到流式请求 - message: ${message}, sessionId: ${sessionId}, scene: ${scene}, characterId: ${characterId}`,
     );
 
-    return new Observable((observer) => {
-      void (async () => {
-        try {
-          const asyncGen = this.chatService.chatWithHistoryStream(
-            message,
-            sessionId,
-            characterId,
-          );
-          for await (const chunk of asyncGen) {
-            observer.next({ data: chunk });
-          }
-          observer.complete();
-        } catch (error) {
-          observer.error(error);
-        }
-      })();
-    });
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    try {
+      const asyncGen = this.chatService.chatWithHistoryStream(
+        message,
+        sessionId,
+        characterId,
+      );
+
+      for await (const chunk of asyncGen) {
+        // 按照 SSE 标准格式写入数据
+        res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+      }
+
+      // 发送结束标记
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+    } catch (error) {
+      // 发送错误事件
+      res.write(
+        `event: error\ndata: ${JSON.stringify({ message: error instanceof Error ? error.message : 'Unknown error' })}\n\n`,
+      );
+      res.end();
+    }
   }
 
   /**

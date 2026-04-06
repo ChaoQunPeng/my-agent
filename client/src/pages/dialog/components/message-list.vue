@@ -105,8 +105,8 @@ const handleRegenerate = (index: number) => emit('regenerate', index)
   display: flex;
   gap: 12px;
   max-width: 100%;
-  margin-bottom: 20px;
-  animation: fadeIn 0.3s ease-in;
+  // margin-bottom: 20px;
+  // animation: fadeIn 0.3s ease-in;
 }
 
 @keyframes fadeIn {
@@ -130,7 +130,7 @@ const handleRegenerate = (index: number) => emit('regenerate', index)
 .content {
   flex: 1;
   min-width: 0;
-  max-width: 90%;
+  max-width: 100%;
 }
 .message.user .content {
   display: flex;
