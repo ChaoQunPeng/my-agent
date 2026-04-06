@@ -90,14 +90,6 @@
               </div>
             </div>
           </div>
-
-          <!-- 解绑按钮 -->
-          <div class="unbind-action">
-            <a-button danger @click="handleUnbindCharacter">
-              <DeleteOutlined />
-              解绑角色
-            </a-button>
-          </div>
         </div>
 
         <!-- 如果未绑定人物，显示选择器 -->
@@ -211,7 +203,6 @@ import {
   updateCharacter,
   deleteCharacter,
   bindCharacterToSession,
-  unbindCharacterFromSession,
   getCharacterBySessionId,
   type Character
 } from '@/api/character'
@@ -224,7 +215,6 @@ const props = defineProps<{
 // Emits
 const emit = defineEmits<{
   (e: 'characterBound', characterId: string): void
-  (e: 'characterUnbound'): void
 }>()
 
 // 激活的Tab
@@ -458,37 +448,6 @@ const handleBindCharacter = async () => {
   }
 }
 
-/**
- * 解绑当前会话的人物
- */
-const handleUnbindCharacter = async () => {
-  if (!boundCharacter.value || !props.sessionId) {
-    return
-  }
-
-  Modal.confirm({
-    title: '确认解绑',
-    content: `确定要解绑角色「${boundCharacter.value.name}」吗？`,
-    okText: '确定',
-    cancelText: '取消',
-    okType: 'danger',
-    onOk: async () => {
-      try {
-        await unbindCharacterFromSession(boundCharacter.value!.characterId, props.sessionId)
-        antMessage.success('解绑成功')
-
-        // 重新获取绑定状态
-        await fetchBoundCharacter()
-
-        // 通知父组件角色已解绑
-        emit('characterUnbound')
-      } catch (error: any) {
-        antMessage.error('解绑失败')
-      }
-    }
-  })
-}
-
 // 监听sessionId变化，重新获取绑定的人物
 watch(
   () => props.sessionId,
@@ -665,11 +624,6 @@ onMounted(() => {
             }
           }
         }
-      }
-
-      .unbind-action {
-        display: flex;
-        justify-content: flex-end;
       }
     }
 

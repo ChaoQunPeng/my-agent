@@ -100,20 +100,4 @@ export class CharacterController {
     );
     return ApiResponseDto.success(character);
   }
-
-  /**
-   * 从会话中解绑人物
-   * @param params 包含人物ID和会话ID的参数对象
-   * @returns 更新后的人物信息
-   */
-  @Post('unbind-session')
-  async unbindFromSession(
-    @Body() params: { characterId: string; sessionId: string },
-  ) {
-    const character = await this.characterService.unbindFromSession(
-      params.characterId,
-      params.sessionId,
-    );
-    return ApiResponseDto.success(character, '人物解绑成功');
-  }
 }

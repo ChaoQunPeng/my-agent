@@ -161,46 +161,4 @@ export class CharacterService {
 
     return character;
   }
-
-  /**
-   * 从会话中解绑人物
-   * 通过将Session中的characterId设置为空字符串来实现解绑
-   * @param characterId 人物ID
-   * @param sessionId 会话ID
-   * @returns 解绑的人物信息
-   */
-  async unbindFromSession(
-    characterId: string,
-    sessionId: string,
-  ): Promise<Character> {
-    // 验证人物是否存在
-    const character = await this.characterModel.findOne({ characterId }).exec();
-    if (!character) {
-      throw new NotFoundException(`Character ${characterId} not found`);
-    }
-
-    // 验证会话是否存在
-    const session = await this.sessionModel.findOne({ sessionId }).exec();
-    if (!session) {
-      throw new NotFoundException(`Session ${sessionId} not found`);
-    }
-
-    // 检查会话是否绑定了该人物
-    if (session.characterId !== characterId) {
-      throw new NotFoundException(
-        `Session ${sessionId} is not bound to character ${characterId}`,
-      );
-    }
-
-    // 清除Session中的characterId
-    await this.sessionModel
-      .findOneAndUpdate(
-        { sessionId },
-        { $set: { characterId: '' } },
-        { new: true },
-      )
-      .exec();
-
-    return character;
-  }
 }

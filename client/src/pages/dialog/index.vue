@@ -41,7 +41,6 @@
         v-if="sessionCategory == 'digital' && currentSessionId"
         :session-id="currentSessionId"
         @character-bound="handleCharacterBound"
-        @character-unbound="handleCharacterUnbound"
       />
 
       <!-- 写作助手（仅在writing分类下显示） -->
@@ -222,14 +221,6 @@ const fetchCurrentCharacterId = async (sessionId: string) => {
 const handleCharacterBound = (characterId: string) => {
   currentCharacterId.value = characterId
   antMessage.success('角色绑定成功，后续对话将使用该角色')
-}
-
-/**
- * 处理角色解绑事件
- */
-const handleCharacterUnbound = () => {
-  currentCharacterId.value = ''
-  antMessage.info('角色已解绑，后续对话将使用默认设置')
 }
 
 // 会话操作（编辑、删除）

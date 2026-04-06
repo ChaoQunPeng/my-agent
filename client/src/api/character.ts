@@ -65,10 +65,3 @@ export function bindCharacterToSession(characterId: string, sessionId: string) {
 export function getCharacterBySessionId(sessionId: string) {
   return request.post<Character | null>('/characters/find-by-session', { sessionId })
 }
-
-/**
- * 从会话中解绑人物
- */
-export function unbindCharacterFromSession(characterId: string, sessionId: string) {
-  return request.post<Character>('/characters/unbind-session', { characterId, sessionId })
-}
