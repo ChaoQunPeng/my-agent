@@ -8,7 +8,7 @@
  */
 import type { RouteRecordRaw } from 'vue-router'
 
-export const ROOT_ROUTE_REDIRECT_PATH = '/writer-assistant'
+export const ROOT_ROUTE_REDIRECT_PATH = '/account/center'
 const Layout = () => import('~/layouts/index.vue')
 
 export const rootRoute: RouteRecordRaw = {

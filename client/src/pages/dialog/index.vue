@@ -31,7 +31,12 @@
         <MessageList ref="messageListRef" :messages="messages" @copy="copyMessage" @regenerate="regenerateMessage" />
       </div>
 
-      <input-area @send="handleSend" :sending="sending" @stop="stopGeneration"></input-area>
+      <input-area @send="handleNoRecordChat" :sending="sending" @stop="stopGeneration"></input-area>
+
+      <!-- 不保存记录的对话按钮 -->
+      <!-- <div class="no-record-chat-btn">
+        <a-button type="dashed" @click="handleNoRecordChat" :disabled="sending"> 💬 临时对话（不保存） </a-button>
+      </div> -->
     </div>
 
     <!-- 素材区域 -->
@@ -73,7 +78,7 @@ import SessionItem from './components/session-item.vue'
 import MessageList from './components/message-list.vue'
 import WritingAssistant from './components/writing-assistant.vue'
 import CharacterSelector from './components/character-selector.vue'
-import { chatStreamApi } from '../../composables/chat-stream'
+import { chatStreamApi, chatStreamNoRecordApi } from '../../composables/chat-stream'
 import {
   getSessions,
   createSession,
@@ -443,6 +448,98 @@ const stopGeneration = () => {
   }
 }
 
+/**
+ * 不保存记录的对话（临时对话）
+ * 此功能不会将消息保存到数据库，适合临时性对话和测试
+ */
+const handleNoRecordChat = async (text: string) => {
+  if (!text.trim()) {
+    antMessage.warning('请输入消息内容')
+    return
+  }
+
+  // 如果正在发送,先停止当前请求
+  if (sending.value && abortController.value) {
+    abortController.value.abort()
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  sending.value = true
+  abortController.value = new AbortController()
+
+  // 添加用户消息（仅显示，不保存到后端）
+  messages.value.push({ role: 'user', content: text })
+
+  // 添加 AI 回复占位(带加载状态)
+  const assistantIndex = messages.value.length
+  messages.value.push({
+    role: 'assistant',
+    content: '',
+    loading: true,
+    loadingText: ''
+  })
+
+  await nextTick()
+  messageListRef.value?.scrollToBottom()
+
+  let fullReply = ''
+
+  try {
+    await chatStreamNoRecordApi({
+      message: text,
+      characterId: currentCharacterId.value,
+      signal: abortController.value.signal,
+
+      onChunk: async (content: string) => {
+        // 检查是否已中止
+        if (!abortController.value) return
+
+        // 第一次收到内容时,移除加载状态
+        if (messages.value[assistantIndex]?.loading) {
+          messages.value[assistantIndex].loading = false
+          messages.value[assistantIndex].loadingText = undefined
+        }
+
+        messages.value[assistantIndex].content += content
+        fullReply += content
+
+        await nextTick()
+        messageListRef.value?.scrollToBottom()
+      }
+    })
+
+    // 完成后移除加载状态(如果还没有内容)
+    if (messages.value[assistantIndex]?.loading) {
+      messages.value[assistantIndex].loading = false
+      messages.value[assistantIndex].loadingText = undefined
+    }
+  } catch (e: any) {
+    // 如果是被中止的,不显示错误
+    if (e.name === 'AbortError') {
+      antMessage.info('已停止生成')
+    } else {
+      antMessage.error('消息发送失败,请稍后重试')
+    }
+
+    // 移除空的 AI 占位消息
+    if (!messages.value[assistantIndex]?.content) {
+      messages.value.splice(assistantIndex, 1)
+    } else {
+      // 如果有部分内容,移除加载状态
+      if (messages.value[assistantIndex]) {
+        messages.value[assistantIndex].loading = false
+        messages.value[assistantIndex].loadingText = undefined
+      }
+    }
+  } finally {
+    // 只有当前 controller 未被替换时才重置状态
+    if (abortController.value?.signal.aborted !== true || !abortController.value) {
+      sending.value = false
+      abortController.value = null
+    }
+  }
+}
+
 onMounted(() => {
   fetchSessions()
 })
@@ -622,6 +719,13 @@ defineExpose({
       }
     }
   }
+}
+
+// 不保存记录的对话按钮样式
+.no-record-chat-btn {
+  padding: 12px 0;
+  text-align: center;
+  border-top: 1px solid #f0f0f0;
 }
 
 @media (max-width: 768px) {

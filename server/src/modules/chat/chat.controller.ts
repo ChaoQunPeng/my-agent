@@ -76,6 +76,54 @@ export class ChatController {
   }
 
   /**
+   * 流式发送消息(SSE) - 不保存任何记录
+   * 前端使用 @microsoft/fetch-event-source 进行消费
+   * @param body.message 用户消息内容
+   * @param body.characterId 可选的角色ID，用于动态构建 System Prompt
+   */
+  @Post('stream-message-no-record')
+  async streamMessageNoRecord(
+    @Body()
+    body: {
+      message: string;
+      characterId?: string;
+    },
+    @Res() res: Response,
+  ): Promise<void> {
+    const { message, characterId } = body;
+
+    console.log(
+      `收到无记录流式请求 - message: ${message}, characterId: ${characterId}`,
+    );
+
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    try {
+      const asyncGen = this.chatService.chatStreamNoRecord(message, characterId);
+
+      for await (const chunk of asyncGen) {
+        // 按照 SSE 标准格式写入数据
+        res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+      }
+
+      // 发送结束标记
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+    } catch (error) {
+      // 发送错误事件
+      res.write(
+        `event: error\ndata: ${JSON.stringify({ message: error instanceof Error ? error.message : 'Unknown error' })}\n\n`,
+      );
+      res.end();
+    }
+  }
+
+  /**
    * 获取聊天历史
    * @param params.sessionId 可选的会话ID
    */

@@ -13,6 +13,7 @@ declare global {
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const breakpointsEnum: typeof import('../src/composables/query-breakpoints')['breakpointsEnum']
   const chatStreamApi: typeof import('../src/composables/chat-stream')['chatStreamApi']
+  const chatStreamNoRecordApi: typeof import('../src/composables/chat-stream')['chatStreamNoRecordApi']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
