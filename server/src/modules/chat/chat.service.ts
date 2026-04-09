@@ -186,20 +186,16 @@ ${character.behaviorDescriptions.map((desc, index) => `${index + 1}. ${desc}`).j
   /**
    * 流式对话(SSE) - 不保存任何记录
    * @param userMessage 用户消息
-   * @param characterId 可选的角色ID，用于动态构建 System Prompt
    */
   async *chatStreamNoRecord(
     userMessage: string,
-    characterId?: string,
+    systemPrompt: string,
   ): AsyncGenerator<string> {
     // 1. 严格校验输入并清理空格
     const cleanMessage = userMessage?.trim();
     if (!cleanMessage) {
       throw new Error('Message content cannot be empty');
     }
-
-    // 构建动态 System Prompt
-    const systemPrompt = await this.buildDynamicSystemPrompt(characterId);
 
     // 构建消息列表（只包含 system prompt 和当前用户消息）
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [

@@ -86,15 +86,11 @@ export class ChatController {
     @Body()
     body: {
       message: string;
-      characterId?: string;
+      systemPrompt: string;
     },
     @Res() res: Response,
   ): Promise<void> {
-    const { message, characterId } = body;
-
-    console.log(
-      `收到无记录流式请求 - message: ${message}, characterId: ${characterId}`,
-    );
+    const { message, systemPrompt } = body;
 
     // 设置 SSE 响应头
     res.setHeader('Content-Type', 'text/event-stream');
@@ -104,7 +100,10 @@ export class ChatController {
     res.flushHeaders();
 
     try {
-      const asyncGen = this.chatService.chatStreamNoRecord(message, characterId);
+      const asyncGen = this.chatService.chatStreamNoRecord(
+        message,
+        systemPrompt,
+      );
 
       for await (const chunk of asyncGen) {
         // 按照 SSE 标准格式写入数据

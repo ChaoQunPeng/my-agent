@@ -487,7 +487,7 @@ const handleNoRecordChat = async (text: string) => {
   try {
     await chatStreamNoRecordApi({
       message: text,
-      characterId: currentCharacterId.value,
+      systemPrompt: `你是一名侦探`,
       signal: abortController.value.signal,
 
       onChunk: async (content: string) => {

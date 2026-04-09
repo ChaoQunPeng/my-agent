@@ -99,12 +99,12 @@ export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
  * @param options.onComplete 完成时的回调函数
  * @param options.signal 可选的中断信号，用于取消请求
  */
-export async function chatStreamNoRecordApi(options: Omit<ChatStreamOptions, 'sessionId' | 'scene'>): Promise<void> {
-  const { message, characterId, onChunk, onError, onComplete, signal } = options
+export async function chatStreamNoRecordApi(options: any): Promise<void> {
+  const { message, systemPrompt, onChunk, onError, onComplete, signal } = options
 
   // 构建请求体（不包含 sessionId 和 scene）
   const body: Record<string, string> = { message }
-  if (characterId) body.characterId = characterId
+  if (systemPrompt) body.systemPrompt = systemPrompt
 
   await fetchEventSource(`${BASE_PREFIX}/chat/stream-message-no-record`, {
     method: 'POST',
