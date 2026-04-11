@@ -100,10 +100,7 @@ export class ChatController {
     res.flushHeaders();
 
     try {
-      const asyncGen = this.chatService.chatStreamNoRecord(
-        message,
-        systemPrompt,
-      );
+      const asyncGen = this.chatService.chatStreamTest(message, systemPrompt);
 
       for await (const chunk of asyncGen) {
         // 按照 SSE 标准格式写入数据
@@ -141,7 +138,7 @@ export class ChatController {
     }
 
     // 否则返回临时会话的历史
-    const reply = this.chatService.getFullHistory();
+    const reply = this.chatService.getHistory();
     return ApiResponseDto.success({ reply });
   }
 
