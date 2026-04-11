@@ -4,6 +4,16 @@ import { basicRouteMap } from './router-modules'
 
 export default [
   {
+    path: '/self',
+    name: 'self',
+    component: () => import('~/pages/self/index.vue'),
+    meta: {
+      title: '我的',
+      icon: 'CommentOutlined',
+      sessionCategory: 'self'
+    }
+  },
+  {
     path: '/dialog',
     name: 'WriterAssistant',
     redirect: '/writer-assistant/writer-assistan',
@@ -22,16 +32,6 @@ export default [
           sessionCategory: 'writing',
           novelCode: 'yi_quan_po_tian'
         }
-      },
-      {
-        path: '/writer-assistant/longzu',
-        name: 'longzu',
-        component: () => import('~/pages/dialog/index.vue'),
-        meta: {
-          title: '龙族',
-          sessionCategory: 'writing',
-          novelCode: 'longzu'
-        }
       }
     ]
   },
@@ -40,7 +40,7 @@ export default [
     name: 'DigitalHuman',
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
-      title: '人物对话',
+      title: 'NPC们',
       icon: 'CommentOutlined',
       sessionCategory: 'digital'
     }
@@ -60,7 +60,7 @@ export default [
     name: 'pet',
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
-      title: '电子宠物',
+      title: '宠物',
       icon: 'SmileOutlined',
       sessionCategory: 'pet'
     }

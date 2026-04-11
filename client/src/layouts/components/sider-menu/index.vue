@@ -33,7 +33,7 @@
         </div>
         <div class="menu-item" :class="resolveMenuCls('/account/settings')" @click="goViews('/account/settings')">
           <SettingOutlined class="mr-4" />
-          <span>个人设置</span>
+          <span>设置</span>
         </div>
         <div class="mt-12 px-5">
           <a-button type="primary" block> 新建对话 </a-button>
