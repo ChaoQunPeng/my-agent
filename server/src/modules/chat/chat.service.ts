@@ -4,7 +4,6 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import { OpenaiService } from '../../shared/openai/openai.service';
-import { tplContent1 } from './chat-system-prompt';
 import { CharacterService } from '../character/character.service';
 import { SessionService } from '../session/session.service';
 import { FileReaderService } from '../../shared/file-reader/file-reader.service';
@@ -20,9 +19,6 @@ export interface Session {
 
 @Injectable()
 export class ChatService {
-  private readonly FIXED_SESSION_ID = 'debug_session_001';
-  private session: Session | null = null;
-
   // 1. 缓存读取的素材内容，避免重复读取文件
   private cachedSucaiContent: string | null = null;
 
@@ -36,22 +32,6 @@ export class ChatService {
     private readonly sessionService: SessionService,
     private readonly fileReaderService: FileReaderService,
   ) {}
-
-  /**
-   * 获取或创建临时调试会话
-   */
-  private getOrCreateSession(): Session {
-    if (!this.session) {
-      this.session = {
-        id: this.FIXED_SESSION_ID,
-        history: [{ role: 'system', content: tplContent1 }],
-        createdAt: new Date(),
-        lastActiveAt: new Date(),
-        title: '调试会话',
-      };
-    }
-    return this.session;
-  }
 
   /**
    * 动态 System Prompt 构建
@@ -117,39 +97,48 @@ export class ChatService {
   }
 
   /**
-   * 修改后的测试函数：chatStreamNoRecord
+   * 流式对话测试版本（不持久化，仅内存）
    * 1. 使用 cachedSucaiContent 确保文件仅读取一次
    * 2. 使用类成员变量 tempHistory 保留内存上下文（不持久化）
    * 3. 每次对话都会将当前 user 和 assistant 消息推入 tempHistory
+   * 4. 支持自定义 temperature 和 systemPrompt
    */
   async *chatStreamTest(
     userMessage: string,
-    systemPrompt: string,
+    systemPrompt?: string,
+    options: {
+      temperature?: number;
+    } = {},
   ): AsyncGenerator<string> {
     const cleanMessage = userMessage?.trim();
     if (!cleanMessage) throw new Error('Message content cannot be empty');
 
     // --- 逻辑 A: 仅在第一次调用时读取素材文件 ---
-    if (this.cachedSucaiContent === null) {
-      try {
-        const sucaiPath = path.join(__dirname, '../../../src/shared/sucai');
-        const content = await this.fileReaderService.readAndConcatFiles(
-          sucaiPath,
-          '\n---分割线---\n',
-        );
-        this.cachedSucaiContent = content || '素材为空';
-        console.log('素材文件已首次加载并缓存');
-      } catch (error) {
-        console.error('读取素材文件失败:', error);
-        this.cachedSucaiContent = '读取失败';
-      }
-    }
+    // if (this.cachedSucaiContent === null) {
+    //   try {
+    //     const sucaiPath = path.join(__dirname, '../../../src/shared/sucai');
+    //     const content = await this.fileReaderService.readAndConcatFiles(
+    //       sucaiPath,
+    //       '\n---分割线---\n',
+    //     );
+    //     this.cachedSucaiContent = content || '素材为空';
+    //     console.log('素材文件已首次加载并缓存');
+    //   } catch (error) {
+    //     console.error('读取素材文件失败:', error);
+    //     this.cachedSucaiContent = '读取失败';
+    //   }
+    // }
 
     // --- 逻辑 B: 组装消息列表 ---
-    // 基础 System 信息
+    // 基础 System 信息 - 如果提供了自定义 systemPrompt，则使用它
+    const finalSystemPrompt =
+      systemPrompt && systemPrompt.trim()
+        ? systemPrompt.trim()
+        : `这是用户的日记数据,你作为用户的数字灵魂,对自我进行分析: ${this.cachedSucaiContent}`;
+
     const systemMessage: OpenAI.Chat.Completions.ChatCompletionMessageParam = {
       role: 'system',
-      content: `这是用户的日记数据,你作为用户的数字灵魂,对自我进行分析: ${this.cachedSucaiContent}\n额外提示: ${systemPrompt}`,
+      content: finalSystemPrompt,
     };
 
     // 将用户当前消息加入临时历史
@@ -161,11 +150,17 @@ export class ChatService {
       ...this.tempHistory,
     ];
 
+    // 验证 temperature 参数范围 (0-2)
+    const validTemperature =
+      options.temperature !== undefined
+        ? Math.max(0, Math.min(2, options.temperature))
+        : 0.7;
+
     // --- 逻辑 C: 请求 OpenAI ---
     const stream = await this.openaiService.client.chat.completions.create({
       model: this.openaiService.model,
       messages,
-      temperature: 0.5,
+      temperature: validTemperature,
       stream: true,
     });
 
@@ -189,21 +184,14 @@ export class ChatService {
     }
   }
 
+  getTempHistory(): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+    return this.tempHistory;
+  }
+
   /**
    * 重置测试对话历史
    */
   clearTempHistory(): void {
     this.tempHistory = [];
-  }
-
-  /**
-   * 临时会话管理相关逻辑 (原有的保留)
-   */
-  getHistory() {
-    return this.session?.history.slice(1) || [];
-  }
-
-  clearHistory(): void {
-    this.session = null;
   }
 }

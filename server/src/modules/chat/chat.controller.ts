@@ -6,7 +6,6 @@
  * 会话管理由 SessionModule 负责
  */
 import { Controller, Post, Body, Res } from '@nestjs/common';
-import OpenAI from 'openai';
 import type { Response } from 'express';
 import { ChatService } from './chat.service';
 import { SessionService } from '../session/session.service';
@@ -26,6 +25,8 @@ export class ChatController {
    * @param body.sessionId 可选的会话ID
    * @param body.scene 可选的场景标识
    * @param body.characterId 可选的角色ID，用于动态构建 System Prompt
+   * @param body.temperature 可选的温度参数，控制生成随机性 (0-2)
+   * @param body.systemPrompt 可选的系统提示词，覆盖默认的系统提示词
    */
   @Post('stream-message')
   async streamMessage(
@@ -35,13 +36,15 @@ export class ChatController {
       sessionId?: string;
       scene?: string;
       characterId?: string;
+      temperature?: number;
+      systemPrompt?: string;
     },
     @Res() res: Response,
   ): Promise<void> {
-    const { message, sessionId, scene, characterId } = body;
+    const { message, sessionId, scene, characterId, temperature } = body;
 
     console.log(
-      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, scene: ${scene}, characterId: ${characterId}`,
+      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, scene: ${scene}, characterId: ${characterId}, temperature: ${temperature}`,
     );
 
     // 设置 SSE 响应头
@@ -76,21 +79,65 @@ export class ChatController {
   }
 
   /**
+   * 获取聊天历史
+   * @param params.sessionId 可选的会话ID
+   */
+  // @Post('get-chat-history')
+  // async getChatHistory(@Body() params?: { sessionId?: string }): Promise<
+  //   ApiResponseDto<{
+  //     reply: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+  //   }>
+  // > {
+  //   if (params?.sessionId) {
+  //     // 从 Session Service 获取历史
+  //     const history = await this.sessionService.getMessageHistory(
+  //       params.sessionId,
+  //     );
+  //     return ApiResponseDto.success({ reply: history });
+  //   }
+
+  //   // 否则返回临时会话的历史
+  //   const reply = this.chatService.getHistory();
+  //   return ApiResponseDto.success({ reply });
+  // }
+
+  /**
+   * 清空聊天历史
+   * @param params.sessionId 可选的会话ID
+   */
+  // @Post('clear-chat-history')
+  // async clearChatHistory(
+  //   @Body() params?: { sessionId?: string },
+  // ): Promise<ApiResponseDto<null>> {
+  //   if (params?.sessionId) {
+  //     // 清空指定会话的消息
+  //     await this.sessionService.clearMessages(params.sessionId);
+  //     return ApiResponseDto.success(null, '会话消息已清空');
+  //   }
+
+  //   // 否则清空临时会话
+  //   this.chatService.clearHistory();
+  //   return ApiResponseDto.success(null, '会话已清空');
+  // }
+
+  /**
    * 流式发送消息(SSE) - 不保存任何记录
    * 前端使用 @microsoft/fetch-event-source 进行消费
    * @param body.message 用户消息内容
-   * @param body.characterId 可选的角色ID，用于动态构建 System Prompt
+   * @param body.systemPrompt 可选的系统提示词
+   * @param body.temperature 可选的温度参数，控制生成随机性 (0-2)
    */
   @Post('stream-message-no-record')
   async streamMessageNoRecord(
     @Body()
     body: {
       message: string;
-      systemPrompt: string;
+      systemPrompt?: string;
+      temperature?: number;
     },
     @Res() res: Response,
   ): Promise<void> {
-    const { message, systemPrompt } = body;
+    const { message, systemPrompt, temperature } = body;
 
     // 设置 SSE 响应头
     res.setHeader('Content-Type', 'text/event-stream');
@@ -100,7 +147,9 @@ export class ChatController {
     res.flushHeaders();
 
     try {
-      const asyncGen = this.chatService.chatStreamTest(message, systemPrompt);
+      const asyncGen = this.chatService.chatStreamTest(message, systemPrompt, {
+        temperature,
+      });
 
       for await (const chunk of asyncGen) {
         // 按照 SSE 标准格式写入数据
@@ -120,44 +169,23 @@ export class ChatController {
   }
 
   /**
-   * 获取聊天历史
-   * @param params.sessionId 可选的会话ID
-   */
-  @Post('get-chat-history')
-  async getChatHistory(@Body() params?: { sessionId?: string }): Promise<
-    ApiResponseDto<{
-      reply: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
-    }>
-  > {
-    if (params?.sessionId) {
-      // 从 Session Service 获取历史
-      const history = await this.sessionService.getMessageHistory(
-        params.sessionId,
-      );
-      return ApiResponseDto.success({ reply: history });
-    }
-
-    // 否则返回临时会话的历史
-    const reply = this.chatService.getHistory();
-    return ApiResponseDto.success({ reply });
-  }
-
-  /**
    * 清空聊天历史
    * @param params.sessionId 可选的会话ID
    */
-  @Post('clear-chat-history')
-  async clearChatHistory(
-    @Body() params?: { sessionId?: string },
-  ): Promise<ApiResponseDto<null>> {
-    if (params?.sessionId) {
-      // 清空指定会话的消息
-      await this.sessionService.clearMessages(params.sessionId);
-      return ApiResponseDto.success(null, '会话消息已清空');
-    }
-
+  @Post('clear-test-messages')
+  clearTestMessages(): ApiResponseDto<null> {
     // 否则清空临时会话
-    this.chatService.clearHistory();
+    this.chatService.clearTempHistory();
     return ApiResponseDto.success(null, '会话已清空');
+  }
+
+  /**
+   * 获取临时聊天历史
+   */
+  @Post('get-test-messages')
+  getTestMessages(): ApiResponseDto<{ reply: any[] }> {
+    // 否则返回临时会话的历史
+    const reply = this.chatService.getTempHistory();
+    return ApiResponseDto.success({ reply });
   }
 }

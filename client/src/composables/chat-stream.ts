@@ -93,18 +93,20 @@ export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
  * 不保存记录的流式对话接口(SSE) - 使用 @microsoft/fetch-event-source
  * 通过 POST 请求发送消息，接收 SSE 流式响应，不会保存任何消息记录
  * @param options.message 用户消息
- * @param options.characterId 可选的角色ID，用于动态构建 System Prompt
+ * @param options.systemPrompt 可选的系统提示词
+ * @param options.temperature 可选的温度参数 (0-2)
  * @param options.onChunk 接收每个数据块的回调函数
  * @param options.onError 错误处理回调函数
  * @param options.onComplete 完成时的回调函数
  * @param options.signal 可选的中断信号，用于取消请求
  */
 export async function chatStreamNoRecordApi(options: any): Promise<void> {
-  const { message, systemPrompt, onChunk, onError, onComplete, signal } = options
+  const { message, systemPrompt, temperature, onChunk, onError, onComplete, signal } = options
 
   // 构建请求体（不包含 sessionId 和 scene）
-  const body: Record<string, string> = { message }
+  const body: Record<string, any> = { message }
   if (systemPrompt) body.systemPrompt = systemPrompt
+  if (temperature !== undefined) body.temperature = temperature
 
   await fetchEventSource(`${BASE_PREFIX}/chat/stream-message-no-record`, {
     method: 'POST',
