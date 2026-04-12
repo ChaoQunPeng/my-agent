@@ -1,7 +1,7 @@
 <template>
   <div class="chat-panel">
     <div class="chat-messages" ref="messagesContainer">
-      <MessageList ref="messageListRef" :messages="messages" @copy="copyMessage" @regenerate="regenerateMessage" />
+      <MessageList ref="messageListRef" :messages="messages" :outputting="outputting" @copy="copyMessage" @regenerate="regenerateMessage" />
     </div>
 
     <div>
@@ -38,6 +38,7 @@ const props = withDefaults(
 // 消息相关
 const messages = ref<ChatMessage[]>([])
 const sending = ref(false)
+const outputting = ref(false)
 const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
 const abortController = ref<AbortController | null>(null)
 
@@ -91,6 +92,8 @@ const handleSend = async (text: string) => {
       signal: abortController.value.signal,
 
       onChunk: async (content: string) => {
+        outputting.value = true
+
         // 检查是否已中止
         if (!abortController.value) return
 
@@ -137,6 +140,9 @@ const handleSend = async (text: string) => {
       sending.value = false
       abortController.value = null
     }
+
+    outputting.value = false
+    console.log(`结束`)
   }
 }
 

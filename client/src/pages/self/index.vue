@@ -1,33 +1,30 @@
 <template>
   <div class="chat-page">
     <div class="chat-container">
-      <ChatPanel ref="chatPanelRef" :api-func="chatStreamNoRecordApi" :api-params="{ temperature, systemPrompt }" />
-      <!-- <div class="chat-messages" ref="messagesContainer">
-        <MessageList ref="messageListRef" :messages="messages" @copy="copyMessage" @regenerate="regenerateMessage" />
-      </div>
-
-      <div>
-        <input-area @send="handleNoRecordChat" :sending="sending" @stop="stopGeneration"></input-area>
-      </div> -->
+      <ChatPanel ref="chatPanelRef" :api-func="chatStreamNoRecordApi" :api-params="chatOptions" />
     </div>
 
     <!-- 素材区域 -->
     <div class="material-area">
-      <!-- 设置面板：temperature和systemPrompt -->
       <div class="settings-panel">
         <a-divider orientation="left">对话设置</a-divider>
 
         <!-- Temperature 选择器 -->
         <div class="setting-item">
-          <label class="setting-label">Temperature ({{ temperature }})</label>
-          <a-slider v-model:value="temperature" :min="0" :max="2" :step="0.1" :marks="{ 0: '0', 1: '1', 2: '2' }" />
+          <label class="setting-label">Temperature ({{ chatOptions.temperature }})</label>
+          <a-slider v-model:value="chatOptions.temperature" :min="0" :max="2" :step="0.1" :marks="{ 0: '0', 1: '1', 2: '2' }" />
           <div class="setting-hint">控制生成的随机性，值越高越有创意</div>
         </div>
 
         <!-- System Prompt 输入框 -->
         <div class="setting-item">
           <label class="setting-label">系统提示词</label>
-          <a-textarea v-model:value="systemPrompt" placeholder="输入自定义的系统提示词，留空则使用默认提示词" :rows="4" show-count />
+          <a-textarea
+            v-model:value="chatOptions.systemPrompt"
+            placeholder="输入自定义的系统提示词，留空则使用默认提示词"
+            :rows="4"
+            show-count
+          />
         </div>
 
         <!-- 清空消息按钮 -->
@@ -47,10 +44,11 @@ import { message as antMessage, Modal } from 'ant-design-vue'
 import { chatStreamNoRecordApi } from '@/composables/chat-stream'
 import { clearTempMessages } from '@/api/session'
 
-// Temperature 设置 (0-2)
-const temperature = ref<number>(0.7)
-// System Prompt 设置
-const systemPrompt = ref<string>('')
+const chatOptions = reactive({
+  // Temperature 设置 (0-2)
+  temperature: 0.7,
+  systemPrompt: ''
+})
 
 const chatPanelRef = ref<InstanceType<typeof ChatPanel>>()
 

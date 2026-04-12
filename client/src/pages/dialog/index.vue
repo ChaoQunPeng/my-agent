@@ -28,10 +28,10 @@
       </div>
 
       <div class="chat-messages" ref="messagesContainer">
-        <MessageList ref="messageListRef" :messages="messages" @copy="copyMessage" @regenerate="regenerateMessage" />
+        <MessageList ref="messageListRef" :messages="messages" :outputting="true" @copy="copyMessage" @regenerate="regenerateMessage" />
       </div>
 
-      <input-area @send="handleNoRecordChat" :sending="sending" @stop="stopGeneration"></input-area>
+      <input-area @send="handleSend" :sending="sending" @stop="stopGeneration"></input-area>
 
       <!-- 不保存记录的对话按钮 -->
       <!-- <div class="no-record-chat-btn">

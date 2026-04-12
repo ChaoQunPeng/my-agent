@@ -9,8 +9,18 @@ export default [
     component: () => import('~/pages/self/index.vue'),
     meta: {
       title: '我的',
-      icon: 'CommentOutlined',
+      icon: 'SmileOutlined',
       sessionCategory: 'self'
+    }
+  },
+  {
+    path: '/npc',
+    name: 'DigitalHuman',
+    component: () => import('~/pages/dialog/index.vue'),
+    meta: {
+      title: 'NPC们',
+      icon: 'CommentOutlined',
+      sessionCategory: 'digital'
     }
   },
   {
@@ -35,16 +45,6 @@ export default [
       }
     ]
   },
-  {
-    path: '/npc',
-    name: 'DigitalHuman',
-    component: () => import('~/pages/dialog/index.vue'),
-    meta: {
-      title: 'NPC们',
-      icon: 'CommentOutlined',
-      sessionCategory: 'digital'
-    }
-  },
   // {
   //   path: '/dialog/diary',
   //   name: 'diary',
@@ -56,12 +56,12 @@ export default [
   //   }
   // },
   {
-    path: '/dialog/pet',
+    path: '/pet',
     name: 'pet',
     component: () => import('~/pages/pet/index.vue'),
     meta: {
       title: '宠物',
-      icon: 'SmileOutlined',
+      icon: 'AndroidOutlined',
       sessionCategory: 'pet'
     }
   },

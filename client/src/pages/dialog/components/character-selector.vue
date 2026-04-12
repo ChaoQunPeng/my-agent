@@ -45,7 +45,7 @@
       <div v-show="activeTab === 'current'" class="tab-content">
         <!-- 如果已经绑定了人物，显示人物详情 -->
         <div v-if="boundCharacter" class="bound-character">
-          <a-alert message="当前会话已绑定人物" description="您可以查看角色详情或解绑角色" type="info" show-icon class="mb-16" />
+          <a-alert message="当前会话已绑定人物" type="info" show-icon class="mb-16" />
 
           <div class="character-detail">
             <div class="detail-item">

@@ -10,7 +10,7 @@
             <span class="loading-text">{{ message.loadingText || '正在思考...' }}</span>
           </div>
 
-          <div v-if="message.role === 'assistant' && message.content && !message.loading" class="message-actions">
+          <div v-if="message.role === 'assistant' && message.content && !message.loading && !outputting" class="message-actions">
             <a-tooltip title="复制">
               <a-button type="text" size="small" @click="handleCopy(message.content)">
                 <template #icon><CopyOutlined /></template>
@@ -44,6 +44,7 @@ interface ChatMessage {
 
 interface Props {
   messages: ChatMessage[]
+  outputting: boolean
 }
 
 interface Emits {
