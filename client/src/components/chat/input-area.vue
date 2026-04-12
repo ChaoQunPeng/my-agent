@@ -7,7 +7,7 @@
         placeholder="说点什么~"
         :disabled="sending"
         auto-size
-        @pressEnter="handleSend"
+        @keydown="handleKeydown"
       />
     </div>
     <div class="chat-actions">
@@ -56,13 +56,36 @@ const handleClick = () => {
     emits('stop')
   } else {
     // 否则正常发送
-    handleSend(new Event('click'))
+    handleSend()
   }
 }
 
-const handleSend = (e: Event) => {
-  e.preventDefault()
+/**
+ * 处理键盘按下事件
+ * @param e - 键盘事件对象
+ * @description 
+ * - 单独按回车:发送消息
+ * - Shift+回车:换行
+ */
+const handleKeydown = (e: KeyboardEvent) => {
+  // 检测是否按下回车键
+  if (e.key === 'Enter') {
+    // 如果按下了 Shift 键,允许换行(不阻止默认行为)
+    if (e.shiftKey) {
+      return
+    }
+    
+    // 否则阻止默认行为并发送消息
+    e.preventDefault()
+    handleSend()
+  }
+}
 
+/**
+ * 发送消息
+ * @description 将用户输入的消息发送出去,并清空输入框
+ */
+const handleSend = () => {
   if (props.sending || !inputMessage.value.trim()) return
 
   emits('send', inputMessage.value)
