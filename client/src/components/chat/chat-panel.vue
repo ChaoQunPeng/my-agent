@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-container">
+  <div class="chat-panel">
     <div class="chat-messages" ref="messagesContainer">
       <MessageList ref="messageListRef" :messages="messages" @copy="copyMessage" @regenerate="regenerateMessage" />
     </div>
@@ -185,15 +185,24 @@ const stopGeneration = () => {
     abortController.value = null
   }
 }
+
+// 清空对话
+const clearMessages = () => {
+  messages.value = []
+}
+
+defineExpose({
+  clearMessages
+})
 </script>
 
 <style scoped lang="less">
 // 右侧聊天区域
-.chat-container {
-  flex: 1;
+.chat-panel {
   display: flex;
   flex-direction: column;
   position: relative;
+  height: 100%;
 
   .chat-messages {
     flex: 1;

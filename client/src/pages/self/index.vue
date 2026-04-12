@@ -1,7 +1,7 @@
 <template>
   <div class="chat-page">
     <div class="chat-container">
-      <ChatPanel :api-func="chatStreamNoRecordApi" :api-params="{ temperature, systemPrompt }" />
+      <ChatPanel ref="chatPanelRef" :api-func="chatStreamNoRecordApi" :api-params="{ temperature, systemPrompt }" />
       <!-- <div class="chat-messages" ref="messagesContainer">
         <MessageList ref="messageListRef" :messages="messages" @copy="copyMessage" @regenerate="regenerateMessage" />
       </div>
@@ -49,9 +49,10 @@ import { clearTempMessages } from '@/api/session'
 
 // Temperature 设置 (0-2)
 const temperature = ref<number>(0.7)
-
 // System Prompt 设置
 const systemPrompt = ref<string>('')
+
+const chatPanelRef = ref<InstanceType<typeof ChatPanel>>()
 
 /**
  * 清空所有消息
@@ -67,6 +68,7 @@ const handleClearMessages = async () => {
       try {
         // 调用后端接口清除临时会话
         await clearTempMessages()
+        chatPanelRef.value?.clearMessages()
 
         antMessage.success('已清空所有消息')
       } catch (error) {
@@ -83,6 +85,14 @@ const handleClearMessages = async () => {
   display: flex;
   height: 100%;
   background: #fff;
+}
+
+// 右侧聊天区域
+.chat-container {
+  padding: 24px 84px;
+  overflow-y: auto;
+  height: 100%;
+  flex: 1;
 }
 
 .material-area {
@@ -127,44 +137,6 @@ const handleClearMessages = async () => {
       font-size: 12px;
       color: #8c8c8c;
       margin-top: 4px;
-    }
-  }
-}
-
-// 右侧聊天区域
-.chat-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  padding: 24px 84px;
-
-  .chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 0 20px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    // max-width: 900px;
-    // margin: 0 auto;
-    width: 100%;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: transparent;
-      border-radius: 3px;
-
-      &:hover {
-        background: transparent;
-      }
     }
   }
 }

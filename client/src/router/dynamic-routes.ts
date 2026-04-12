@@ -58,7 +58,7 @@ export default [
   {
     path: '/dialog/pet',
     name: 'pet',
-    component: () => import('~/pages/dialog/index.vue'),
+    component: () => import('~/pages/pet/index.vue'),
     meta: {
       title: '宠物',
       icon: 'SmileOutlined',
