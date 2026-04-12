@@ -131,10 +131,7 @@ export class ChatService {
 
     // --- 逻辑 B: 组装消息列表 ---
     // 基础 System 信息 - 如果提供了自定义 systemPrompt，则使用它
-    const finalSystemPrompt =
-      systemPrompt && systemPrompt.trim()
-        ? systemPrompt.trim()
-        : `这是用户的日记数据,你作为用户的数字灵魂,对自我进行分析: ${this.cachedSucaiContent}`;
+    const finalSystemPrompt = systemPrompt || '';
 
     const systemMessage: OpenAI.Chat.Completions.ChatCompletionMessageParam = {
       role: 'system',

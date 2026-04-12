@@ -36,7 +36,7 @@ export default [
     ]
   },
   {
-    path: '/dialog/digital-human',
+    path: '/npc',
     name: 'DigitalHuman',
     component: () => import('~/pages/dialog/index.vue'),
     meta: {

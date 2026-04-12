@@ -28,13 +28,7 @@
         <!-- System Prompt 输入框 -->
         <div class="setting-item">
           <label class="setting-label">系统提示词</label>
-          <a-textarea
-            v-model:value="systemPrompt"
-            placeholder="输入自定义的系统提示词，留空则使用默认提示词"
-            :rows="4"
-            :maxlength="500"
-            show-count
-          />
+          <a-textarea v-model:value="systemPrompt" placeholder="输入自定义的系统提示词，留空则使用默认提示词" :rows="4" show-count />
         </div>
 
         <!-- 清空消息按钮 -->
@@ -50,9 +44,10 @@
 import { ref, nextTick, onUnmounted } from 'vue'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { DeleteOutlined } from '@ant-design/icons-vue'
-import InputArea from './components/input-area.vue'
-import MessageList from './components/message-list.vue'
+import InputArea from '@/components/chat/input-area.vue'
+import MessageList from '@/components/chat/message-list.vue'
 import { chatStreamNoRecordApi } from '../../composables/chat-stream'
+import { clearTempMessages } from '../../api/session'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -113,6 +108,9 @@ const regenerateMessage = async (index: number) => {
 const stopGeneration = () => {
   if (abortController.value) {
     abortController.value.abort()
+    // 立即重置发送状态和控制器
+    sending.value = false
+    abortController.value = null
   }
 }
 
@@ -212,14 +210,27 @@ const handleNoRecordChat = async (text: string) => {
 /**
  * 清空所有消息
  */
-const handleClearMessages = () => {
+const handleClearMessages = async () => {
   Modal.confirm({
     title: '确认清空',
     content: '确定要清空所有消息吗？此操作不可恢复。',
     okText: '确定',
     cancelText: '取消',
     okType: 'danger',
-    onOk: () => {}
+    onOk: async () => {
+      try {
+        // 调用后端接口清除临时会话
+        await clearTempMessages()
+
+        // 清空前端消息数组
+        messages.value = []
+
+        antMessage.success('已清空所有消息')
+      } catch (error) {
+        console.error('清空消息失败:', error)
+        antMessage.error(error instanceof Error ? error.message : '清空消息失败')
+      }
+    }
   })
 }
 

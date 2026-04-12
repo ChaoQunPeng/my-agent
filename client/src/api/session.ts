@@ -84,3 +84,10 @@ export function getSessionMessages(sessionId: string) {
 export function clearSessionMessages(sessionId: string) {
   return request.post('/sessions/clear-messages', { id: sessionId })
 }
+
+/**
+ * 清除临时会话的所有消息（不保存记录的聊天）
+ */
+export function clearTempMessages() {
+  return request.post('/chat/clear-test-messages', {})
+}
