@@ -24,4 +24,9 @@ export class CreateSessionDto {
   @IsOptional()
   @IsString()
   characterId?: string;
+
+  // 关联的人物ID（可选，可以在创建时绑定人物）
+  @IsOptional()
+  @IsString()
+  testId?: string;
 }

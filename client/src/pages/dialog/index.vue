@@ -43,7 +43,7 @@
     <div class="material-area">
       <!-- 人物选择组件 -->
       <CharacterSelector
-        v-if="sessionCategory == 'digital' && currentSessionId"
+        v-if="sessionCategory == 'npc' && currentSessionId"
         :session-id="currentSessionId"
         @character-bound="handleCharacterBound"
       />

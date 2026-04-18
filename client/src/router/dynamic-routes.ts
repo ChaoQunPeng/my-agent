@@ -15,12 +15,12 @@ export default [
   },
   {
     path: '/npc',
-    name: 'DigitalHuman',
+    name: 'npc',
     component: () => import('~/pages/dialog/index.vue'),
     meta: {
       title: 'NPC们',
       icon: 'CommentOutlined',
-      sessionCategory: 'digital'
+      sessionCategory: 'npc'
     }
   },
   {

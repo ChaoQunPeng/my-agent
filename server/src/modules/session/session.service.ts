@@ -110,7 +110,10 @@ export class SessionService {
       summary: createSessionDto.summary || '',
       category: createSessionDto.category || '',
       novelCode: createSessionDto.novelCode || '',
+      testId: createSessionDto.testId || '123',
     });
+
+    console.log(`createdSession`, createdSession);
 
     // 初始化内存为空数组
     this.historyMap.set(sessionId, []);
