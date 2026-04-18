@@ -4,28 +4,32 @@ import { IsOptional, IsString } from 'class-validator';
  * 创建会话的数据传输对象
  */
 export class CreateSessionDto {
+  // 会话标题（可选）
   @IsOptional()
   @IsString()
   title?: string;
 
+  // 会话摘要（可选）
   @IsOptional()
   @IsString()
   summary?: string;
 
+  // 会话分类（可选）
   @IsOptional()
   @IsString()
   category?: string;
 
+  // 资源类型：'character'（角色）| 'novel'（小说）（可选）
   @IsOptional()
   @IsString()
-  novelCode?: string;
+  type?: string;
 
-  // 关联的人物ID（可选，可以在创建时绑定人物）
+  // 资源ID：对应type类型的资源ID（可选）
   @IsOptional()
   @IsString()
-  characterId?: string;
+  resourceId?: string;
 
-  // 关联的人物ID（可选，可以在创建时绑定人物）
+  // 测试ID（可选，用于测试场景）
   @IsOptional()
   @IsString()
   testId?: string;

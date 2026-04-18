@@ -24,7 +24,8 @@ export class ChatController {
    * @param body.message 用户消息内容
    * @param body.sessionId 可选的会话ID
    * @param body.scene 可选的场景标识
-   * @param body.characterId 可选的角色ID，用于动态构建 System Prompt
+   * @param body.type 资源类型（'character' | 'novel'），用于动态构建 System Prompt
+   * @param body.resourceId 资源ID，对应type类型的资源ID
    * @param body.temperature 可选的温度参数，控制生成随机性 (0-2)
    * @param body.systemPrompt 可选的系统提示词，覆盖默认的系统提示词
    */
@@ -35,16 +36,17 @@ export class ChatController {
       message: string;
       sessionId?: string;
       scene?: string;
-      characterId?: string;
+      type?: string;
+      resourceId?: string;
       temperature?: number;
       systemPrompt?: string;
     },
     @Res() res: Response,
   ): Promise<void> {
-    const { message, sessionId, scene, characterId, temperature } = body;
+    const { message, sessionId, scene, type, resourceId, temperature } = body;
 
     console.log(
-      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, scene: ${scene}, characterId: ${characterId}, temperature: ${temperature}`,
+      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, scene: ${scene}, type: ${type}, resourceId: ${resourceId}, temperature: ${temperature}`,
     );
 
     // 设置 SSE 响应头
@@ -55,10 +57,12 @@ export class ChatController {
     res.flushHeaders();
 
     try {
+      // 调用聊天服务进行流式对话
       const asyncGen = this.chatService.chatWithHistoryStream(
         message,
         sessionId,
-        characterId,
+        type,
+        resourceId,
       );
 
       for await (const chunk of asyncGen) {

@@ -2,15 +2,19 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 
 const BASE_PREFIX = import.meta.env.VITE_APP_BASE_API_DEV ?? ''
 
+/**
+ * 流式对话选项接口
+ */
 export interface ChatStreamOptions {
-  message: string
-  sessionId?: string
-  scene?: string
-  characterId?: string
-  onChunk: (content: string) => void | Promise<void>
-  onError?: (error: Error) => void
-  onComplete?: () => void
-  signal?: AbortSignal
+  message: string // 用户消息
+  sessionId?: string // 可选的会话ID
+  scene?: string // 可选的场景标识（如 "npc"、"writing"）
+  type?: string // 可选的资源类型（'character' | 'novel'），用于动态构建 System Prompt
+  resourceId?: string // 可选的资源ID，对应type类型的资源ID
+  onChunk: (content: string) => void | Promise<void> // 接收每个数据块的回调函数
+  onError?: (error: Error) => void // 错误处理回调函数
+  onComplete?: () => void // 完成时的回调函数
+  signal?: AbortSignal // 可选的中断信号，用于取消请求
 }
 
 /**
@@ -19,16 +23,22 @@ export interface ChatStreamOptions {
  * @param options.message 用户消息
  * @param options.sessionId 可选的会话ID
  * @param options.scene 可选的场景标识（如 "digital"、"writing"）
- * @param options.characterId 可选的角色ID，用于动态构建 System Prompt
+ * @param options.type 可选的资源类型（'character' | 'novel'），用于动态构建 System Prompt
+ * @param options.resourceId 可选的资源ID，对应type类型的资源ID
+ * @param options.onChunk 接收每个数据块的回调函数
+ * @param options.onError 错误处理回调函数
+ * @param options.onComplete 完成时的回调函数
+ * @param options.signal 可选的中断信号，用于取消请求
  */
 export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
-  const { message, sessionId, scene, characterId, onChunk, onError, onComplete, signal } = options
+  const { message, sessionId, scene, type, resourceId, onChunk, onError, onComplete, signal } = options
 
   // 构建请求体
   const body: Record<string, string> = { message }
   if (sessionId) body.sessionId = sessionId
   if (scene) body.scene = scene
-  if (characterId) body.characterId = characterId
+  if (type) body.type = type
+  if (resourceId) body.resourceId = resourceId
 
   await fetchEventSource(`${BASE_PREFIX}/chat/stream-message`, {
     method: 'POST',

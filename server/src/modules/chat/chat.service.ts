@@ -35,46 +35,65 @@ export class ChatService {
 
   /**
    * 动态 System Prompt 构建
+   * 根据资源类型和资源ID获取对应的资源信息，构建系统提示词
+   * @param type 资源类型（'character' | 'novel'）
+   * @param resourceId 资源ID
    */
   private async buildDynamicSystemPrompt(
-    characterId?: string,
+    type?: string,
+    resourceId?: string,
   ): Promise<string> {
     let systemPrompt = '';
-    if (characterId) {
+    
+    // 如果是角色类型，获取角色信息
+    if (type === 'character' && resourceId) {
       try {
-        const character = await this.characterService.findOne(characterId);
+        const character = await this.characterService.findOne(resourceId);
         systemPrompt = `你将扮演演员: ${character.name}，性格: ${character.personalityOverview}`;
       } catch (error) {
         console.error(`获取角色信息失败:`, error);
       }
     }
+    
+    // TODO: 未来可以扩展小说类型的处理逻辑
+    // if (type === 'novel' && resourceId) { ... }
+    
     return systemPrompt;
   }
 
   /**
    * 标准流式对话 - 存数据库
+   * @param userMessage 用户消息
+   * @param sessionId 会话ID（可选）
+   * @param type 资源类型（'character' | 'novel'）（可选）
+   * @param resourceId 资源ID（可选）
    */
   async *chatWithHistoryStream(
     userMessage: string,
     sessionId?: string,
-    characterId?: string,
+    type?: string,
+    resourceId?: string,
   ): AsyncGenerator<string> {
     const cleanMessage = userMessage?.trim();
     if (!cleanMessage) throw new Error('Message content cannot be empty');
 
-    const systemPrompt = await this.buildDynamicSystemPrompt(characterId);
+    // 构建系统提示词
+    const systemPrompt = await this.buildDynamicSystemPrompt(type, resourceId);
     let messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
+    // 获取历史消息
     const customHistory = sessionId
       ? await this.sessionService.getMessageHistory(sessionId)
       : [];
 
+    // 组装消息列表
     messages = [
       { role: 'system', content: systemPrompt },
       ...customHistory,
       { role: 'user', content: cleanMessage },
     ];
 
+    // 调用 OpenAI API
     const stream = await this.openaiService.client.chat.completions.create({
       model: this.openaiService.model,
       messages,
@@ -82,6 +101,7 @@ export class ChatService {
       stream: true,
     });
 
+    // 流式返回响应
     let fullReply = '';
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || '';
@@ -91,6 +111,7 @@ export class ChatService {
       }
     }
 
+    // 保存 AI 回复到数据库
     if (sessionId && fullReply) {
       await this.sessionService.addMessage(sessionId, 'assistant', fullReply);
     }

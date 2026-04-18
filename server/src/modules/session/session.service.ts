@@ -102,14 +102,17 @@ export class SessionService {
    * 创建新会话
    */
   async create(createSessionDto: CreateSessionDto): Promise<Session> {
+    // 生成唯一的会话ID
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
+    // 创建会话实例
     const createdSession = new this.sessionModel({
       sessionId,
       title: createSessionDto.title || '新会话',
       summary: createSessionDto.summary || '',
       category: createSessionDto.category || '',
-      novelCode: createSessionDto.novelCode || '',
+      type: createSessionDto.type || '',
+      resourceId: createSessionDto.resourceId || '',
       testId: createSessionDto.testId || '123',
     });
 
@@ -166,11 +169,18 @@ export class SessionService {
 
   /**
    * 获取会话列表
+   * @param category 可选的分类筛选条件
+   * @param type 可选的资源类型筛选条件（'character' | 'novel'）
+   * @param resourceId 可选的资源ID筛选条件
    */
-  async findAll(category?: string, novelCode?: string): Promise<Session[]> {
+  async findAll(category?: string, type?: string, resourceId?: string): Promise<Session[]> {
+    // 构建查询条件
     const query: Record<string, string> = {};
     if (category) query.category = category;
-    if (novelCode) query.novelCode = novelCode;
+    if (type) query.type = type;
+    if (resourceId) query.resourceId = resourceId;
+    
+    // 按更新时间倒序返回
     return this.sessionModel.find(query).sort({ updatedAt: -1 }).exec();
   }
 
