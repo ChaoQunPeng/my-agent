@@ -39,7 +39,7 @@
       <CharacterSelector
         v-if="currentSessionType == 'character' && currentSessionId"
         :session-id="currentSessionId"
-        v-model:selected-character-id="selectedCharacterId"
+        v-model="selectedCharacterId"
         @character-bound="handleCharacterBound"
       />
 
@@ -197,7 +197,6 @@ const fetchCurrentCharacterId = async (sessionId: string) => {
  */
 const handleCharacterBound = (characterId: string) => {
   currentCharacterId.value = characterId
-  antMessage.success('角色绑定成功，后续对话将使用该角色')
 }
 
 // 会话操作（编辑、删除）

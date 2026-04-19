@@ -48,7 +48,12 @@ export class ChatService {
     if (type === 'character' && resourceId) {
       try {
         const character = await this.characterService.findOne(resourceId);
-        systemPrompt = `你将扮演演员: ${character.name}，性格: ${character.personalityDescription}`;
+        systemPrompt = `
+        你是一名演员,心理专家,请根据以下角色信息来扮演角色
+        你将扮演演员: ${character.name}，性格: ${character.personalityDescription}
+        形象: ${character.appearance}，职业: ${character.profession}，关系: ${character.relation}
+       
+        `;
       } catch (error) {
         console.error(`获取角色信息失败:`, error);
       }
@@ -75,8 +80,6 @@ export class ChatService {
   ): AsyncGenerator<string> {
     const cleanMessage = userMessage?.trim();
     if (!cleanMessage) throw new Error('Message content cannot be empty');
-
-    console.log(`耍都阿是`, type, resourceId);
 
     // 构建系统提示词
     const systemPrompt = await this.buildDynamicSystemPrompt(type, resourceId);

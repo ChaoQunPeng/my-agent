@@ -111,7 +111,6 @@
               </div>
             </a-select-option>
           </a-select>
-
           <a-button type="primary" block :disabled="!selectedCharacterId" @click="handleBindCharacter"> 确定绑定 </a-button>
         </div>
       </div>
@@ -233,9 +232,9 @@ const characters = ref<Character[]>([])
 // 当前会话绑定的人物
 const boundCharacter = ref<Character | null>(null)
 
-// 选中的人物ID（用于绑定）- 使用 computed 实现双向绑定
+// 选中的人物ID(用于绑定)- 使用 computed 实现双向绑定
 const selectedCharacterId = computed({
-  get: () => props.modelValue || '',
+  get: () => props.modelValue || undefined,
   set: (value: string) => {
     emit('update:modelValue', value)
   }
@@ -388,6 +387,7 @@ const handleSaveCharacter = async () => {
     if (isEditMode.value && editForm.value.characterId) {
       // 更新人物（使用characterId）
       await updateCharacter(editForm.value.characterId, editForm.value)
+      fetchBoundCharacter()
       antMessage.success('人物更新成功')
     } else {
       // 新建人物
@@ -601,12 +601,12 @@ onMounted(() => {
           label {
             min-width: 80px;
             font-weight: 500;
-            color: #595959;
+            color: #333;
           }
 
           span {
             flex: 1;
-            color: #262626;
+            color: #666;
           }
 
           &.full-width {
