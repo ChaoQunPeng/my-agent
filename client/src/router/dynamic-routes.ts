@@ -10,7 +10,7 @@ export default [
     meta: {
       title: '我的',
       icon: 'SmileOutlined',
-      sessionCategory: 'self'
+      sessionType: 'self'
     }
   },
   {
@@ -20,7 +20,7 @@ export default [
     meta: {
       title: 'NPC们',
       icon: 'CommentOutlined',
-      sessionCategory: 'npc'
+      sessionType: 'character'
     }
   },
   // {

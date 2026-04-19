@@ -31,14 +31,12 @@ export interface ChatStreamOptions {
  * @param options.signal 可选的中断信号，用于取消请求
  */
 export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
-  const { message, sessionId, scene, type, resourceId, onChunk, onError, onComplete, signal } = options
+  const { message, sessionId, type, onChunk, onError, onComplete, signal } = options
 
   // 构建请求体
   const body: Record<string, string> = { message }
   if (sessionId) body.sessionId = sessionId
-  if (scene) body.scene = scene
   if (type) body.type = type
-  if (resourceId) body.resourceId = resourceId
 
   await fetchEventSource(`${BASE_PREFIX}/chat/stream-message`, {
     method: 'POST',

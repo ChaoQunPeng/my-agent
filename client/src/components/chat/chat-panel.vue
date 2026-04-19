@@ -15,7 +15,7 @@
 import InputArea from '@/components/chat/input-area.vue'
 import MessageList from '@/components/chat/message-list.vue'
 import { message as antMessage } from 'ant-design-vue'
-import { addMessage } from '~@/api/session'
+import { addMessage, getSessionDetail } from '~@/api/session'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -51,6 +51,16 @@ onUnmounted(() => {
   }
 })
 
+const getMessages = async () => {
+  if (!props.sessionId) return
+  const { data } = await getSessionDetail(props.sessionId)
+  if (data) {
+    messages.value = data.messages.map((item: any) => ({
+      role: item.role,
+      content: item.content
+    }))
+  }
+}
 /**
  * 不保存记录的对话（临时对话）
  * 此功能不会将消息保存到数据库，适合临时性对话和测试
@@ -98,6 +108,7 @@ const handleSend = async (text: string) => {
     await props.apiFunc({
       message: text,
       ...props.apiParams,
+      sessionId: props.sessionId,
       signal: abortController.value.signal,
 
       onChunk: async (content: string) => {
@@ -207,7 +218,9 @@ const clearMessages = () => {
 }
 
 defineExpose({
-  clearMessages
+  stopGeneration,
+  clearMessages,
+  getMessages
 })
 </script>
 

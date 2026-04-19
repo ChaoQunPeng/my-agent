@@ -29,18 +29,13 @@
     <div class="material-area">
       <!-- 人物选择组件（仅在type为character时显示） -->
       <CharacterSelector
-        v-if="currentResourceType == 'character' && currentSessionId"
+        v-if="currentSessionType == 'character' && currentSessionId"
         :session-id="currentSessionId"
         @character-bound="handleCharacterBound"
       />
 
       <!-- 写作助手（仅在type为novel时显示） -->
-      <WritingAssistant
-        v-if="currentResourceType == 'novel' && currentSessionId"
-        :session-id="currentSessionId"
-        :session-category="sessionCategory"
-        :novel-code="currentResourceId"
-      />
+      <WritingAssistant v-if="currentSessionType == 'novel' && currentSessionId" :session-id="currentSessionId" />
     </div>
 
     <!-- 编辑会话对话框 -->
@@ -60,22 +55,12 @@ import { useRoute } from 'vue-router'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import ChatPanel from '~@/components/chat/chat-panel.vue'
-import InputArea from '@/components/chat/input-area.vue'
 import SessionItem from '@/components/chat/session-item.vue'
 import MessageList from '@/components/chat/message-list.vue'
 import WritingAssistant from './components/writing-assistant.vue'
 import CharacterSelector from './components/character-selector.vue'
-import { chatStreamApi, chatStreamNoRecordApi } from '../../composables/chat-stream'
-import {
-  getSessions,
-  createSession,
-  getSessionDetail,
-  updateSession,
-  deleteSession,
-  addMessage,
-  type Session,
-  type Message
-} from '@/api/session'
+import { chatStreamApi } from '../../composables/chat-stream'
+import { getSessions, createSession, updateSession, deleteSession, type Session } from '@/api/session'
 // 导入获取会话绑定角色的 API
 import { getCharacterBySessionId } from '@/api/character'
 
@@ -89,37 +74,13 @@ interface ChatMessage {
 // 会话相关
 const sessions = ref<Session[]>([])
 const currentSessionId = ref<string>('')
-const loading = ref(false)
+const chatPanelRef = ref<InstanceType<typeof ChatPanel> | null>(null)
 
 // 获取当前路由信息
 const route = useRoute()
 
-// 从路由meta中获取sessionCategory
-const sessionCategory = computed(() => (route.meta?.sessionCategory as string) || '')
-
-// 从路由meta中获取资源类型和资源ID（用于写作助手等组件）
-const routeResourceType = computed(() => (route.meta?.resourceType as string) || '')
-const routeResourceId = computed(() => (route.meta?.resourceId as string) || '')
-
-// 获取当前会话的资源类型和资源ID（优先使用路由中的值）
-const currentResourceType = computed(() => {
-  // 如果路由中有 resourceType，优先使用
-  if (routeResourceType.value) {
-    return routeResourceType.value
-  }
-  // 否则从会话列表中获取
-  const currentSession = sessions.value.find(s => s.sessionId === currentSessionId.value)
-  return currentSession?.type || ''
-})
-
-const currentResourceId = computed(() => {
-  // 如果路由中有 resourceId，优先使用
-  if (routeResourceId.value) {
-    return routeResourceId.value
-  }
-  // 否则从会话列表中获取
-  const currentSession = sessions.value.find(s => s.sessionId === currentSessionId.value)
-  return currentSession?.resourceId || ''
+const currentSessionType = computed(() => {
+  return route.meta?.sessionType as string
 })
 
 // 当前会话绑定的角色ID（用于聊天API调用）
@@ -153,7 +114,7 @@ onUnmounted(() => {
 const fetchSessions = async () => {
   try {
     // 根据新的schema，使用category、type、resourceId作为筛选条件
-    const res = await getSessions(currentResourceType.value)
+    const res = await getSessions(currentSessionType.value)
     sessions.value = res.data || []
   } catch (error: any) {
     antMessage.error('获取会话列表失败')
@@ -165,8 +126,7 @@ const handleCreateSession = async () => {
   try {
     // 根据新的schema，使用type和resourceId代替novelCode
     const res = await createSession({
-      type: currentResourceType.value,
-      resourceId: currentResourceId.value
+      type: currentSessionType.value
     })
     const newSession = res.data
 
@@ -184,39 +144,22 @@ const handleCreateSession = async () => {
 
 // 选择会话
 const handleSelectSession = async (sessionId: string) => {
-  if (currentSessionId.value === sessionId) return
+  // if (currentSessionId.value === sessionId) return
 
   // 如果正在发送，先停止
   if (sending.value && abortController.value) {
-    abortController.value.abort()
-    await new Promise(resolve => setTimeout(resolve, 100))
+    chatPanelRef.value?.stopGeneration()
   }
 
   currentSessionId.value = sessionId
-  loading.value = true
-  try {
-    const res = await getSessionDetail(sessionId)
-    const { messages: messageList } = res.data
-
-    // 转换消息格式
-    messages.value = messageList.map((msg: Message) => ({
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-      loading: false
-    }))
-
-    // 如果会话类型为character，获取绑定的角色ID
-    if (res.data.session.type === 'character') {
-      await fetchCurrentCharacterId(sessionId)
-    }
-
-    await nextTick()
-    messageListRef.value?.scrollToBottom()
-  } catch (error: any) {
-    antMessage.error('获取会话详情失败')
-  } finally {
-    loading.value = false
+  await nextTick()
+  chatPanelRef.value?.getMessages()
+  // 如果会话类型为character，获取绑定的角色ID
+  if (currentSessionType.value === 'character') {
+    await fetchCurrentCharacterId(sessionId)
   }
+
+  messageListRef.value?.scrollToBottom()
 }
 
 /**
