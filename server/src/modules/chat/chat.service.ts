@@ -76,6 +76,8 @@ export class ChatService {
     const cleanMessage = userMessage?.trim();
     if (!cleanMessage) throw new Error('Message content cannot be empty');
 
+    console.log(`耍都阿是`, type, resourceId);
+
     // 构建系统提示词
     const systemPrompt = await this.buildDynamicSystemPrompt(type, resourceId);
     let messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];

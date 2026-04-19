@@ -197,7 +197,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import dayjs, { Dayjs } from 'dayjs'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
@@ -214,10 +214,13 @@ import {
 // Props
 const props = defineProps<{
   sessionId: string
+  // 支持 v-model 双向绑定选中的角色ID
+  modelValue?: string
 }>()
 
 // Emits
 const emit = defineEmits<{
+  (e: 'update:modelValue', value: string): void
   (e: 'characterBound', characterId: string): void
 }>()
 
@@ -230,8 +233,13 @@ const characters = ref<Character[]>([])
 // 当前会话绑定的人物
 const boundCharacter = ref<Character | null>(null)
 
-// 选中的人物ID（用于绑定）
-const selectedCharacterId = ref<string>('')
+// 选中的人物ID（用于绑定）- 使用 computed 实现双向绑定
+const selectedCharacterId = computed({
+  get: () => props.modelValue || '',
+  set: (value: string) => {
+    emit('update:modelValue', value)
+  }
+})
 
 // 编辑对话框
 const editModalVisible = ref(false)

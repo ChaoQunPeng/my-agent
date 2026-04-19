@@ -31,8 +31,8 @@ export class CharacterService {
    */
   async create(createCharacterDto: CreateCharacterDto): Promise<Character> {
     // 如果前端没有提供characterId，则自动生成
-    const characterId = createCharacterDto.characterId || `char_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    
+    const characterId = `char_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
     // 创建新的人物记录
     const createdCharacter = new this.characterModel({
       ...createCharacterDto,
@@ -98,7 +98,9 @@ export class CharacterService {
    */
   async remove(characterId: string): Promise<void> {
     // 使用characterId字段查询并删除
-    const character = await this.characterModel.findOneAndDelete({ characterId }).exec();
+    const character = await this.characterModel
+      .findOneAndDelete({ characterId })
+      .exec();
 
     if (!character) {
       throw new NotFoundException(`Character ${characterId} not found`);

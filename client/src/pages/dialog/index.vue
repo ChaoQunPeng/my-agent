@@ -22,7 +22,15 @@
 
     <!-- 右侧聊天区域 -->
     <div class="chat-container">
-      <ChatPanel ref="chatPanelRef" :session-id="currentSessionId" :api-func="chatStreamApi" />
+      <ChatPanel
+        ref="chatPanelRef"
+        :session-id="currentSessionId"
+        :api-func="chatStreamApi"
+        :api-params="{
+          type: currentSessionType,
+          resourceId: currentCharacterId
+        }"
+      />
     </div>
 
     <!-- 素材区域 -->
@@ -31,6 +39,7 @@
       <CharacterSelector
         v-if="currentSessionType == 'character' && currentSessionId"
         :session-id="currentSessionId"
+        v-model:selected-character-id="selectedCharacterId"
         @character-bound="handleCharacterBound"
       />
 
@@ -85,6 +94,9 @@ const currentSessionType = computed(() => {
 
 // 当前会话绑定的角色ID（用于聊天API调用）
 const currentCharacterId = ref<string>('')
+
+// 选中的角色ID（用于人物选择器双向绑定）
+const selectedCharacterId = ref<string>('')
 
 // 消息相关
 const messages = ref<ChatMessage[]>([])

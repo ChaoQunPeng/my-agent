@@ -33,9 +33,10 @@ export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
   const { message, sessionId, type, resourceId, onChunk, onError, onComplete, signal } = options
 
   // 构建请求体
-  const body: Record<string, string> = { message, type, resourceId }
+  const body: Record<string, string> = { message }
   if (sessionId) body.sessionId = sessionId
   if (type) body.type = type
+  if (resourceId) body.resourceId = resourceId
 
   await fetchEventSource(`${BASE_PREFIX}/chat/stream-message`, {
     method: 'POST',
