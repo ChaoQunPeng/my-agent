@@ -5,6 +5,7 @@ import request from '@/utils/request'
  */
 export interface Character {
   _id: string // MongoDB 自动生成的唯一标识ID
+  characterId: string // 自定义的人物唯一标识（如：char_1776599676755_d4x5gbz75）
   name: string // 姓名（必填）
   gender?: number // 性别：0-未知, 1-男, 2-女, 3-其他（可选，默认0）
   birthday?: string // 出生年月：ISO 8601 格式日期字符串（可选）

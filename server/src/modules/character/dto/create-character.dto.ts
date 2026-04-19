@@ -11,9 +11,15 @@ import {
 /**
  * 创建人物的数据传输对象
  * 包含所有必填和可选字段的验证规则
+ * 字段定义与 Character Schema 保持一致
  */
 export class CreateCharacterDto {
-  // 姓名：唯一的必填项（必填）
+  // 人物唯一标识：自定义ID格式（可选，如果不提供则自动生成）
+  @IsString()
+  @IsOptional()
+  characterId?: string;
+
+  // 姓名：唯一的必填项
   @IsString()
   name!: string;
 

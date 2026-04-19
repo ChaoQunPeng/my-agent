@@ -11,8 +11,14 @@ import {
 /**
  * 更新人物的数据传输对象
  * 所有字段都是可选的，用于部分更新
+ * 字段定义与 Character Schema 保持一致
  */
 export class UpdateCharacterDto {
+  // 人物唯一标识：自定义ID格式（可选）
+  @IsString()
+  @IsOptional()
+  characterId?: string;
+
   // 姓名：真实姓名或代号（可选）
   @IsString()
   @IsOptional()

@@ -21,7 +21,7 @@
 
         <!-- 人物列表 -->
         <div class="character-list">
-          <div v-for="character in characters" :key="character._id" class="character-item" @click="handleEditCharacter(character)">
+          <div v-for="character in characters" :key="character.characterId" class="character-item" @click="handleEditCharacter(character)">
             <div class="character-info">
               <div class="character-name">{{ character.name }}</div>
               <div class="character-meta">
@@ -32,7 +32,7 @@
                 <span v-if="character.profession" class="profession-text">{{ character.profession }}</span>
               </div>
             </div>
-            <a-button type="text" size="small" @click.stop="handleDeleteCharacter(character._id)">
+            <a-button type="text" size="small" @click.stop="handleDeleteCharacter(character.characterId)">
               <DeleteOutlined />
             </a-button>
           </div>
@@ -100,7 +100,7 @@
             show-search
             :filter-option="filterCharacterOption"
           >
-            <a-select-option v-for="character in characters" :key="character._id" :value="character._id">
+            <a-select-option v-for="character in characters" :key="character.characterId" :value="character.characterId">
               <div class="select-option">
                 <span class="option-name">{{ character.name }}</span>
                 <span class="option-meta">
@@ -126,14 +126,14 @@
       @cancel="handleCancelEdit"
     >
       <a-form :model="editForm" layout="vertical" class="character-form">
-        <!-- 姓名 -->
-        <a-form-item label="姓名" required>
-          <a-input v-model:value="editForm.name" placeholder="请输入真实姓名或代号" />
-        </a-form-item>
-
-        <!-- 性别和生日 -->
+        <!-- 姓名、性别、生日 -->
         <a-row :gutter="16">
-          <a-col :span="12">
+          <a-col :span="8">
+            <a-form-item label="姓名" required>
+              <a-input v-model:value="editForm.name" placeholder="请输入真实姓名或代号" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
             <a-form-item label="性别">
               <a-select v-model:value="editForm.gender" placeholder="请选择性别">
                 <a-select-option :value="0">未知</a-select-option>
@@ -143,12 +143,23 @@
               </a-select>
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="8">
             <a-form-item label="生日">
-              <a-date-picker v-model:value="editForm.birthday" placeholder="请选择生日" style="width: 100%" format="YYYY-MM-DD" value-format="YYYY-MM-DD" />
+              <a-date-picker
+                v-model:value="editForm.birthday"
+                placeholder="请选择生日"
+                style="width: 100%"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+              />
             </a-form-item>
           </a-col>
         </a-row>
+
+        <!-- 与我的关系 -->
+        <a-form-item label="与我的关系">
+          <a-input v-model:value="editForm.relation" placeholder="描述你与人物的关系" />
+        </a-form-item>
 
         <!-- 外貌 -->
         <a-form-item label="外貌">
@@ -163,11 +174,6 @@
         <!-- 性格描述 -->
         <a-form-item label="性格描述">
           <a-textarea v-model:value="editForm.personalityDescription" placeholder="描述矛盾点和内在驱动力" :rows="4" />
-        </a-form-item>
-
-        <!-- 与我的关系 -->
-        <a-form-item label="与我的关系">
-          <a-input v-model:value="editForm.relation" placeholder="描述你与人物的关系" />
         </a-form-item>
 
         <!-- 行为图谱 -->
@@ -371,9 +377,9 @@ const handleSaveCharacter = async () => {
   }
 
   try {
-    if (isEditMode.value && editForm.value._id) {
-      // 更新人物
-      await updateCharacter(editForm.value._id, editForm.value)
+    if (isEditMode.value && editForm.value.characterId) {
+      // 更新人物（使用characterId）
+      await updateCharacter(editForm.value.characterId, editForm.value)
       antMessage.success('人物更新成功')
     } else {
       // 新建人物
@@ -636,15 +642,17 @@ onMounted(() => {
       }
     }
   }
+}
 
-  .character-form {
-    .behavior-input {
-      .behavior-item-input {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
+.character-form {
+  .behavior-item-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+
+    .ant-input {
+      flex: 1;
     }
   }
 }

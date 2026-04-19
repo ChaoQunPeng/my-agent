@@ -48,7 +48,7 @@ export class ChatService {
     if (type === 'character' && resourceId) {
       try {
         const character = await this.characterService.findOne(resourceId);
-        systemPrompt = `你将扮演演员: ${character.name}，性格: ${character.personalityOverview}`;
+        systemPrompt = `你将扮演演员: ${character.name}，性格: ${character.personalityDescription}`;
       } catch (error) {
         console.error(`获取角色信息失败:`, error);
       }

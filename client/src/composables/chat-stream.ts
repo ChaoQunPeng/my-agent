@@ -8,7 +8,6 @@ const BASE_PREFIX = import.meta.env.VITE_APP_BASE_API_DEV ?? ''
 export interface ChatStreamOptions {
   message: string // 用户消息
   sessionId?: string // 可选的会话ID
-  scene?: string // 可选的场景标识（如 "npc"、"writing"）
   type?: string // 可选的资源类型（'character' | 'novel'），用于动态构建 System Prompt
   resourceId?: string // 可选的资源ID，对应type类型的资源ID
   onChunk: (content: string) => void | Promise<void> // 接收每个数据块的回调函数
@@ -31,10 +30,10 @@ export interface ChatStreamOptions {
  * @param options.signal 可选的中断信号，用于取消请求
  */
 export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
-  const { message, sessionId, type, onChunk, onError, onComplete, signal } = options
+  const { message, sessionId, type, resourceId, onChunk, onError, onComplete, signal } = options
 
   // 构建请求体
-  const body: Record<string, string> = { message }
+  const body: Record<string, string> = { message, type, resourceId }
   if (sessionId) body.sessionId = sessionId
   if (type) body.type = type
 

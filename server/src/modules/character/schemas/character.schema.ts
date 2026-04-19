@@ -12,10 +12,14 @@ export enum Gender {
 }
 
 @Schema({
-  timestamps: true, // 记录创建/更新时间，方便追踪“行为图谱”的扩充历程
+  timestamps: true, // 记录创建/更新时间，方便追踪"行为图谱"的扩充历程
   collection: 'characters',
 })
 export class Character {
+  // 人物唯一标识：自定义ID格式（如：char_1776599676755_d4x5gbz75）
+  @Prop({ required: true, unique: true, index: true })
+  characterId!: string;
+
   // 姓名：唯一的必填项
   @Prop({ required: true, trim: true, index: true })
   name!: string;
