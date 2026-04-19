@@ -6,16 +6,16 @@ export type MessageDocument = Message & Document;
 @Schema({ timestamps: true })
 export class Message {
   @Prop({ required: true })
-  sessionId: string;
+  sessionId!: string;
 
   @Prop({ required: true, enum: ['user', 'assistant', 'system'] })
-  role: string;
+  role!: string;
 
   @Prop({ required: true })
-  content: string;
+  content!: string;
 
   @Prop({ default: Date.now })
-  timestamp: Date;
+  timestamp!: Date;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

@@ -23,28 +23,28 @@ export default [
       sessionCategory: 'npc'
     }
   },
-  {
-    path: '/dialog',
-    name: 'WriterAssistant',
-    redirect: '/writer-assistant/writer-assistan',
-    meta: {
-      title: '写作助手',
-      icon: 'EditOutlined'
-    },
-    component: basicRouteMap.RouteView,
-    children: [
-      {
-        path: '/writer-assistant/yiquanpotian',
-        name: 'yiquanpotian',
-        component: () => import('~/pages/dialog/index.vue'),
-        meta: {
-          title: '一拳破天',
-          sessionCategory: 'writing',
-          novelCode: 'yi_quan_po_tian'
-        }
-      }
-    ]
-  },
+  // {
+  //   path: '/dialog',
+  //   name: 'WriterAssistant',
+  //   redirect: '/writer-assistant/writer-assistan',
+  //   meta: {
+  //     title: '写作助手',
+  //     icon: 'EditOutlined'
+  //   },
+  //   component: basicRouteMap.RouteView,
+  //   children: [
+  //     {
+  //       path: '/writer-assistant/yiquanpotian',
+  //       name: 'yiquanpotian',
+  //       component: () => import('~/pages/dialog/index.vue'),
+  //       meta: {
+  //         title: '一拳破天',
+  //         sessionCategory: 'writing',
+  //         novelCode: 'yi_quan_po_tian'
+  //       }
+  //     }
+  //   ]
+  // },
   // {
   //   path: '/dialog/diary',
   //   name: 'diary',

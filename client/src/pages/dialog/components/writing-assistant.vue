@@ -169,7 +169,7 @@ import { getSessionDetail } from '@/api/session'
 const props = defineProps<{
   sessionId: string
   sessionCategory?: string
-  novelCode?: string
+  novelCode?: string // 小说编码（对应session的resourceId，当type='novel'时）
 }>()
 
 // Tab 激活状态

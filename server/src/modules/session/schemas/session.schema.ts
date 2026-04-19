@@ -21,10 +21,6 @@ export class Session {
   @Prop({ default: '' })
   summary!: string;
 
-  // 会话分类
-  @Prop({ default: '' })
-  category!: string;
-
   // 资源类型：'character'（角色）| 'novel'（小说）
   @Prop({ default: '' })
   type!: string;

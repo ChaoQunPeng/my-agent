@@ -7,7 +7,6 @@ export interface Session {
   sessionId: string
   title: string
   summary: string
-  category?: string
   type?: string // 资源类型：'character'（角色）| 'novel'（小说）
   resourceId?: string // 资源ID：对应type类型的资源ID
   createdAt: string
@@ -33,11 +32,9 @@ export interface Message {
  * @param type 可选的资源类型筛选条件（'character' | 'novel'）
  * @param resourceId 可选的资源ID筛选条件
  */
-export function getSessions(category?: string, type?: string, resourceId?: string) {
+export function getSessions(type?: string) {
   const params: any = {}
-  if (category) {
-    params.category = category
-  }
+
   if (type) {
     params.type = type
   }

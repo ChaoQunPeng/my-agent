@@ -113,7 +113,6 @@ export class SessionService {
       category: createSessionDto.category || '',
       type: createSessionDto.type || '',
       resourceId: createSessionDto.resourceId || '',
-      testId: createSessionDto.testId || '123',
     });
 
     console.log(`createdSession`, createdSession);
@@ -173,13 +172,11 @@ export class SessionService {
    * @param type 可选的资源类型筛选条件（'character' | 'novel'）
    * @param resourceId 可选的资源ID筛选条件
    */
-  async findAll(category?: string, type?: string, resourceId?: string): Promise<Session[]> {
+  async findAll(type?: string): Promise<Session[]> {
     // 构建查询条件
     const query: Record<string, string> = {};
-    if (category) query.category = category;
     if (type) query.type = type;
-    if (resourceId) query.resourceId = resourceId;
-    
+
     // 按更新时间倒序返回
     return this.sessionModel.find(query).sort({ updatedAt: -1 }).exec();
   }

@@ -21,12 +21,8 @@ export class SessionController {
    * 获取所有会话列表
    */
   @Post('list')
-  async findAll(@Body() params?: { category?: string; type?: string; resourceId?: string }) {
-    const sessions = await this.sessionService.findAll(
-      params?.category,
-      params?.type,
-      params?.resourceId,
-    );
+  async findAll(@Body() params?: { type?: string }) {
+    const sessions = await this.sessionService.findAll(params?.type);
     return ApiResponseDto.success(sessions);
   }
 

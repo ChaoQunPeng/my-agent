@@ -22,38 +22,24 @@
 
     <!-- 右侧聊天区域 -->
     <div class="chat-container">
-      <!-- Loading 遮罩 -->
-      <div v-if="loading" class="loading-overlay">
-        <a-spin size="large" tip="加载中..." />
-      </div>
-
-      <div class="chat-messages" ref="messagesContainer">
-        <MessageList ref="messageListRef" :messages="messages" :outputting="true" @copy="copyMessage" @regenerate="regenerateMessage" />
-      </div>
-
-      <input-area @send="handleSend" :sending="sending" @stop="stopGeneration"></input-area>
-
-      <!-- 不保存记录的对话按钮 -->
-      <!-- <div class="no-record-chat-btn">
-        <a-button type="dashed" @click="handleNoRecordChat" :disabled="sending"> 💬 临时对话（不保存） </a-button>
-      </div> -->
+      <ChatPanel ref="chatPanelRef" :session-id="currentSessionId" :api-func="chatStreamApi" />
     </div>
 
     <!-- 素材区域 -->
     <div class="material-area">
-      <!-- 人物选择组件 -->
+      <!-- 人物选择组件（仅在type为character时显示） -->
       <CharacterSelector
-        v-if="sessionCategory == 'npc' && currentSessionId"
+        v-if="currentResourceType == 'character' && currentSessionId"
         :session-id="currentSessionId"
         @character-bound="handleCharacterBound"
       />
 
-      <!-- 写作助手（仅在writing分类下显示） -->
+      <!-- 写作助手（仅在type为novel时显示） -->
       <WritingAssistant
-        v-if="sessionCategory == 'writing' && currentSessionId"
+        v-if="currentResourceType == 'novel' && currentSessionId"
         :session-id="currentSessionId"
         :session-category="sessionCategory"
-        :novel-code="currentNovelCode"
+        :novel-code="currentResourceId"
       />
     </div>
 
@@ -73,6 +59,7 @@ import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
+import ChatPanel from '~@/components/chat/chat-panel.vue'
 import InputArea from '@/components/chat/input-area.vue'
 import SessionItem from '@/components/chat/session-item.vue'
 import MessageList from '@/components/chat/message-list.vue'
@@ -110,21 +97,32 @@ const route = useRoute()
 // 从路由meta中获取sessionCategory
 const sessionCategory = computed(() => (route.meta?.sessionCategory as string) || '')
 
-// 从路由meta中获取novelCode
-const routeNovelCode = computed(() => (route.meta?.novelCode as string) || '')
+// 从路由meta中获取资源类型和资源ID（用于写作助手等组件）
+const routeResourceType = computed(() => (route.meta?.resourceType as string) || '')
+const routeResourceId = computed(() => (route.meta?.resourceId as string) || '')
 
-// 获取当前会话的 novelCode（优先使用路由中的值）
-const currentNovelCode = computed(() => {
-  // 如果路由中有 novelCode，优先使用
-  if (routeNovelCode.value) {
-    return routeNovelCode.value
+// 获取当前会话的资源类型和资源ID（优先使用路由中的值）
+const currentResourceType = computed(() => {
+  // 如果路由中有 resourceType，优先使用
+  if (routeResourceType.value) {
+    return routeResourceType.value
   }
   // 否则从会话列表中获取
   const currentSession = sessions.value.find(s => s.sessionId === currentSessionId.value)
-  return currentSession?.novelCode || ''
+  return currentSession?.type || ''
 })
 
-// 当前会话绑定的角色ID
+const currentResourceId = computed(() => {
+  // 如果路由中有 resourceId，优先使用
+  if (routeResourceId.value) {
+    return routeResourceId.value
+  }
+  // 否则从会话列表中获取
+  const currentSession = sessions.value.find(s => s.sessionId === currentSessionId.value)
+  return currentSession?.resourceId || ''
+})
+
+// 当前会话绑定的角色ID（用于聊天API调用）
 const currentCharacterId = ref<string>('')
 
 // 消息相关
@@ -140,10 +138,22 @@ const editForm = ref({
   title: ''
 })
 
+onMounted(() => {
+  fetchSessions()
+})
+
+onUnmounted(() => {
+  // 清理未完成的请求
+  if (abortController.value) {
+    abortController.value.abort()
+  }
+})
+
 // 获取会话列表
 const fetchSessions = async () => {
   try {
-    const res = await getSessions(sessionCategory.value, currentNovelCode.value)
+    // 根据新的schema，使用category、type、resourceId作为筛选条件
+    const res = await getSessions(currentResourceType.value)
     sessions.value = res.data || []
   } catch (error: any) {
     antMessage.error('获取会话列表失败')
@@ -153,7 +163,11 @@ const fetchSessions = async () => {
 // 创建新会话
 const handleCreateSession = async () => {
   try {
-    const res = await createSession({ category: sessionCategory.value, novelCode: currentNovelCode.value })
+    // 根据新的schema，使用type和resourceId代替novelCode
+    const res = await createSession({
+      type: currentResourceType.value,
+      resourceId: currentResourceId.value
+    })
     const newSession = res.data
 
     // 添加到列表顶部
@@ -191,8 +205,8 @@ const handleSelectSession = async (sessionId: string) => {
       loading: false
     }))
 
-    if (sessionCategory.value === 'digital') {
-      // 获取当前会话绑定的角色ID
+    // 如果会话类型为character，获取绑定的角色ID
+    if (res.data.session.type === 'character') {
       await fetchCurrentCharacterId(sessionId)
     }
 
@@ -212,6 +226,7 @@ const fetchCurrentCharacterId = async (sessionId: string) => {
   try {
     const res = await getCharacterBySessionId(sessionId)
     if (res.data) {
+      // 这里保留characterId用于聊天API调用
       currentCharacterId.value = res.data.characterId
     } else {
       currentCharacterId.value = ''
@@ -303,269 +318,16 @@ const handleUpdateSession = async () => {
   }
 }
 
-// 复制消息内容
-const copyMessage = async (content: string) => {
-  try {
-    await navigator.clipboard.writeText(content)
-    antMessage.success('已复制到剪贴板')
-  } catch (error) {
-    antMessage.error('复制失败')
-  }
-}
-
-// 重新生成消息
-const regenerateMessage = async (index: number) => {
-  if (sending.value || !currentSessionId.value) return
-
-  // 找到最近的用户消息
-  let userMessageIndex = -1
-  for (let i = index - 1; i >= 0; i--) {
-    if (messages.value[i].role === 'user') {
-      userMessageIndex = i
-      break
-    }
-  }
-
-  if (userMessageIndex === -1) {
-    antMessage.warning('找不到对应的用户消息')
-    return
-  }
-
-  // 删除当前的助手消息及之后的所有消息
-  messages.value.splice(index)
-
-  // 重新发送
-  const userMessage = messages.value[userMessageIndex].content
-  await handleSend(userMessage, true)
-}
-
-// 发送消息
-const handleSend = async (text: string, isRegenerate = false) => {
-  if (!text.trim() || !currentSessionId.value) {
-    if (!currentSessionId.value) {
-      antMessage.warning('请先选择或创建一个会话')
-    }
-    return
-  }
-
-  // 如果正在发送,先停止当前请求
-  if (sending.value && abortController.value) {
-    abortController.value.abort()
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-
-  sending.value = true
-  abortController.value = new AbortController()
-
-  // 如果不是重新生成,添加用户消息
-  if (!isRegenerate) {
-    messages.value.push({ role: 'user', content: text })
-
-    // 保存到后端
-    try {
-      await addMessage(currentSessionId.value, 'user', text)
-    } catch (error) {
-      console.error('保存用户消息失败', error)
-    }
-  }
-
-  // 添加 AI 回复占位(带加载状态)
-  const assistantIndex = messages.value.length
-  messages.value.push({
-    role: 'assistant',
-    content: '',
-    loading: true,
-    loadingText: ''
-  })
-
-  await nextTick()
-  messageListRef.value?.scrollToBottom()
-
-  let fullReply = ''
-
-  try {
-    await chatStreamApi({
-      message: text,
-      sessionId: currentSessionId.value,
-      scene: sessionCategory.value,
-      characterId: currentCharacterId.value,
-      signal: abortController.value.signal,
-
-      onChunk: async (content: string) => {
-        // 检查是否已中止
-        if (!abortController.value) return
-
-        // 第一次收到内容时,移除加载状态
-        if (messages.value[assistantIndex]?.loading) {
-          messages.value[assistantIndex].loading = false
-          messages.value[assistantIndex].loadingText = undefined
-        }
-
-        messages.value[assistantIndex].content += content
-        fullReply += content
-
-        await nextTick()
-        messageListRef.value?.scrollToBottom()
-      }
-    })
-
-    // 完成后移除加载状态(如果还没有内容)
-    if (messages.value[assistantIndex]?.loading) {
-      messages.value[assistantIndex].loading = false
-      messages.value[assistantIndex].loadingText = undefined
-    }
-  } catch (e: any) {
-    // 如果是被中止的,不显示错误
-    if (e.name === 'AbortError') {
-      antMessage.info('已停止生成')
-    } else {
-      antMessage.error('消息发送失败,请稍后重试')
-    }
-
-    // 移除空的 AI 占位消息
-    if (!messages.value[assistantIndex]?.content) {
-      messages.value.splice(assistantIndex, 1)
-    } else {
-      // 如果有部分内容,移除加载状态
-      if (messages.value[assistantIndex]) {
-        messages.value[assistantIndex].loading = false
-        messages.value[assistantIndex].loadingText = undefined
-      }
-    }
-  } finally {
-    // 只有当前 controller 未被替换时才重置状态
-    if (abortController.value?.signal.aborted !== true || !abortController.value) {
-      sending.value = false
-      abortController.value = null
-    }
-  }
-}
-
-// 停止生成
-const stopGeneration = () => {
-  if (abortController.value) {
-    abortController.value.abort()
-  }
-}
-
-/**
- * 不保存记录的对话（临时对话）
- * 此功能不会将消息保存到数据库，适合临时性对话和测试
- */
-const handleNoRecordChat = async (text: string) => {
-  if (!text.trim()) {
-    antMessage.warning('请输入消息内容')
-    return
-  }
-
-  // 如果正在发送,先停止当前请求
-  if (sending.value && abortController.value) {
-    abortController.value.abort()
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-
-  sending.value = true
-  abortController.value = new AbortController()
-
-  // 添加用户消息（仅显示，不保存到后端）
-  messages.value.push({ role: 'user', content: text })
-
-  // 添加 AI 回复占位(带加载状态)
-  const assistantIndex = messages.value.length
-  messages.value.push({
-    role: 'assistant',
-    content: '',
-    loading: true,
-    loadingText: ''
-  })
-
-  await nextTick()
-  messageListRef.value?.scrollToBottom()
-
-  let fullReply = ''
-
-  try {
-    await chatStreamNoRecordApi({
-      message: text,
-      systemPrompt: `你是一名侦探`,
-      signal: abortController.value.signal,
-
-      onChunk: async (content: string) => {
-        // 检查是否已中止
-        if (!abortController.value) return
-
-        // 第一次收到内容时,移除加载状态
-        if (messages.value[assistantIndex]?.loading) {
-          messages.value[assistantIndex].loading = false
-          messages.value[assistantIndex].loadingText = undefined
-        }
-
-        messages.value[assistantIndex].content += content
-        fullReply += content
-
-        await nextTick()
-        messageListRef.value?.scrollToBottom()
-      }
-    })
-
-    // 完成后移除加载状态(如果还没有内容)
-    if (messages.value[assistantIndex]?.loading) {
-      messages.value[assistantIndex].loading = false
-      messages.value[assistantIndex].loadingText = undefined
-    }
-  } catch (e: any) {
-    // 如果是被中止的,不显示错误
-    if (e.name === 'AbortError') {
-      antMessage.info('已停止生成')
-    } else {
-      antMessage.error('消息发送失败,请稍后重试')
-    }
-
-    // 移除空的 AI 占位消息
-    if (!messages.value[assistantIndex]?.content) {
-      messages.value.splice(assistantIndex, 1)
-    } else {
-      // 如果有部分内容,移除加载状态
-      if (messages.value[assistantIndex]) {
-        messages.value[assistantIndex].loading = false
-        messages.value[assistantIndex].loadingText = undefined
-      }
-    }
-  } finally {
-    // 只有当前 controller 未被替换时才重置状态
-    if (abortController.value?.signal.aborted !== true || !abortController.value) {
-      sending.value = false
-      abortController.value = null
-    }
-  }
-}
-
-onMounted(() => {
-  fetchSessions()
-})
-
-// 监听路由变化，当sessionCategory或novelCode改变时重新获取会话列表
+// 监听路由变化，当sessionCategory、resourceType或resourceId改变时重新获取会话列表
 watch(
-  () => [route.meta?.sessionCategory, route.meta?.novelCode],
+  () => [route.meta?.sessionCategory, route.meta?.resourceType, route.meta?.resourceId],
   () => {
     // 清空当前选中的会话和消息
     currentSessionId.value = ''
-    messages.value = []
     // 重新获取会话列表
     fetchSessions()
   }
 )
-
-onUnmounted(() => {
-  // 清理未完成的请求
-  if (abortController.value) {
-    abortController.value.abort()
-  }
-})
-
-defineExpose({
-  stopGeneration
-})
 </script>
 
 <style lang="less" scoped>

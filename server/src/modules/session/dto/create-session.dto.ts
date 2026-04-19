@@ -28,9 +28,4 @@ export class CreateSessionDto {
   @IsOptional()
   @IsString()
   resourceId?: string;
-
-  // 测试ID（可选，用于测试场景）
-  @IsOptional()
-  @IsString()
-  testId?: string;
 }

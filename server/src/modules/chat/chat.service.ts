@@ -7,7 +7,6 @@ import { OpenaiService } from '../../shared/openai/openai.service';
 import { CharacterService } from '../character/character.service';
 import { SessionService } from '../session/session.service';
 import { FileReaderService } from '../../shared/file-reader/file-reader.service';
-import * as path from 'path';
 
 export interface Session {
   id: string;
@@ -44,7 +43,7 @@ export class ChatService {
     resourceId?: string,
   ): Promise<string> {
     let systemPrompt = '';
-    
+
     // 如果是角色类型，获取角色信息
     if (type === 'character' && resourceId) {
       try {
@@ -54,10 +53,10 @@ export class ChatService {
         console.error(`获取角色信息失败:`, error);
       }
     }
-    
+
     // TODO: 未来可以扩展小说类型的处理逻辑
     // if (type === 'novel' && resourceId) { ... }
-    
+
     return systemPrompt;
   }
 

@@ -15,6 +15,7 @@
 import InputArea from '@/components/chat/input-area.vue'
 import MessageList from '@/components/chat/message-list.vue'
 import { message as antMessage } from 'ant-design-vue'
+import { addMessage } from '~@/api/session'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -26,6 +27,7 @@ interface ChatMessage {
 // 定义组件属性,使用 withDefaults 设置默认值
 const props = withDefaults(
   defineProps<{
+    sessionId?: string
     apiFunc: (params: any) => Promise<any>
     apiParams?: object // 将 apiParams 设为可选参数
   }>(),
@@ -63,6 +65,13 @@ const handleSend = async (text: string) => {
   if (sending.value && abortController.value) {
     abortController.value.abort()
     await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  try {
+    if (!props.sessionId) return
+    await addMessage(props.sessionId, 'user', text)
+  } catch (error) {
+    console.error('保存用户消息失败', error)
   }
 
   sending.value = true
