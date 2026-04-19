@@ -4,15 +4,16 @@ import request from '@/utils/request'
  * 人物信息接口定义
  */
 export interface Character {
-  characterId: string // 人物唯一标识ID
-  name: string // 姓名
-  gender: number // 性别：0-未知, 1-男, 2-女
-  age: number // 年龄
-  appearance: string // 外貌描述
-  profession: string // 职业
-  personalityOverview: string // 性格概述
-  personalityTags: string[] // 性格标签数组
-  behaviorDescriptions: string[] // 行为描述数组
+  _id: string // MongoDB 自动生成的唯一标识ID
+  name: string // 姓名（必填）
+  gender?: number // 性别：0-未知, 1-男, 2-女, 3-其他（可选，默认0）
+  birthday?: string // 出生年月：ISO 8601 格式日期字符串（可选）
+  appearance?: string // 外貌描述（可选）
+  profession?: string // 职业（可选）
+  personalityDescription?: string // 性格描述（可选）
+  relation?: string // 与我的关系（可选）
+  behaviorAtlas?: string[] // 行为图谱数组（可选）
+  age?: number | null // 年龄（虚拟属性，根据birthday计算得出）
   createdAt: string // 创建时间
   updatedAt: string // 更新时间
 }
@@ -27,29 +28,29 @@ export function getCharacters() {
 /**
  * 创建新人物
  */
-export function createCharacter(data: Omit<Character, 'characterId' | 'createdAt' | 'updatedAt'>) {
+export function createCharacter(data: Omit<Character, '_id' | 'createdAt' | 'updatedAt' | 'age'>) {
   return request.post<Character>('/characters/create', data)
 }
 
 /**
  * 获取人物详情
  */
-export function getCharacterDetail(characterId: string) {
-  return request.post<Character>('/characters/detail', { id: characterId })
+export function getCharacterDetail(id: string) {
+  return request.post<Character>('/characters/detail', { id })
 }
 
 /**
  * 更新人物信息
  */
-export function updateCharacter(characterId: string, data: Partial<Omit<Character, 'characterId' | 'createdAt' | 'updatedAt'>>) {
-  return request.post<Character>('/characters/update', { id: characterId, ...data })
+export function updateCharacter(id: string, data: Partial<Omit<Character, '_id' | 'createdAt' | 'updatedAt' | 'age'>>) {
+  return request.post<Character>('/characters/update', { id, ...data })
 }
 
 /**
  * 删除人物
  */
-export function deleteCharacter(characterId: string) {
-  return request.post('/characters/delete', { id: characterId })
+export function deleteCharacter(id: string) {
+  return request.post('/characters/delete', { id })
 }
 
 /**

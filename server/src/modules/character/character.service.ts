@@ -30,12 +30,8 @@ export class CharacterService {
    * @returns 创建成功的人物信息
    */
   async create(createCharacterDto: CreateCharacterDto): Promise<Character> {
-    // 生成唯一的人物ID
-    const characterId = `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // 创建新的人物记录
+    // 创建新的人物记录（MongoDB会自动生成_id）
     const createdCharacter = new this.characterModel({
-      characterId,
       ...createCharacterDto,
     });
 
@@ -52,14 +48,14 @@ export class CharacterService {
 
   /**
    * 根据ID获取人物详情
-   * @param characterId 人物ID
+   * @param id 人物ID（MongoDB _id）
    * @returns 人物详细信息
    */
-  async findOne(characterId: string): Promise<Character> {
-    const character = await this.characterModel.findOne({ characterId }).exec();
+  async findOne(id: string): Promise<Character> {
+    const character = await this.characterModel.findById(id).exec();
 
     if (!character) {
-      throw new NotFoundException(`Character ${characterId} not found`);
+      throw new NotFoundException(`Character ${id} not found`);
     }
 
     return character;
@@ -67,24 +63,24 @@ export class CharacterService {
 
   /**
    * 更新人物信息
-   * @param characterId 人物ID
+   * @param id 人物ID（MongoDB _id）
    * @param updateCharacterDto 更新人物的数据传输对象
    * @returns 更新后的人物信息
    */
   async update(
-    characterId: string,
+    id: string,
     updateCharacterDto: UpdateCharacterDto,
   ): Promise<Character> {
     const updatedCharacter = await this.characterModel
-      .findOneAndUpdate(
-        { characterId },
+      .findByIdAndUpdate(
+        id,
         { $set: updateCharacterDto },
         { new: true }, // 返回更新后的文档
       )
       .exec();
 
     if (!updatedCharacter) {
-      throw new NotFoundException(`Character ${characterId} not found`);
+      throw new NotFoundException(`Character ${id} not found`);
     }
 
     return updatedCharacter;
@@ -92,15 +88,13 @@ export class CharacterService {
 
   /**
    * 删除人物
-   * @param characterId 人物ID
+   * @param id 人物ID（MongoDB _id）
    */
-  async remove(characterId: string): Promise<void> {
-    const character = await this.characterModel
-      .findOneAndDelete({ characterId })
-      .exec();
+  async remove(id: string): Promise<void> {
+    const character = await this.characterModel.findByIdAndDelete(id).exec();
 
     if (!character) {
-      throw new NotFoundException(`Character ${characterId} not found`);
+      throw new NotFoundException(`Character ${id} not found`);
     }
   }
 
@@ -114,7 +108,7 @@ export class CharacterService {
     const { characterId, sessionId } = bindDto;
 
     // 验证人物是否存在
-    const character = await this.characterModel.findOne({ characterId }).exec();
+    const character = await this.characterModel.findById(characterId).exec();
     if (!character) {
       throw new NotFoundException(`Character ${characterId} not found`);
     }
@@ -135,9 +129,9 @@ export class CharacterService {
     // 在Session中设置type和resourceId
     await this.sessionModel
       .findOneAndUpdate(
-        { sessionId }, 
-        { $set: { type: 'character', resourceId: characterId } }, 
-        { new: true }
+        { sessionId },
+        { $set: { type: 'character', resourceId: characterId } },
+        { new: true },
       )
       .exec();
 
@@ -159,9 +153,9 @@ export class CharacterService {
       return null;
     }
 
-    // 再查询对应的人物
+    // 再查询对应的人物（resourceId存储的是MongoDB _id）
     const character = await this.characterModel
-      .findOne({ characterId: session.resourceId })
+      .findById(session.resourceId)
       .exec();
 
     return character;

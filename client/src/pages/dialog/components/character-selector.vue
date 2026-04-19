@@ -21,18 +21,18 @@
 
         <!-- 人物列表 -->
         <div class="character-list">
-          <div v-for="character in characters" :key="character.characterId" class="character-item" @click="handleEditCharacter(character)">
+          <div v-for="character in characters" :key="character._id" class="character-item" @click="handleEditCharacter(character)">
             <div class="character-info">
               <div class="character-name">{{ character.name }}</div>
               <div class="character-meta">
-                <span class="gender-tag" :class="getGenderClass(character.gender)">
-                  {{ getGenderText(character.gender) }}
+                <span class="gender-tag" :class="getGenderClass(character.gender || 0)">
+                  {{ getGenderText(character.gender || 0) }}
                 </span>
-                <span class="age-text">{{ character.age }}岁</span>
-                <span class="profession-text">{{ character.profession }}</span>
+                <span v-if="character.age" class="age-text">{{ character.age }}岁</span>
+                <span v-if="character.profession" class="profession-text">{{ character.profession }}</span>
               </div>
             </div>
-            <a-button type="text" size="small" @click.stop="handleDeleteCharacter(character.characterId)">
+            <a-button type="text" size="small" @click.stop="handleDeleteCharacter(character._id)">
               <DeleteOutlined />
             </a-button>
           </div>
@@ -54,39 +54,38 @@
             </div>
             <div class="detail-item">
               <label>性别：</label>
-              <span>{{ getGenderText(boundCharacter.gender) }}</span>
+              <span>{{ getGenderText(boundCharacter.gender || 0) }}</span>
             </div>
-            <div class="detail-item">
+            <div v-if="boundCharacter.age" class="detail-item">
               <label>年龄：</label>
               <span>{{ boundCharacter.age }}岁</span>
             </div>
-            <div class="detail-item">
-              <label>外貌：</label>
-              <span>{{ boundCharacter.appearance || '未填写' }}</span>
+            <div v-if="boundCharacter.birthday" class="detail-item">
+              <label>生日：</label>
+              <span>{{ formatDate(boundCharacter.birthday) }}</span>
             </div>
-            <div class="detail-item">
+            <div v-if="boundCharacter.appearance" class="detail-item full-width">
+              <label>外貌：</label>
+              <span>{{ boundCharacter.appearance }}</span>
+            </div>
+            <div v-if="boundCharacter.profession" class="detail-item full-width">
               <label>职业：</label>
               <span>{{ boundCharacter.profession }}</span>
             </div>
-            <div class="detail-item full-width">
-              <label>性格概述：</label>
-              <span>{{ boundCharacter.personalityOverview }}</span>
+            <div v-if="boundCharacter.personalityDescription" class="detail-item full-width">
+              <label>性格描述：</label>
+              <span>{{ boundCharacter.personalityDescription }}</span>
             </div>
-            <div class="detail-item full-width">
-              <label>性格标签：</label>
-              <div class="tags-container">
-                <a-tag v-for="tag in boundCharacter.personalityTags" :key="tag" color="blue">
-                  {{ tag }}
-                </a-tag>
-              </div>
+            <div v-if="boundCharacter.relation" class="detail-item full-width">
+              <label>关系：</label>
+              <span>{{ boundCharacter.relation }}</span>
             </div>
-            <div class="detail-item full-width">
-              <label>行为描述：</label>
+            <div v-if="boundCharacter.behaviorAtlas && boundCharacter.behaviorAtlas.length > 0" class="detail-item full-width">
+              <label>行为图谱：</label>
               <div class="behavior-list">
-                <div v-for="(desc, index) in boundCharacter.behaviorDescriptions" :key="index" class="behavior-item">
+                <div v-for="(desc, index) in boundCharacter.behaviorAtlas" :key="index" class="behavior-item">
                   {{ index + 1 }}. {{ desc }}
                 </div>
-                <span v-if="!boundCharacter.behaviorDescriptions || boundCharacter.behaviorDescriptions.length === 0"> 未填写 </span>
               </div>
             </div>
           </div>
@@ -101,11 +100,13 @@
             show-search
             :filter-option="filterCharacterOption"
           >
-            <a-select-option v-for="character in characters" :key="character.characterId" :value="character.characterId">
+            <a-select-option v-for="character in characters" :key="character._id" :value="character._id">
               <div class="select-option">
                 <span class="option-name">{{ character.name }}</span>
                 <span class="option-meta">
-                  · {{ getGenderText(character.gender) }} · {{ character.age }}岁 · {{ character.profession }}
+                  · {{ getGenderText(character.gender || 0) }}
+                  <span v-if="character.age">· {{ character.age }}岁</span>
+                  <span v-if="character.profession">· {{ character.profession }}</span>
                 </span>
               </div>
             </a-select-option>
@@ -130,20 +131,21 @@
           <a-input v-model:value="editForm.name" placeholder="请输入真实姓名或代号" />
         </a-form-item>
 
-        <!-- 性别和年龄 -->
+        <!-- 性别和生日 -->
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="性别" required>
+            <a-form-item label="性别">
               <a-select v-model:value="editForm.gender" placeholder="请选择性别">
                 <a-select-option :value="0">未知</a-select-option>
                 <a-select-option :value="1">男</a-select-option>
                 <a-select-option :value="2">女</a-select-option>
+                <a-select-option :value="3">其他</a-select-option>
               </a-select>
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="年龄" required>
-              <a-input-number v-model:value="editForm.age" :min="1" :max="150" placeholder="请输入年龄" style="width: 100%" />
+            <a-form-item label="生日">
+              <a-date-picker v-model:value="editForm.birthday" placeholder="请选择生日" style="width: 100%" format="YYYY-MM-DD" value-format="YYYY-MM-DD" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -154,30 +156,25 @@
         </a-form-item>
 
         <!-- 职业 -->
-        <a-form-item label="职业" required>
-          <a-input v-model:value="editForm.profession" placeholder="描述职业对思维方式的影响，不要只是标签化" />
+        <a-form-item label="职业">
+          <a-input v-model:value="editForm.profession" placeholder="描述职业对思维方式的影响" />
         </a-form-item>
 
-        <!-- 性格概述 -->
-        <a-form-item label="性格概述" required>
-          <a-textarea v-model:value="editForm.personalityOverview" placeholder="描述矛盾点和内在驱动力" :rows="4" />
+        <!-- 性格描述 -->
+        <a-form-item label="性格描述">
+          <a-textarea v-model:value="editForm.personalityDescription" placeholder="描述矛盾点和内在驱动力" :rows="4" />
         </a-form-item>
 
-        <!-- 性格标签 -->
-        <a-form-item label="性格标签" required>
-          <a-select
-            v-model:value="editForm.personalityTags"
-            mode="tags"
-            placeholder="输入3-5个关键性格锚点，按回车添加"
-            :max-tag-count="5"
-          />
+        <!-- 与我的关系 -->
+        <a-form-item label="与我的关系">
+          <a-input v-model:value="editForm.relation" placeholder="描述你与人物的关系" />
         </a-form-item>
 
-        <!-- 行为描述 -->
-        <a-form-item label="行为描述">
+        <!-- 行为图谱 -->
+        <a-form-item label="行为图谱">
           <div class="behavior-input">
-            <div v-for="(desc, index) in editForm.behaviorDescriptions || []" :key="index" class="behavior-item-input">
-              <a-input v-model:value="editForm.behaviorDescriptions![index]" placeholder="描述解决问题的逻辑、应对压力的反应" />
+            <div v-for="(desc, index) in editForm.behaviorAtlas || []" :key="index" class="behavior-item-input">
+              <a-input v-model:value="editForm.behaviorAtlas![index]" placeholder="描述解决问题的逻辑、应对压力的反应" />
               <a-button type="text" danger @click="removeBehaviorDescription(index)">
                 <DeleteOutlined />
               </a-button>
@@ -195,6 +192,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import dayjs, { Dayjs } from 'dayjs'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import {
@@ -235,12 +233,12 @@ const isEditMode = ref(false)
 const editForm = ref<Partial<Character>>({
   name: '',
   gender: 0,
-  age: undefined,
+  birthday: undefined,
   appearance: '',
   profession: '',
-  personalityOverview: '',
-  personalityTags: [],
-  behaviorDescriptions: []
+  personalityDescription: '',
+  relation: '',
+  behaviorAtlas: []
 })
 
 /**
@@ -270,13 +268,21 @@ const fetchBoundCharacter = async () => {
 }
 
 /**
+ * 格式化日期
+ */
+const formatDate = (dateStr: string): string => {
+  return dayjs(dateStr).format('YYYY年MM月DD日')
+}
+
+/**
  * 获取性别文本
  */
 const getGenderText = (gender: number): string => {
   const genderMap: Record<number, string> = {
     0: '未知',
     1: '男',
-    2: '女'
+    2: '女',
+    3: '其他'
   }
   return genderMap[gender] || '未知'
 }
@@ -288,7 +294,8 @@ const getGenderClass = (gender: number): string => {
   const classMap: Record<number, string> = {
     0: 'gender-unknown',
     1: 'gender-male',
-    2: 'gender-female'
+    2: 'gender-female',
+    3: 'gender-other'
   }
   return classMap[gender] || 'gender-unknown'
 }
@@ -310,12 +317,12 @@ const handleCreateCharacter = () => {
   editForm.value = {
     name: '',
     gender: 0,
-    age: undefined,
+    birthday: undefined,
     appearance: '',
     profession: '',
-    personalityOverview: '',
-    personalityTags: [],
-    behaviorDescriptions: []
+    personalityDescription: '',
+    relation: '',
+    behaviorAtlas: ['']
   }
   editModalVisible.value = true
 }
@@ -334,7 +341,7 @@ const handleEditCharacter = (character: Character) => {
 /**
  * 删除人物
  */
-const handleDeleteCharacter = (characterId: string) => {
+const handleDeleteCharacter = (id: string) => {
   Modal.confirm({
     title: '确认删除',
     content: '确定要删除这个人物吗？删除后无法恢复。',
@@ -343,7 +350,7 @@ const handleDeleteCharacter = (characterId: string) => {
     okType: 'danger',
     onOk: async () => {
       try {
-        await deleteCharacter(characterId)
+        await deleteCharacter(id)
         await fetchCharacters()
         antMessage.success('人物删除成功')
       } catch (error: any) {
@@ -362,31 +369,11 @@ const handleSaveCharacter = async () => {
     antMessage.warning('请输入姓名')
     return
   }
-  if (editForm.value.gender === undefined || editForm.value.gender === null) {
-    antMessage.warning('请选择性别')
-    return
-  }
-  if (!editForm.value.age) {
-    antMessage.warning('请输入年龄')
-    return
-  }
-  if (!editForm.value.profession?.trim()) {
-    antMessage.warning('请输入职业')
-    return
-  }
-  if (!editForm.value.personalityOverview?.trim()) {
-    antMessage.warning('请输入性格概述')
-    return
-  }
-  if (!editForm.value.personalityTags || editForm.value.personalityTags.length === 0) {
-    antMessage.warning('请至少添加一个性格标签')
-    return
-  }
 
   try {
-    if (isEditMode.value && editForm.value.characterId) {
+    if (isEditMode.value && editForm.value._id) {
       // 更新人物
-      await updateCharacter(editForm.value.characterId, editForm.value)
+      await updateCharacter(editForm.value._id, editForm.value)
       antMessage.success('人物更新成功')
     } else {
       // 新建人物
@@ -412,17 +399,17 @@ const handleCancelEdit = () => {
  * 添加行为描述
  */
 const addBehaviorDescription = () => {
-  if (!editForm.value.behaviorDescriptions) {
-    editForm.value.behaviorDescriptions = []
+  if (!editForm.value.behaviorAtlas) {
+    editForm.value.behaviorAtlas = []
   }
-  editForm.value.behaviorDescriptions.push('')
+  editForm.value.behaviorAtlas.push('')
 }
 
 /**
  * 移除行为描述
  */
 const removeBehaviorDescription = (index: number) => {
-  editForm.value.behaviorDescriptions?.splice(index, 1)
+  editForm.value.behaviorAtlas?.splice(index, 1)
 }
 
 /**
@@ -563,6 +550,11 @@ onMounted(() => {
               &.gender-female {
                 background: #fff0f6;
                 color: #eb2f96;
+              }
+
+              &.gender-other {
+                background: #f9f0ff;
+                color: #722ed1;
               }
 
               &.gender-unknown {
