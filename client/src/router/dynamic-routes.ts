@@ -23,28 +23,38 @@ export default [
       sessionType: 'character'
     }
   },
-  // {
-  //   path: '/dialog',
-  //   name: 'WriterAssistant',
-  //   redirect: '/writer-assistant/writer-assistan',
-  //   meta: {
-  //     title: '写作助手',
-  //     icon: 'EditOutlined'
-  //   },
-  //   component: basicRouteMap.RouteView,
-  //   children: [
-  //     {
-  //       path: '/writer-assistant/yiquanpotian',
-  //       name: 'yiquanpotian',
-  //       component: () => import('~/pages/dialog/index.vue'),
-  //       meta: {
-  //         title: '一拳破天',
-  //         sessionCategory: 'writing',
-  //         novelCode: 'yi_quan_po_tian'
-  //       }
-  //     }
-  //   ]
-  // },
+  {
+    path: '/dialog',
+    name: 'WriterAssistant',
+    redirect: '/writer-assistant/writer-assistan',
+    meta: {
+      title: '写作助手',
+      icon: 'EditOutlined'
+    },
+    component: basicRouteMap.RouteView,
+    children: [
+      {
+        path: '/writer-assistant/yiquanpotian',
+        name: 'yiquanpotian',
+        component: () => import('~/pages/dialog/index.vue'),
+        meta: {
+          title: '一拳破天',
+          sessionCategory: 'writing',
+          novelCode: 'yi_quan_po_tian'
+        }
+      },
+      // 小说大纲生成：上传 txt → 拆分 → 调用大模型增量生成大纲
+      {
+        path: '/writer-assistant/novel-outline',
+        name: 'WriterAssistantNovelOutline',
+        component: () => import('~/pages/writer-assistant/novel-outline/index.vue'),
+        meta: {
+          title: '小说大纲生成',
+          icon: 'FileTextOutlined'
+        }
+      }
+    ]
+  },
   // {
   //   path: '/dialog/diary',
   //   name: 'diary',

@@ -15,6 +15,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { SessionModule } from './modules/session/session.module';
 import { NovelContextModule } from './modules/novel-context/novel-context.module';
 import { CharacterModule } from './modules/character/character.module';
+import { NovelOutlineModule } from './modules/novel-outline/novel-outline.module';
 // import { TaskModule } from './modules/task/task.module';
 
 @Module({
@@ -34,6 +35,7 @@ import { CharacterModule } from './modules/character/character.module';
     SessionModule,
     NovelContextModule,
     CharacterModule, // 注册人物模块
+    NovelOutlineModule, // 小说大纲生成模块（拆分 txt + 调用大模型增量生成大纲）
     // UserModule,
     // TaskModule,
   ],
