@@ -2,6 +2,47 @@
   <div class="novel-outline-page">
     <!-- 左侧：上传 + 任务控制 -->
     <div class="left-panel">
+      <!-- 恢复任务：在后端重启 / 页面刷新后，通过 jobId 重新挂上某个历史任务 -->
+      <a-card title="0. 恢复任务" size="small" class="mb-12">
+        <a-form layout="vertical">
+          <a-form-item label="小说编码 novelCode">
+            <a-input-search
+              v-model:value="recoverForm.novelCode"
+              placeholder="输入 novelCode 查询历史任务"
+              enter-button="列出任务"
+              :loading="listingJobs"
+              @search="handleListJobs"
+            />
+          </a-form-item>
+          <a-form-item label="选择历史任务 jobId">
+            <a-select
+              v-model:value="recoverForm.jobId"
+              placeholder="先点上方'列出任务'"
+              :options="jobOptions"
+              :disabled="!jobOptions.length"
+              style="width: 100%"
+              option-label-prop="label"
+            >
+              <template #option="{ label, desc }">
+                <div class="job-option">
+                  <div class="job-option-title">{{ label }}</div>
+                  <div class="job-option-desc">{{ desc }}</div>
+                </div>
+              </template>
+            </a-select>
+          </a-form-item>
+          <a-button
+            type="primary"
+            block
+            :disabled="!recoverForm.jobId"
+            :loading="recovering"
+            @click="handleRecover"
+          >
+            恢复此任务
+          </a-button>
+        </a-form>
+      </a-card>
+
       <a-card title="1. 上传 TXT 并拆分" size="small">
         <a-form layout="vertical" :model="form">
           <a-form-item label="小说编码 novelCode" required>
@@ -129,6 +170,7 @@ import {
   getOutlineJobStatus,
   abortOutlineJob,
   getNovelOutline,
+  listOutlineJobs,
   type NovelOutlineJob,
   type NovelOutlineResult
 } from '@/api/novel-outline'
@@ -154,16 +196,30 @@ const queryNovelCode = ref('')
 const uploading = ref(false)
 const generating = ref(false)
 
+// 恢复任务相关状态：用户输入 novelCode，查询历史 job 列表，选中后恢复为 currentJob
+const recoverForm = reactive({
+  novelCode: '',
+  jobId: ''
+})
+const listingJobs = ref(false)
+const recovering = ref(false)
+// 下拉可选项（来自 listOutlineJobs 的返回）
+const jobOptions = ref<Array<{ value: string; label: string; desc: string }>>([])
+
 // 轮询定时器
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const canUpload = computed(() => !!form.novelCode && !!pickedFile.value && !uploading.value)
+// 允许续跑的状态：
+// - split_done / failed / aborted：常规可续跑
+// - generating：后端重启后残留的"假在跑"任务，允许强制再次拉起（后端有二次校验）
 const canGenerate = computed(
   () =>
     !!currentJob.value &&
     (currentJob.value.status === 'split_done' ||
       currentJob.value.status === 'failed' ||
-      currentJob.value.status === 'aborted') &&
+      currentJob.value.status === 'aborted' ||
+      currentJob.value.status === 'generating') &&
     currentJob.value.processedChunks < currentJob.value.totalChunks
 )
 const canAbort = computed(
@@ -333,6 +389,78 @@ async function loadOutline() {
   }
 }
 
+/**
+ * 列出指定 novelCode 的历史任务，填充下拉选项
+ */
+async function handleListJobs() {
+  const code = recoverForm.novelCode.trim()
+  if (!code) {
+    antMessage.warning('请先输入 novelCode')
+    return
+  }
+  listingJobs.value = true
+  try {
+    const res = await listOutlineJobs(code)
+    const jobs = res.data || []
+    jobOptions.value = jobs.map(j => ({
+      value: j.jobId,
+      // 下拉关闭时显示的紧凑文案
+      label: `${j.jobId}  [${j.status}]  ${j.processedChunks}/${j.totalChunks}`,
+      // 下拉展开时副标题，便于区分同一 novelCode 下的多次上传
+      desc: `原文：${j.sourceFileName}  · 创建：${formatTime(j.createdAt)}`
+    }))
+    recoverForm.jobId = ''
+    if (!jobs.length) antMessage.info('该 novelCode 没有历史任务')
+    else antMessage.success(`共 ${jobs.length} 条历史任务`)
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '查询失败')
+  } finally {
+    listingJobs.value = false
+  }
+}
+
+/**
+ * 根据选中的 jobId 恢复任务：拉取 job 快照 + 大纲，按状态决定是否重启轮询
+ */
+async function handleRecover() {
+  if (!recoverForm.jobId) return
+  recovering.value = true
+  try {
+    const res = await getOutlineJobStatus(recoverForm.jobId)
+    if (!res.data) {
+      antMessage.error('未查到该任务')
+      return
+    }
+    currentJob.value = res.data
+    queryNovelCode.value = res.data.novelCode
+    // 同步到上传表单的 novelCode，便于后续继续生成 / 中止按钮的语义统一
+    form.novelCode = res.data.novelCode
+    await loadOutline()
+    // 若任务仍被标记为生成中（可能是后端重启后残留），打开轮询让 UI 感知最新状态
+    if (res.data.status === 'generating') {
+      startPolling()
+      antMessage.warning('任务状态仍为 generating，若确认后端已停止，请点击"继续生成大纲"强制续跑')
+    } else {
+      antMessage.success('任务已恢复')
+    }
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '恢复失败')
+  } finally {
+    recovering.value = false
+  }
+}
+
+/**
+ * 格式化时间戳为短文本（下拉副标题用）
+ */
+function formatTime(t?: string): string {
+  if (!t) return '-'
+  const d = new Date(t)
+  if (Number.isNaN(d.getTime())) return t
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 // 切换 novelCode 时自动清掉旧大纲
 watch(
   () => form.novelCode,
@@ -366,7 +494,22 @@ onBeforeUnmount(() => {
 .mt-12 {
   margin-top: 12px;
 }
+.mb-12 {
+  margin-bottom: 12px;
+}
 .fs-12 {
+  font-size: 12px;
+  color: #999;
+}
+// 恢复任务下拉里每项的双行展示
+.job-option {
+  line-height: 1.4;
+  padding: 2px 0;
+}
+.job-option-title {
+  font-size: 13px;
+}
+.job-option-desc {
   font-size: 12px;
   color: #999;
 }

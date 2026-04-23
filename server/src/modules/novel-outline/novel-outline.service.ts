@@ -63,12 +63,17 @@ export class NovelOutlineService {
     const chunkDir = path.join(this.uploadRoot, jobId);
     await fs.mkdir(chunkDir, { recursive: true });
 
-    // 原文持久化到目录内（便于日后重跑）
-    const sourceFilePath = path.join(chunkDir, '__source__.txt');
-    await fs.writeFile(sourceFilePath, fileBuffer);
+    // 自动识别原文编码（UTF-8 / UTF-16 / GBK(GB18030) 等），统一解码为 JS 字符串
+    const { text: sourceText, encoding: detectedEncoding } =
+      this.decodeNovelBuffer(fileBuffer);
+    this.logger.log(
+      `原文解码完成 jobId=${jobId} encoding=${detectedEncoding} chars=${sourceText.length}`,
+    );
 
-    // 读取为字符串（统一按 UTF-8）
-    const sourceText = fileBuffer.toString('utf-8');
+    // 原文持久化到目录内（统一以 UTF-8 落盘，便于日后重跑 & 后续 chunk 统一编码）
+    const sourceFilePath = path.join(chunkDir, '__source__.txt');
+    await fs.writeFile(sourceFilePath, sourceText, 'utf-8');
+
     const totalChars = Array.from(sourceText).length;
     const estimated = this.splitter.estimateChunkCount(totalChars, {
       chunkSize,
@@ -303,6 +308,57 @@ export class NovelOutlineService {
       await fs.rm(dir, { recursive: true, force: true });
     } catch (err) {
       this.logger.warn(`清理目录失败 ${dir}: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * 自动识别小说 txt 原文编码并解码成 JS 字符串
+   * 识别顺序：
+   * 1. UTF-8 / UTF-16LE / UTF-16BE BOM：直接按对应编码解码
+   * 2. 无 BOM 时，先严格模式尝试 UTF-8（fatal=true），合法则视为 UTF-8
+   * 3. UTF-8 严格解码失败，说明是 GBK 系国标编码，退回 gb18030（GBK 的超集）
+   * 说明：Node.js 内置 ICU 支持 gb18030，无需引入 iconv-lite 等额外依赖
+   */
+  private decodeNovelBuffer(buf: Buffer): { text: string; encoding: string } {
+    // 1) 优先基于 BOM 判断
+    if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) {
+      return {
+        text: new TextDecoder('utf-8').decode(buf.subarray(3)),
+        encoding: 'utf-8 (bom)',
+      };
+    }
+    if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+      return {
+        text: new TextDecoder('utf-16le').decode(buf.subarray(2)),
+        encoding: 'utf-16le',
+      };
+    }
+    if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+      return {
+        text: new TextDecoder('utf-16be').decode(buf.subarray(2)),
+        encoding: 'utf-16be',
+      };
+    }
+
+    // 2) 无 BOM：严格模式尝试 UTF-8，失败则视为非 UTF-8
+    try {
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+      return { text, encoding: 'utf-8' };
+    } catch {
+      // 3) 回退到 GB18030（兼容 GBK / GB2312）
+      try {
+        const text = new TextDecoder('gb18030').decode(buf);
+        return { text, encoding: 'gb18030' };
+      } catch (err) {
+        // gb18030 解码还失败的话，最后再宽松地按 UTF-8（非 fatal）兜底，避免整体崩溃
+        this.logger.warn(
+          `gb18030 解码失败，回退到宽松 UTF-8: ${(err as Error).message}`,
+        );
+        return {
+          text: new TextDecoder('utf-8').decode(buf),
+          encoding: 'utf-8 (lossy)',
+        };
+      }
     }
   }
 

@@ -45,8 +45,13 @@ export class NovelOutlineController {
     if (!file) {
       throw new BadRequestException('请上传 txt 文件（字段名：file）');
     }
+    // multer 默认按 latin1 解码 originalname，中文会乱码（如 é¾æ[1-3é¨å¨].txt），
+    // 这里统一按 utf-8 重新解码还原真实文件名
+    const originalName = Buffer.from(file.originalname, 'latin1').toString(
+      'utf8',
+    );
     // 简单校验扩展名 & mime
-    const name = file.originalname?.toLowerCase() ?? '';
+    const name = originalName.toLowerCase();
     if (!name.endsWith('.txt')) {
       throw new BadRequestException('仅支持 .txt 文件');
     }
@@ -62,7 +67,7 @@ export class NovelOutlineController {
       novelCode: body.novelCode,
       chunkSize,
       overlap,
-      sourceFileName: file.originalname,
+      sourceFileName: originalName,
       fileBuffer: file.buffer,
     });
     return ApiResponseDto.success(job, '拆分完成');
