@@ -33,6 +33,9 @@ export class NovelOutlineService {
   // 进程内正在跑的生成任务 jobId 集合，防止重复启动
   private readonly runningJobs = new Set<string>();
 
+  // 每个正在生成的任务对应的 AbortController，用于在用户点击"中止"时立即 cancel 底层 LLM 请求
+  private readonly jobControllers = new Map<string, AbortController>();
+
   constructor(
     @InjectModel(NovelSplitJob.name)
     private jobModel: Model<NovelSplitJobDocument>,
@@ -58,8 +61,12 @@ export class NovelOutlineService {
   }): Promise<NovelSplitJob> {
     const { novelCode, chunkSize, overlap, sourceFileName, fileBuffer } = params;
 
-    // 生成 jobId & 目录
-    const jobId = `novel_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    // 生成 jobId & 目录：把 novelCode 编入目录名，便于按小说归档查找
+    // novelCode 做一次文件系统安全化：只保留字母/数字/下划线/短横线
+    const safeNovelCode =
+      (novelCode || '').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) ||
+      'unknown';
+    const jobId = `novel_${safeNovelCode}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     const chunkDir = path.join(this.uploadRoot, jobId);
     await fs.mkdir(chunkDir, { recursive: true });
 
@@ -162,9 +169,14 @@ export class NovelOutlineService {
     );
     this.runningJobs.add(jobId);
 
+    // 为本次运行创建 AbortController，abortJob 时会调用 .abort() 立即中断 LLM 请求
+    const controller = new AbortController();
+    this.jobControllers.set(jobId, controller);
+
     // 异步执行（Promise 脱离主链路），错误在内部捕获并写库
-    void this.runGenerateLoop(jobId).finally(() => {
+    void this.runGenerateLoop(jobId, controller.signal).finally(() => {
       this.runningJobs.delete(jobId);
+      this.jobControllers.delete(jobId);
     });
 
     return (await this.jobModel.findOne({ jobId }).exec())!;
@@ -173,8 +185,16 @@ export class NovelOutlineService {
   /**
    * 后台生成循环：从 processedChunks 继续，逐块请求大模型并更新大纲
    * 关键要求（来自需求）：每次都带上"已知大纲 + 新片段"
+   * 中止策略：
+   *   1. 每轮开头检查一次 status（避免状态突变后进入下一块）
+   *   2. 调 LLM 时透传 AbortSignal，abortJob 触发后立即 cancel 网络请求
+   *   3. LLM 返回后再校验一次 status，防止极端时序下结果污染大纲
    */
-  private async runGenerateLoop(jobId: string): Promise<void> {
+  private async runGenerateLoop(
+    jobId: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    this.logger.log(`[gen-loop] 开始生成循环 jobId=${jobId}`);
     try {
       // 每轮都重新读任务，以便响应外部 abort
       let job = await this.findJobOrThrow(jobId);
@@ -183,7 +203,9 @@ export class NovelOutlineService {
         // 中途被中止 / 被删除 → 终止
         const latest = await this.jobModel.findOne({ jobId }).exec();
         if (!latest || latest.status !== 'generating') {
-          this.logger.warn(`生成循环提前结束：${jobId} -> ${latest?.status}`);
+          this.logger.warn(
+            `[gen-loop] 退出循环（状态变更）jobId=${jobId} status=${latest?.status ?? 'missing'} processed=${latest?.processedChunks ?? '?'}/${latest?.totalChunks ?? '?'}`,
+          );
           return;
         }
         job = latest;
@@ -194,7 +216,9 @@ export class NovelOutlineService {
             { jobId },
             { $set: { status: 'done' } },
           );
-          this.logger.log(`任务完成：${jobId}`);
+          this.logger.log(
+            `[gen-loop] 任务完成 jobId=${jobId} total=${job.totalChunks}`,
+          );
           return;
         }
 
@@ -210,6 +234,10 @@ export class NovelOutlineService {
           this.emptyOutline(job.novelCode);
 
         // 调大模型：已知大纲 + 新片段
+        this.logger.log(
+          `[gen-loop] → 调用大模型 jobId=${jobId} chunk=${nextIndex}/${job.totalChunks} chunkChars=${chunkText.length}`,
+        );
+        const llmStart = Date.now();
         const { payload, raw } = await this.generator.updateOutlineWithChunk(
           {
             synopsis: existing.synopsis,
@@ -221,7 +249,21 @@ export class NovelOutlineService {
           nextIndex,
           job.totalChunks,
           chunkText,
+          signal,
         );
+        const llmCost = Date.now() - llmStart;
+        this.logger.log(
+          `[gen-loop] ← 大模型返回 jobId=${jobId} chunk=${nextIndex}/${job.totalChunks} cost=${llmCost}ms rawLen=${raw?.length ?? 0}`,
+        );
+
+        // 大模型返回后再校验一次：如果此时已被中止，本轮结果直接丢弃，避免污染大纲
+        const afterCall = await this.jobModel.findOne({ jobId }).exec();
+        if (!afterCall || afterCall.status !== 'generating') {
+          this.logger.warn(
+            `[gen-loop] 大模型返回后检测到中止，丢弃本轮结果 jobId=${jobId} chunk=${nextIndex} status=${afterCall?.status ?? 'missing'}`,
+          );
+          return;
+        }
 
         // upsert 大纲
         await this.outlineModel.updateOne(
@@ -242,13 +284,37 @@ export class NovelOutlineService {
           { jobId },
           { $set: { processedChunks: nextIndex } },
         );
+        this.logger.log(
+          `[gen-loop] ✓ 进度更新 jobId=${jobId} processed=${nextIndex}/${job.totalChunks}`,
+        );
       }
     } catch (err) {
-      this.logger.error(`生成任务失败 jobId=${jobId}: ${(err as Error).stack}`);
+      const e = err as Error;
+      // 1) AbortError：用户点了中止，signal 让 LLM/fetch 从 await 中立刻抛出。正常语义，不算失败
+      const isAbortError =
+        e?.name === 'AbortError' ||
+        signal.aborted ||
+        /aborted/i.test(e?.message || '');
+      if (isAbortError) {
+        this.logger.warn(
+          `[gen-loop] LLM 请求被中止（AbortController）jobId=${jobId} msg=${e?.message}`,
+        );
+        return;
+      }
+      // 2) 竞态保护：如果此刻 status 已经是 aborted（用户在 IO 期间点了中止导致的 ENOENT 等），
+      //    不要再把它覆盖为 failed——那样会误报给前端"失败了"
+      const latest = await this.jobModel.findOne({ jobId }).exec();
+      if (latest && latest.status === 'aborted') {
+        this.logger.warn(
+          `[gen-loop] 捕获到异常但任务已被中止，跳过 failed 覆盖 jobId=${jobId} err=${e?.message}`,
+        );
+        return;
+      }
+      this.logger.error(`[gen-loop] 任务失败 jobId=${jobId}: ${e?.stack}`);
       await this.jobModel.updateOne(
         { jobId },
         {
-          $set: { status: 'failed', lastError: (err as Error).message },
+          $set: { status: 'failed', lastError: e?.message },
         },
       );
     }
@@ -256,14 +322,44 @@ export class NovelOutlineService {
 
   /**
    * 中止任务并清理切片目录
+   * 立即中止策略：
+   *   1. 通过 AbortController.abort() 让正在飞的 LLM HTTP 请求从网络层断开（不再等它返回）
+   *   2. 把 DB 状态置为 aborted（双保险：即便 controller 已经被清掉，循环下一轮检查也会退出）
+   *   3. 清理切片目录
    */
   async abortJob(jobId: string): Promise<void> {
     const job = await this.findJobOrThrow(jobId);
+    const controller = this.jobControllers.get(jobId);
+    const hasController = !!controller;
+    this.logger.warn(
+      `[abort] 收到中止请求 jobId=${jobId} novelCode=${job.novelCode} currentStatus=${job.status} processed=${job.processedChunks}/${job.totalChunks} hasController=${hasController}`,
+    );
+
+    // 先触发 abort：尽早让底层 fetch 抛 AbortError，循环会立刻从 await 里跳出
+    if (controller) {
+      try {
+        controller.abort();
+        this.logger.warn(
+          `[abort] 已触发 AbortController.abort() jobId=${jobId}，当前飞行中的 LLM 请求将被取消`,
+        );
+      } catch (e) {
+        this.logger.error(
+          `[abort] 触发 abort 时异常 jobId=${jobId}: ${(e as Error).message}`,
+        );
+      }
+      // 主动从 map 中删除，避免后续重复 abort
+      this.jobControllers.delete(jobId);
+    }
+
     await this.jobModel.updateOne(
       { jobId },
       { $set: { status: 'aborted' } },
     );
     await this.safeRemoveDir(job.chunkDir);
+    const isRunning = this.runningJobs.has(jobId);
+    this.logger.warn(
+      `[abort] 已置为 aborted 并清理目录 jobId=${jobId} dir=${job.chunkDir} inRunningJobs=${isRunning}`,
+    );
   }
 
   /**

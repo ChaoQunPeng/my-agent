@@ -125,32 +125,40 @@
         <template v-else>
           <a-tabs>
             <a-tab-pane key="synopsis" tab="故事简介">
-              <pre class="outline-text">{{ outline.synopsis || '（空）' }}</pre>
+              <pre class="outline-text">{{ formatMultiPoint(outline.synopsis) || '（空）' }}</pre>
             </a-tab-pane>
             <a-tab-pane key="world" tab="世界观">
-              <pre class="outline-text">{{ outline.worldSetting || '（空）' }}</pre>
+              <pre class="outline-text">{{ formatMultiPoint(outline.worldSetting) || '（空）' }}</pre>
             </a-tab-pane>
             <a-tab-pane key="mainline" tab="主线">
-              <pre class="outline-text">{{ outline.plotMainline || '（空）' }}</pre>
+              <pre class="outline-text">{{ formatMultiPoint(outline.plotMainline) || '（空）' }}</pre>
             </a-tab-pane>
             <a-tab-pane key="outline" tab="剧情大纲">
-              <pre class="outline-text">{{ outline.plotOutline || '（空）' }}</pre>
+              <pre class="outline-text">{{ formatMultiPoint(outline.plotOutline) || '（空）' }}</pre>
             </a-tab-pane>
             <a-tab-pane :key="`chars`" :tab="`人物 (${outline.characters.length})`">
               <a-empty v-if="!outline.characters.length" />
-              <a-list v-else :data-source="outline.characters" size="small">
-                <template #renderItem="{ item }">
-                  <a-list-item>
-                    <a-list-item-meta :title="item.name" :description="item.identity || ''" />
-                    <div class="char-detail">
-                      <div v-if="item.personality"><b>性格：</b>{{ item.personality }}</div>
-                      <div v-if="item.goals"><b>目标：</b>{{ item.goals }}</div>
-                      <div v-if="item.traits"><b>特征：</b>{{ item.traits }}</div>
-                      <div v-if="item.relations"><b>关系：</b>{{ item.relations }}</div>
-                    </div>
-                  </a-list-item>
+              <a-table
+                v-else
+                :columns="characterColumns"
+                :data-source="outline.characters"
+                :pagination="false"
+                size="small"
+                row-key="name"
+                bordered
+                :scroll="{ x: 1080 }"
+                class="char-table"
+              >
+                <template #bodyCell="{ column, text }">
+                  <!-- 姓名 / 身份 保持原文；其余长文本字段做分点预处理，保留换行 -->
+                  <template v-if="column.dataIndex === 'name' || column.dataIndex === 'identity'">
+                    {{ text || '-' }}
+                  </template>
+                  <template v-else>
+                    <div class="cell-multiline">{{ formatMultiPoint(text) || '-' }}</div>
+                  </template>
                 </template>
-              </a-list>
+              </a-table>
             </a-tab-pane>
           </a-tabs>
         </template>
@@ -178,7 +186,7 @@ import {
 // 表单数据：novelCode + 拆分参数
 const form = reactive({
   novelCode: '',
-  chunkSize: 5000,
+  chunkSize: 15000,
   overlap: 300
 })
 
@@ -232,6 +240,42 @@ const genPercent = computed(() => {
   if (!currentJob.value || !currentJob.value.totalChunks) return 0
   return Math.floor((currentJob.value.processedChunks / currentJob.value.totalChunks) * 100)
 })
+
+/**
+ * 大模型经常把分点内容压成一段（如 "1. 背景 2. 冲突 3. 结局"），前端展示时补换行
+ * 命中几类常见分点标志就在其前面加上 \n：
+ *   - 阿拉伯数字序号：1. / 2、 / 3) / 4：
+ *   - 带括号形式：(1) （2） [3]
+ *   - 圈号：① ② ③ ...
+ *   - 项目符号：- / • / * （前面必须是空格）
+ * 注意：都要求分点标志前面有"已存在的非换行字符"，避免首个分点也多一个空行
+ */
+function formatMultiPoint(text: string | undefined | null): string {
+  if (!text) return ''
+  let out = text
+  // 阿拉伯数字 + 分隔符（.、:：)）
+  out = out.replace(/([^\n])\s+(\d{1,2}[.、:：)])\s*/g, '$1\n$2 ')
+  // (1) （1） [1] 形式
+  out = out.replace(/([^\n])\s+([([（【]\s*\d{1,2}\s*[)\]）】])\s*/g, '$1\n$2 ')
+  // 圈号 ①-⑳
+  out = out.replace(/([^\n])\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/g, '$1\n$2 ')
+  // 前面有空格的短横线 / 圆点 / 星号项目符号
+  out = out.replace(/([^\n])\s+([-•*])\s+/g, '$1\n$2 ')
+  return out
+}
+
+/**
+ * 人物表格列定义：固定姓名/身份，其余长文本列允许自然换行（不省略）
+ * 长文本统一用 formatMultiPoint 把"1.xxx 2.xxx"预处理为多行，再靠 css white-space: pre-wrap 渲染换行
+ */
+const characterColumns = [
+  { title: '姓名', dataIndex: 'name', key: 'name', width: 100, fixed: 'left' as const },
+  { title: '身份', dataIndex: 'identity', key: 'identity', width: 140 },
+  { title: '性格', dataIndex: 'personality', key: 'personality', width: 200 },
+  { title: '目标', dataIndex: 'goals', key: 'goals', width: 200 },
+  { title: '特征', dataIndex: 'traits', key: 'traits', width: 200 },
+  { title: '关系', dataIndex: 'relations', key: 'relations', width: 240 }
+]
 
 /**
  * 状态对应的展示色
@@ -352,16 +396,24 @@ function stopPolling() {
 
 /**
  * 中止任务
+ * 关键：无论后端接口成功或失败，前端都必须立即停止轮询，避免"已中止"后仍在刷新状态
  */
 async function handleAbort() {
   if (!currentJob.value) return
+  // 先停轮询：即便接口失败，也不要继续每 3s 去查状态（接口 500 会不停刷错误提示）
+  stopPolling()
   try {
     await abortOutlineJob(currentJob.value.jobId)
     antMessage.success('已中止')
-    stopPolling()
-    await handleRefresh()
   } catch (e: any) {
     antMessage.error(e?.response?.data?.msg || e?.message || '中止失败')
+  } finally {
+    // 无论成功失败，都拉一次最新状态，把 UI 刷到最新（后端可能已经置为 aborted）
+    try {
+      await handleRefresh()
+    } catch {
+      // handleRefresh 失败就不再追加提示，避免叠加 toast
+    }
   }
 }
 
@@ -534,5 +586,17 @@ onBeforeUnmount(() => {
   color: #555;
   line-height: 1.8;
   max-width: 60%;
+}
+// 人物表格单元格：允许按 formatMultiPoint 的换行自然换行
+.char-table {
+  :deep(.ant-table-cell) {
+    vertical-align: top;
+  }
+}
+.cell-multiline {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  font-size: 13px;
 }
 </style>

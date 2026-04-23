@@ -33,6 +33,7 @@ export class OutlineGeneratorService {
    * @param chunkIndex 当前片段索引（从 1 开始），仅用于日志
    * @param totalChunks 总片段数，仅用于日志
    * @param chunkText 本次新增的片段内容
+   * @param signal  可选的 AbortSignal，用于在上层点击"中止"时立刻 cancel 当前 LLM HTTP 请求
    */
   async updateOutlineWithChunk(
     existing: Pick<
@@ -42,6 +43,7 @@ export class OutlineGeneratorService {
     chunkIndex: number,
     totalChunks: number,
     chunkText: string,
+    signal?: AbortSignal,
   ): Promise<{ payload: OutlineUpdatePayload; raw: string }> {
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = this.buildUserPrompt(
@@ -55,16 +57,21 @@ export class OutlineGeneratorService {
       `调用大模型更新大纲：chunk ${chunkIndex}/${totalChunks}，原文 ${chunkText.length} 字`,
     );
 
-    const completion = await this.openaiService.client.chat.completions.create({
-      model: this.openaiService.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      // DeepSeek 支持 json_object 强制返回 JSON
-      response_format: { type: 'json_object' },
-      temperature: 0.3,
-    });
+    // 透传 signal 给 openai sdk：一旦 controller.abort() 被触发，底层 fetch 会抛出 AbortError，
+    // 保证上层循环能立刻从 await 中跳出
+    const completion = await this.openaiService.client.chat.completions.create(
+      {
+        model: this.openaiService.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        // DeepSeek 支持 json_object 强制返回 JSON
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+      },
+      { signal },
+    );
 
     const raw = completion.choices?.[0]?.message?.content ?? '';
     const payload = this.parsePayload(raw);
