@@ -34,13 +34,14 @@ export class ChatController {
       sessionId?: string;
       type?: string;
       resourceId?: string;
+      temperature?: number;
     },
     @Res() res: Response,
   ): Promise<void> {
-    const { message, sessionId, type, resourceId } = body;
+    const { message, sessionId, type, resourceId, temperature } = body;
 
     console.log(
-      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, scene: ${scene}, type: ${type}, resourceId: ${resourceId}, temperature: ${temperature}`,
+      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, type: ${type}, resourceId: ${resourceId}, temperature: ${temperature}`,
     );
 
     // 设置 SSE 响应头
