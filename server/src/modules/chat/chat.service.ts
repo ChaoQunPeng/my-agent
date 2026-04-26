@@ -7,6 +7,7 @@ import { OpenaiService } from '../../shared/openai/openai.service';
 import { CharacterService } from '../character/character.service';
 import { SessionService } from '../session/session.service';
 import { FileReaderService } from '../../shared/file-reader/file-reader.service';
+import { buildNpcPrompt } from 'src/common/prompts/character';
 
 export interface Session {
   id: string;
@@ -48,12 +49,7 @@ export class ChatService {
     if (type === 'character' && resourceId) {
       try {
         const character = await this.characterService.findOne(resourceId);
-        systemPrompt = `
-        你是一名演员,心理专家,请根据以下角色信息来扮演角色
-        你将扮演演员: ${character.name}，性格: ${character.personalityDescription}
-        形象: ${character.appearance}，职业: ${character.profession}，关系: ${character.relation}
-       
-        `;
+        systemPrompt = buildNpcPrompt(character);
       } catch (error) {
         console.error(`获取角色信息失败:`, error);
       }
@@ -101,8 +97,10 @@ export class ChatService {
     const stream = await this.openaiService.client.chat.completions.create({
       model: this.openaiService.model,
       messages,
-      temperature: 0.2,
       stream: true,
+      temperature: 0.9,
+      frequency_penalty: 0.3,
+      presence_penalty: 0.3,
     });
 
     // 流式返回响应

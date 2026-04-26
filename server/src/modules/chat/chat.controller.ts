@@ -23,11 +23,8 @@ export class ChatController {
    * 前端使用 @microsoft/fetch-event-source 进行消费
    * @param body.message 用户消息内容
    * @param body.sessionId 可选的会话ID
-   * @param body.scene 可选的场景标识
    * @param body.type 资源类型（'character' | 'novel'），用于动态构建 System Prompt
    * @param body.resourceId 资源ID，对应type类型的资源ID
-   * @param body.temperature 可选的温度参数，控制生成随机性 (0-2)
-   * @param body.systemPrompt 可选的系统提示词，覆盖默认的系统提示词
    */
   @Post('stream-message')
   async streamMessage(
@@ -35,15 +32,12 @@ export class ChatController {
     body: {
       message: string;
       sessionId?: string;
-      scene?: string;
       type?: string;
       resourceId?: string;
-      temperature?: number;
-      systemPrompt?: string;
     },
     @Res() res: Response,
   ): Promise<void> {
-    const { message, sessionId, scene, type, resourceId, temperature } = body;
+    const { message, sessionId, type, resourceId } = body;
 
     console.log(
       `收到流式请求 - message: ${message}, sessionId: ${sessionId}, scene: ${scene}, type: ${type}, resourceId: ${resourceId}, temperature: ${temperature}`,
