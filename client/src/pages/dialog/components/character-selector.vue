@@ -120,76 +120,84 @@
     <a-modal
       v-model:open="editModalVisible"
       :title="isEditMode ? '编辑人物' : '新建人物'"
-      width="700px"
+      width="1200px"
       @ok="handleSaveCharacter"
       @cancel="handleCancelEdit"
     >
       <a-form :model="editForm" layout="vertical" class="character-form">
-        <!-- 姓名、性别、生日 -->
-        <a-row :gutter="16">
-          <a-col :span="8">
-            <a-form-item label="姓名" required>
-              <a-input v-model:value="editForm.name" placeholder="请输入真实姓名或代号" />
+        <!-- 左右分栏布局 -->
+        <a-row :gutter="24">
+          <!-- 左侧：基本信息字段 -->
+          <a-col :span="14">
+            <!-- 姓名、性别、生日 -->
+            <a-row :gutter="16">
+              <a-col :span="8">
+                <a-form-item label="姓名" required>
+                  <a-input v-model:value="editForm.name" placeholder="请输入真实姓名或代号" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="性别">
+                  <a-select v-model:value="editForm.gender" placeholder="请选择性别">
+                    <a-select-option :value="0">未知</a-select-option>
+                    <a-select-option :value="1">男</a-select-option>
+                    <a-select-option :value="2">女</a-select-option>
+                    <a-select-option :value="3">其他</a-select-option>
+                  </a-select>
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="生日">
+                  <a-date-picker
+                    v-model:value="editForm.birthday"
+                    placeholder="请选择生日"
+                    style="width: 100%"
+                    format="YYYY-MM-DD"
+                    value-format="YYYY-MM-DD"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+
+            <!-- 与我的关系 -->
+            <a-form-item label="与我的关系">
+              <a-input v-model:value="editForm.relation" placeholder="描述你与人物的关系" />
+            </a-form-item>
+
+            <!-- 外貌 -->
+            <a-form-item label="外貌">
+              <a-textarea v-model:value="editForm.appearance" placeholder="侧重于神态和标志性特征" :rows="3" />
+            </a-form-item>
+
+            <!-- 职业 -->
+            <a-form-item label="职业">
+              <a-input v-model:value="editForm.profession" placeholder="描述职业对思维方式的影响" />
+            </a-form-item>
+
+            <!-- 性格描述 -->
+            <a-form-item label="性格描述">
+              <a-textarea v-model:value="editForm.personalityDescription" placeholder="描述矛盾点和内在驱动力" :rows="4" />
             </a-form-item>
           </a-col>
-          <a-col :span="8">
-            <a-form-item label="性别">
-              <a-select v-model:value="editForm.gender" placeholder="请选择性别">
-                <a-select-option :value="0">未知</a-select-option>
-                <a-select-option :value="1">男</a-select-option>
-                <a-select-option :value="2">女</a-select-option>
-                <a-select-option :value="3">其他</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="生日">
-              <a-date-picker
-                v-model:value="editForm.birthday"
-                placeholder="请选择生日"
-                style="width: 100%"
-                format="YYYY-MM-DD"
-                value-format="YYYY-MM-DD"
-              />
+
+          <!-- 右侧：行为图谱 -->
+          <a-col :span="10">
+            <a-form-item label="行为图谱">
+              <div class="behavior-input">
+                <div v-for="(desc, index) in editForm.behaviorAtlas || []" :key="index" class="behavior-item-input">
+                  <a-input v-model:value="editForm.behaviorAtlas![index]" placeholder="描述解决问题的逻辑、应对压力的反应" />
+                  <a-button type="text" danger @click="removeBehaviorDescription(index)">
+                    <DeleteOutlined />
+                  </a-button>
+                </div>
+                <a-button type="dashed" block @click="addBehaviorDescription">
+                  <PlusOutlined />
+                  添加行为描述
+                </a-button>
+              </div>
             </a-form-item>
           </a-col>
         </a-row>
-
-        <!-- 与我的关系 -->
-        <a-form-item label="与我的关系">
-          <a-input v-model:value="editForm.relation" placeholder="描述你与人物的关系" />
-        </a-form-item>
-
-        <!-- 外貌 -->
-        <a-form-item label="外貌">
-          <a-textarea v-model:value="editForm.appearance" placeholder="侧重于神态和标志性特征" :rows="3" />
-        </a-form-item>
-
-        <!-- 职业 -->
-        <a-form-item label="职业">
-          <a-input v-model:value="editForm.profession" placeholder="描述职业对思维方式的影响" />
-        </a-form-item>
-
-        <!-- 性格描述 -->
-        <a-form-item label="性格描述">
-          <a-textarea v-model:value="editForm.personalityDescription" placeholder="描述矛盾点和内在驱动力" :rows="4" />
-        </a-form-item>
-
-        <!-- 行为图谱 -->
-        <a-form-item label="行为图谱">
-          <div class="behavior-input">
-            <div v-for="(desc, index) in editForm.behaviorAtlas || []" :key="index" class="behavior-item-input">
-              <a-input v-model:value="editForm.behaviorAtlas![index]" placeholder="描述解决问题的逻辑、应对压力的反应" />
-              <a-button type="text" danger @click="removeBehaviorDescription(index)">
-                <DeleteOutlined />
-              </a-button>
-            </div>
-            <a-button type="dashed" block @click="addBehaviorDescription">
-              <PlusOutlined />
-              添加行为描述
-            </a-button>
-          </div>
-        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -653,6 +661,27 @@ onMounted(() => {
 }
 
 .character-form {
+  // 行为图谱输入区域样式
+  .behavior-input {
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 8px;
+
+    // 自定义滚动条样式
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #d9d9d9;
+      border-radius: 3px;
+
+      &:hover {
+        background: #bfbfbf;
+      }
+    }
+  }
+
   .behavior-item-input {
     display: flex;
     align-items: center;
