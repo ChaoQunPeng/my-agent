@@ -65,16 +65,16 @@ export default [
   //     sessionCategory: 'diary'
   //   }
   // },
-  {
-    path: '/pet',
-    name: 'pet',
-    component: () => import('~/pages/pet/index.vue'),
-    meta: {
-      title: '宠物',
-      icon: 'AndroidOutlined',
-      sessionCategory: 'pet'
-    }
-  },
+  // {
+  //   path: '/pet',
+  //   name: 'pet',
+  //   component: () => import('~/pages/pet/index.vue'),
+  //   meta: {
+  //     title: '宠物',
+  //     icon: 'AndroidOutlined',
+  //     sessionCategory: 'pet'
+  //   }
+  // },
   /*
    * 任务管理路由
    */

@@ -1,44 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OpenaiService } from '../../shared/openai/openai.service';
-import {
-  NovelOutline,
-  OutlineCharacter,
-} from './schemas/novel-outline.schema';
+import { NovelOutline, OutlineCharacter } from './schemas/novel-outline.schema';
 
 /**
- * 大模型返回期望的 JSON 结构
- * 注意：结构与 NovelOutline schema 保持一致，便于直接 upsert
+ * 结构变更为“增量更新负载”
  */
 export interface OutlineUpdatePayload {
   synopsis: string;
   worldSetting: string;
   plotMainline: string;
-  plotOutline: string;
+  newPlotSegments: string; // 关键：改为返回本段新剧情
   characters: OutlineCharacter[];
 }
 
-/**
- * 大纲生成服务
- * 职责：拿到"已知大纲 + 新增一块原文" → 让大模型输出更新后的大纲（JSON）
- */
 @Injectable()
 export class OutlineGeneratorService {
   private readonly logger = new Logger(OutlineGeneratorService.name);
 
   constructor(private readonly openaiService: OpenaiService) {}
 
-  /**
-   * 核心方法：根据已知大纲 + 新片段，增量更新大纲
-   * @param existing 已有大纲快照（首次调用时可能各字段都为空字符串 / 空数组）
-   * @param chunkIndex 当前片段索引（从 1 开始），仅用于日志
-   * @param totalChunks 总片段数，仅用于日志
-   * @param chunkText 本次新增的片段内容
-   * @param signal  可选的 AbortSignal，用于在上层点击"中止"时立刻 cancel 当前 LLM HTTP 请求
-   */
   async updateOutlineWithChunk(
     existing: Pick<
       NovelOutline,
-      'synopsis' | 'worldSetting' | 'plotMainline' | 'plotOutline' | 'characters'
+      | 'synopsis'
+      | 'worldSetting'
+      | 'plotMainline'
+      | 'plotOutline'
+      | 'characters'
     >,
     chunkIndex: number,
     totalChunks: number,
@@ -53,12 +41,6 @@ export class OutlineGeneratorService {
       chunkText,
     );
 
-    this.logger.log(
-      `调用大模型更新大纲：chunk ${chunkIndex}/${totalChunks}，原文 ${chunkText.length} 字`,
-    );
-
-    // 透传 signal 给 openai sdk：一旦 controller.abort() 被触发，底层 fetch 会抛出 AbortError，
-    // 保证上层循环能立刻从 await 中跳出
     const completion = await this.openaiService.client.chat.completions.create(
       {
         model: this.openaiService.model,
@@ -66,9 +48,9 @@ export class OutlineGeneratorService {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        // DeepSeek 支持 json_object 强制返回 JSON
         response_format: { type: 'json_object' },
         temperature: 0.3,
+        max_tokens: 2500, // 增量更新通常不会超过此长度
       },
       { signal },
     );
@@ -79,67 +61,55 @@ export class OutlineGeneratorService {
     return { payload, raw };
   }
 
-  /**
-   * 系统提示：明确角色与输出契约
-   */
   private buildSystemPrompt(): string {
     return [
-      '你是一位资深小说编辑助手。',
-      '用户会分多次向你投喂同一本小说的连续片段，你需要在"已知大纲"的基础上，结合"新片段"进行增量更新，产出一份新的完整大纲。',
-      '硬性规则：',
-      '1. 不要丢弃已有大纲中的关键信息，除非新片段与之明确冲突（此时以新片段为准并在 plotOutline 中注明修订）。',
-      '2. 如果新片段未涉及某字段，就保留原值。',
-      '3. 人物表按人物名去重合并，若同一人物有新设定/新关系，就补充/修正该人物的字段。',
-      '4. 只输出 JSON，字段严格如下（不得增删字段）：',
-      '{',
-      '  "synopsis": "故事简介",',
-      '  "worldSetting": "世界观设定",',
-      '  "plotMainline": "主线剧情（高层脉络）",',
-      '  "plotOutline": "分段/分章剧情大纲",',
-      '  "characters": [{"name":"","identity":"","personality":"","goals":"","traits":"","relations":""}]',
-      '}',
-      '5. 所有字段必须是字符串或字符串数组，不要使用 null。',
+      '你是一位资深小说编辑助手。你需要阅读小说片段，并提取相关的大纲更新信息。',
+      '请基于"背景信息"和"新片段"，仅输出【增量更新】部分：',
+      '1. synopsis/worldSetting/plotMainline：如果新片段导致这些全局设定有重大更新或修正，请输出完整更新后的文本；否则保留原样。',
+      '2. newPlotSegments：提取本片段发生的剧情概要（本段剧情本身），不要输出之前已有的剧情。',
+      '3. characters：识别本片段中出现的所有人物。如果角色已存在，请更新其关系和特征；如果是新角色，请添加。',
+      '硬性要求：只输出 JSON，严禁任何解释文字。',
     ].join('\n');
   }
 
-  /**
-   * 用户提示：装配「已知大纲 + 新片段」
-   */
   private buildUserPrompt(
-    existing: Pick<
-      NovelOutline,
-      'synopsis' | 'worldSetting' | 'plotMainline' | 'plotOutline' | 'characters'
-    >,
-    chunkIndex: number,
-    totalChunks: number,
-    chunkText: string,
+    existing: any,
+    index: number,
+    total: number,
+    text: string,
   ): string {
-    const existingJson = JSON.stringify(
-      {
-        synopsis: existing.synopsis || '',
-        worldSetting: existing.worldSetting || '',
-        plotMainline: existing.plotMainline || '',
-        plotOutline: existing.plotOutline || '',
-        characters: existing.characters || [],
-      },
-      null,
-      2,
-    );
+    // 关键优化：为了防止 Prompt 爆炸，只传回最近 3000 字的剧情作为模型参考上下文
+    const plotRef =
+      existing.plotOutline?.length > 3000
+        ? `...[之前剧情已省略]...\n${existing.plotOutline.slice(-3000)}`
+        : existing.plotOutline;
+
+    const contextJson = JSON.stringify({
+      synopsis: existing.synopsis || '',
+      worldSetting: existing.worldSetting || '',
+      plotMainline: existing.plotMainline || '',
+      recentPlotContext: plotRef,
+      knownCharacterNames: (existing.characters || []).map((c: any) => c.name),
+    });
 
     return [
-      `【已知大纲（JSON）】`,
-      existingJson,
+      `【背景参考（JSON）】`,
+      contextJson,
       '',
-      `【新片段（第 ${chunkIndex} / ${totalChunks} 块）】`,
-      chunkText,
+      `【新片段（第 ${index} / ${total} 块）】`,
+      text,
       '',
-      '请基于以上"已知大纲"和"新片段"，输出更新后的完整大纲 JSON。只输出 JSON，不要任何解释文字。',
+      '请根据新片段输出 JSON：',
+      '{',
+      '  "synopsis": "更新后的简介",',
+      '  "worldSetting": "更新后的世界观",',
+      '  "plotMainline": "更新后的主线",',
+      '  "newPlotSegments": "仅本片段的详细剧情",',
+      '  "characters": [{"name":"","identity":"","personality":"","goals":"","traits":"","relations":""}]',
+      '}',
     ].join('\n');
   }
 
-  /**
-   * 解析大模型返回的 JSON，失败时抛出可读错误
-   */
   private parsePayload(raw: string): OutlineUpdatePayload {
     if (!raw) throw new Error('大模型返回内容为空');
 
@@ -147,35 +117,19 @@ export class OutlineGeneratorService {
     try {
       parsed = JSON.parse(raw);
     } catch (err) {
-      // 尝试从文本中抠出第一个 JSON 对象（兜底）
       const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) {
-        throw new Error(`无法解析大模型返回的 JSON：${(err as Error).message}`);
-      }
+      if (!match) throw new Error('无法解析 JSON');
       parsed = JSON.parse(match[0]);
     }
 
-    // 强制字段归一化，防止缺字段导致后续写库报错
     const safeStr = (v: any) => (typeof v === 'string' ? v : '');
-    const characters: OutlineCharacter[] = Array.isArray(parsed.characters)
-      ? parsed.characters
-          .filter((c: any) => c && typeof c.name === 'string' && c.name.trim())
-          .map((c: any) => ({
-            name: String(c.name).trim(),
-            identity: safeStr(c.identity),
-            personality: safeStr(c.personality),
-            goals: safeStr(c.goals),
-            traits: safeStr(c.traits),
-            relations: safeStr(c.relations),
-          }))
-      : [];
 
     return {
       synopsis: safeStr(parsed.synopsis),
       worldSetting: safeStr(parsed.worldSetting),
       plotMainline: safeStr(parsed.plotMainline),
-      plotOutline: safeStr(parsed.plotOutline),
-      characters,
+      newPlotSegments: safeStr(parsed.newPlotSegments || parsed.plotOutline),
+      characters: Array.isArray(parsed.characters) ? parsed.characters : [],
     };
   }
 }
