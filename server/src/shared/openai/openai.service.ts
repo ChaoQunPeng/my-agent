@@ -12,7 +12,7 @@ export class OpenaiService {
     const baseURL = this.configService.getOrThrow<string>('DEEPSEEK_API_URL');
 
     this.client = new OpenAI({ apiKey, baseURL });
-    this.model = this.configService.get<string>('DEEPSEEK_MODEL', 'deepseek-chat');
+    this.model = this.configService.getOrThrow<string>('DEEPSEEK_MODEL');
   }
 }
 

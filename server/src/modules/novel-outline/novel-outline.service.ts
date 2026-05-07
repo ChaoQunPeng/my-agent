@@ -58,6 +58,7 @@ export class NovelOutlineService {
     sourceFileName: string;
     fileBuffer: Buffer;
   }): Promise<NovelSplitJob> {
+    console.log('[novel-outline] upload-and-split: 开始创建拆分任务');
     const { novelCode, chunkSize, overlap, sourceFileName, fileBuffer } =
       params;
 
@@ -70,6 +71,9 @@ export class NovelOutlineService {
 
     const { text: sourceText, encoding: detectedEncoding } =
       this.decodeNovelBuffer(fileBuffer);
+    console.log(
+      `[novel-outline] upload-and-split: 文件解码完成 novelCode=${novelCode}, encoding=${detectedEncoding}`,
+    );
     const sourceFilePath = path.join(chunkDir, '__source__.txt');
     await fs.writeFile(sourceFilePath, sourceText, 'utf-8');
 
@@ -95,6 +99,9 @@ export class NovelOutlineService {
     });
 
     try {
+      console.log(
+        `[novel-outline] split: 开始拆分 jobId=${jobId}, totalChars=${totalChars}, chunkSize=${chunkSize}, overlap=${overlap}`,
+      );
       const actualTotal = await this.splitter.splitAndWrite(
         sourceText,
         chunkDir,
@@ -116,6 +123,9 @@ export class NovelOutlineService {
           },
         },
       );
+      console.log(
+        `[novel-outline] split: 拆分完成 jobId=${jobId}, totalChunks=${actualTotal}`,
+      );
       return (await this.jobModel.findOne({ jobId }).exec())!;
     } catch (err) {
       await this.safeRemoveDir(chunkDir);
@@ -131,6 +141,7 @@ export class NovelOutlineService {
    * 启动大纲生成
    */
   async startGenerate(jobId: string): Promise<NovelSplitJob> {
+    console.log(`[novel-outline] generate: 请求启动任务 jobId=${jobId}`);
     const job = await this.findJobOrThrow(jobId);
     if (job.status === 'splitting')
       throw new BadRequestException('拆分尚未完成');
@@ -163,12 +174,14 @@ export class NovelOutlineService {
     signal: AbortSignal,
   ): Promise<void> {
     this.logger.log(`[gen-loop] 开始生成循环 jobId=${jobId}`);
+    console.log(`[novel-outline] gen-loop: 开始 jobId=${jobId}`);
     try {
       while (true) {
         const job = await this.jobModel.findOne({ jobId }).exec();
         if (!job || job.status !== 'generating') return;
 
         if (job.processedChunks >= job.totalChunks) {
+          console.log(`[novel-outline] gen-loop: 全部完成 jobId=${jobId}`);
           await this.jobModel.updateOne(
             { jobId },
             { $set: { status: 'done' } },
@@ -179,23 +192,48 @@ export class NovelOutlineService {
         const nextIndex = job.processedChunks + 1;
         const fileName = `chunk-${String(nextIndex).padStart(4, '0')}.txt`;
         const filePath = path.join(job.chunkDir, fileName);
+        console.log(
+          `[novel-outline] gen-loop: 读取切片 jobId=${jobId}, chunk=${nextIndex}/${job.totalChunks}, file=${fileName}`,
+        );
         const chunkText = await fs.readFile(filePath, 'utf-8');
+        await this.jobModel.updateOne(
+          { jobId },
+          { $set: { processingChunkIndex: nextIndex } },
+        );
 
         // 读取当前大纲
         const existing =
           (await this.outlineModel
             .findOne({ novelCode: job.novelCode })
             .exec()) ?? this.emptyOutline(job.novelCode);
+        console.log(
+          `[novel-outline] gen-loop: 已读取本地大纲 novelCode=${job.novelCode}, characters=${existing.characters?.length || 0}`,
+        );
+
+        const matchedCharacters = this.findMatchedCharactersInChunk(
+          chunkText,
+          existing.characters || [],
+        );
+        console.log(
+          `[novel-outline] gen-loop: 本地匹配当前切片人物 ${matchedCharacters.length} 个：${matchedCharacters.map((c) => c.name).join(', ') || '无'}`,
+        );
 
         // 调用大模型获取“增量”
+        console.log(
+          `[novel-outline] gen-loop: 调用大模型 jobId=${jobId}, chunk=${nextIndex}/${job.totalChunks}`,
+        );
         const { payload, raw } = await this.generator.updateOutlineWithChunk(
+          {
+            jobId,
+            novelCode: job.novelCode,
+          },
           {
             synopsis: existing.synopsis,
             worldSetting: existing.worldSetting,
-            plotMainline: existing.plotMainline,
             plotOutline: existing.plotOutline,
-            characters: existing.characters,
+            storyConflicts: existing.storyConflicts,
           },
+          matchedCharacters,
           nextIndex,
           job.totalChunks,
           chunkText,
@@ -205,36 +243,36 @@ export class NovelOutlineService {
         // 校验中止状态
         const afterCall = await this.jobModel.findOne({ jobId }).exec();
         if (!afterCall || afterCall.status !== 'generating') return;
+        console.log(
+          `[novel-outline] gen-loop: 大模型返回成功 jobId=${jobId}, chunk=${nextIndex}, rawChars=${Array.from(raw).length}`,
+        );
 
         // --- 执行合并逻辑 ---
 
-        // 1. 剧情大纲追加
-        const updatedPlotOutline = existing.plotOutline
-          ? `${existing.plotOutline}\n\n${payload.newPlotSegments}`
-          : payload.newPlotSegments;
-
-        // 2. 角色列表合并（按名称去重）
-        const charMap = new Map<string, OutlineCharacter>();
-        (existing.characters || []).forEach((c) => charMap.set(c.name, c));
-        (payload.characters || []).forEach((nc) => {
-          if (!nc.name) return;
-          const oldChar = charMap.get(nc.name) || ({} as OutlineCharacter);
-          charMap.set(nc.name, {
-            ...oldChar,
-            ...nc, // 新提取的属性覆盖旧属性（如更新关系、特征）
-          });
-        });
+        const updatedCharacters = this.mergeCharactersIncrementally(
+          existing.characters || [],
+          payload.characters || [],
+        );
 
         // 保存更新后的完整大纲
         await this.outlineModel.updateOne(
           { novelCode: job.novelCode },
           {
             $set: {
-              synopsis: payload.synopsis || existing.synopsis,
-              worldSetting: payload.worldSetting || existing.worldSetting,
-              plotMainline: payload.plotMainline || existing.plotMainline,
-              plotOutline: updatedPlotOutline,
-              characters: Array.from(charMap.values()),
+              synopsis: this.appendText(existing.synopsis, payload.synopsis),
+              worldSetting: this.appendText(
+                existing.worldSetting,
+                payload.worldSetting,
+              ),
+              plotOutline: this.appendText(
+                existing.plotOutline,
+                payload.newPlotSegments,
+              ),
+              storyConflicts: this.appendLinesUnique(
+                existing.storyConflicts,
+                payload.storyConflicts,
+              ),
+              characters: updatedCharacters,
               lastJobId: jobId,
               rawLastResponse: raw,
             },
@@ -245,7 +283,17 @@ export class NovelOutlineService {
 
         await this.jobModel.updateOne(
           { jobId },
-          { $set: { processedChunks: nextIndex } },
+          {
+            $set: {
+              processedChunks: nextIndex,
+              processingChunkIndex: 0,
+              lastCompletedChunkIndex: nextIndex,
+              lastCompletedChunkFile: fileName,
+            },
+          },
+        );
+        console.log(
+          `[novel-outline] gen-loop: 切片处理完成 jobId=${jobId}, chunk=${nextIndex}/${job.totalChunks}, newCharacters=${payload.characters?.length || 0}`,
         );
       }
     } catch (err) {
@@ -256,6 +304,9 @@ export class NovelOutlineService {
       if (latest && latest.status === 'aborted') return;
 
       this.logger.error(`[gen-loop] 任务失败 jobId=${jobId}: ${e?.stack}`);
+      console.log(
+        `[novel-outline] gen-loop: 任务失败 jobId=${jobId}, error=${e?.message}`,
+      );
       await this.jobModel.updateOne(
         { jobId },
         { $set: { status: 'failed', lastError: e?.message } },
@@ -264,17 +315,20 @@ export class NovelOutlineService {
   }
 
   /**
-   * 中止任务（保持不变）
+   * 中止生成任务。保留切片文件和 processedChunks，便于之后从断点续跑。
    */
   async abortJob(jobId: string): Promise<void> {
-    const job = await this.findJobOrThrow(jobId);
+    console.log(`[novel-outline] abort: 请求中止任务 jobId=${jobId}`);
+    await this.findJobOrThrow(jobId);
     const controller = this.jobControllers.get(jobId);
     if (controller) {
       controller.abort();
       this.jobControllers.delete(jobId);
     }
-    await this.jobModel.updateOne({ jobId }, { $set: { status: 'aborted' } });
-    await this.safeRemoveDir(job.chunkDir);
+    await this.jobModel.updateOne(
+      { jobId },
+      { $set: { status: 'aborted', processingChunkIndex: 0 } },
+    );
   }
 
   async getJobStatus(jobId: string): Promise<NovelSplitJob> {
@@ -289,6 +343,233 @@ export class NovelOutlineService {
       .sort({ createdAt: -1 })
       .limit(50)
       .exec();
+  }
+
+  /**
+   * 获取待确认的别名候选列表
+   * 返回格式：[{ characterName, aliasCandidates }]
+   */
+  async getAliasCandidates(novelCode: string): Promise<
+    Array<{
+      characterName: string;
+      aliases: string[];
+      aliasCandidates: string[];
+    }>
+  > {
+    const outline = await this.outlineModel.findOne({ novelCode }).exec();
+    if (!outline || !outline.characters) {
+      return [];
+    }
+
+    // 过滤出有候选别名的人物
+    return outline.characters
+      .filter((char) => char.aliasCandidates && char.aliasCandidates.length > 0)
+      .map((char) => ({
+        characterName: char.name,
+        aliases: char.aliases || [],
+        aliasCandidates: char.aliasCandidates || [],
+      }));
+  }
+
+  /**
+   * 合并别名：将候选别名移动到正式别名数组，并从候选列表中移除
+   */
+  async mergeAlias(params: {
+    novelCode: string;
+    characterName: string;
+    aliasesToConfirm: string[];
+  }): Promise<void> {
+    const { novelCode, characterName, aliasesToConfirm } = params;
+
+    const outline = await this.outlineModel.findOne({ novelCode }).exec();
+    if (!outline || !outline.characters) {
+      throw new NotFoundException(`未找到小说大纲: ${novelCode}`);
+    }
+
+    const charIndex = outline.characters.findIndex(
+      (c) => c.name === characterName,
+    );
+    if (charIndex === -1) {
+      throw new NotFoundException(`未找到人物: ${characterName}`);
+    }
+
+    const confirmed = this.uniqueStrings(aliasesToConfirm);
+    const characters = [...outline.characters];
+    let target = characters[charIndex];
+
+    const sourceIndexes = characters
+      .map((char, index) => ({ char, index }))
+      .filter(({ char, index }) => {
+        if (index === charIndex) return false;
+        const names = this.characterNames(char);
+        return confirmed.some((alias) => names.includes(alias));
+      })
+      .map(({ index }) => index);
+
+    target = {
+      ...target,
+      aliases: this.uniqueStrings([...(target.aliases || []), ...confirmed]),
+      aliasCandidates: this.uniqueStrings(
+        (target.aliasCandidates || []).filter((c) => !confirmed.includes(c)),
+      ),
+    };
+
+    for (const sourceIndex of sourceIndexes) {
+      target = this.mergeCharacter(target, characters[sourceIndex]);
+    }
+
+    const sourceIndexSet = new Set(sourceIndexes);
+    const mergedCharacters = characters.flatMap((char, index) => {
+      if (index === charIndex) return [target];
+      if (sourceIndexSet.has(index)) return [];
+      return [char];
+    });
+
+    await this.outlineModel.updateOne(
+      { novelCode },
+      { $set: { characters: mergedCharacters } },
+    );
+  }
+
+  private mergeCharactersIncrementally(
+    existing: OutlineCharacter[],
+    incoming: OutlineCharacter[],
+  ): OutlineCharacter[] {
+    const merged = existing.map((char) => ({ ...char }));
+
+    for (const next of incoming) {
+      if (!next?.name) continue;
+      const targetIndex = merged.findIndex((char) =>
+        this.isSameCharacter(char, next),
+      );
+
+      if (targetIndex === -1) {
+        merged.push(this.normalizeCharacter(next));
+        continue;
+      }
+
+      merged[targetIndex] = this.mergeCharacter(merged[targetIndex], next);
+    }
+
+    return merged;
+  }
+
+  private findMatchedCharactersInChunk(
+    chunkText: string,
+    characters: OutlineCharacter[],
+  ): OutlineCharacter[] {
+    const normalizedChunk = this.normalizeText(chunkText);
+
+    return characters.filter((character) => {
+      const names = this.characterNames(character);
+      return names.some((name) => {
+        const normalizedName = this.normalizeText(name);
+        return (
+          chunkText.includes(name) ||
+          (!!normalizedName && normalizedChunk.includes(normalizedName))
+        );
+      });
+    });
+  }
+
+  private mergeCharacter(
+    base: OutlineCharacter,
+    incoming: OutlineCharacter,
+  ): OutlineCharacter {
+    const aliases = this.uniqueStrings([
+      ...(base.aliases || []),
+      ...(incoming.aliases || []),
+    ]);
+    const candidateBlacklist = this.uniqueStrings([
+      base.name,
+      incoming.name,
+      ...aliases,
+    ]);
+
+    return {
+      name: base.name || incoming.name,
+      aliases,
+      aliasCandidates: this.uniqueStrings([
+        ...(base.aliasCandidates || []),
+        ...(incoming.aliasCandidates || []),
+      ]).filter((alias) => !candidateBlacklist.includes(alias)),
+      identity: this.appendText(base.identity, incoming.identity),
+      personality: this.appendText(base.personality, incoming.personality),
+      goals: this.appendText(base.goals, incoming.goals),
+      traits: this.appendText(base.traits, incoming.traits),
+      relations: this.appendText(base.relations, incoming.relations),
+    };
+  }
+
+  private normalizeCharacter(char: OutlineCharacter): OutlineCharacter {
+    return {
+      name: char.name,
+      aliases: this.uniqueStrings(char.aliases || []),
+      aliasCandidates: this.uniqueStrings(char.aliasCandidates || []),
+      identity: char.identity || '',
+      personality: char.personality || '',
+      goals: char.goals || '',
+      traits: char.traits || '',
+      relations: char.relations || '',
+    };
+  }
+
+  private isSameCharacter(
+    existing: OutlineCharacter,
+    incoming: OutlineCharacter,
+  ): boolean {
+    const left = this.confirmedCharacterNames(existing);
+    const right = this.confirmedCharacterNames(incoming);
+    return left.some((name) => right.includes(name));
+  }
+
+  private characterNames(char: OutlineCharacter): string[] {
+    return this.uniqueStrings([
+      char.name,
+      ...(char.aliases || []),
+      ...(char.aliasCandidates || []),
+    ]);
+  }
+
+  private confirmedCharacterNames(char: OutlineCharacter): string[] {
+    return this.uniqueStrings([char.name, ...(char.aliases || [])]);
+  }
+
+  private appendText(existing?: string, incoming?: string): string {
+    const oldText = (existing || '').trim();
+    const newText = (incoming || '').trim();
+    if (!newText) return oldText;
+    if (!oldText) return newText;
+    if (this.normalizeText(oldText) === this.normalizeText(newText))
+      return oldText;
+    if (this.normalizeText(oldText).includes(this.normalizeText(newText))) {
+      return oldText;
+    }
+    return `${oldText}\n\n${newText}`;
+  }
+
+  private appendLinesUnique(existing?: string, incoming?: string): string {
+    const lines = [
+      ...(existing || '').split('\n'),
+      ...(incoming || '').split('\n'),
+    ]
+      .map((line) => line.trim())
+      .filter(Boolean);
+    return this.uniqueStrings(lines).join('\n');
+  }
+
+  private uniqueStrings(values: Array<string | undefined | null>): string[] {
+    return Array.from(
+      new Set(
+        values
+          .map((value) => (typeof value === 'string' ? value.trim() : ''))
+          .filter(Boolean),
+      ),
+    );
+  }
+
+  private normalizeText(value: string): string {
+    return value.replace(/\s+/g, '');
   }
 
   private async findJobOrThrow(jobId: string): Promise<NovelSplitJobDocument> {
@@ -339,7 +620,7 @@ export class NovelOutlineService {
       novelCode,
       synopsis: '',
       worldSetting: '',
-      plotMainline: '',
+      storyConflicts: '',
       plotOutline: '',
       characters: [],
     } as any;

@@ -27,6 +27,9 @@ export interface NovelOutlineJob {
   totalChunks: number
   splittedChunks: number
   processedChunks: number
+  processingChunkIndex: number
+  lastCompletedChunkIndex: number
+  lastCompletedChunkFile: string
   status: NovelOutlineJobStatus
   lastError: string
   createdAt?: string
@@ -38,6 +41,8 @@ export interface NovelOutlineJob {
  */
 export interface OutlineCharacter {
   name: string
+  aliases?: string[]
+  aliasCandidates?: string[]
   identity?: string
   personality?: string
   goals?: string
@@ -54,7 +59,7 @@ export interface NovelOutlineResult {
   lastJobId: string
   synopsis: string
   worldSetting: string
-  plotMainline: string
+  storyConflicts: string // 故事矛盾和冲突点
   plotOutline: string
   characters: OutlineCharacter[]
   rawLastResponse: string
@@ -74,22 +79,29 @@ export function uploadAndSplitNovel(params: {
 }) {
   const form = new FormData()
   form.append('novelCode', params.novelCode)
-  if (params.chunkSize != null) form.append('chunkSize', String(params.chunkSize))
+  if (params.chunkSize != null)
+    form.append('chunkSize', String(params.chunkSize))
   if (params.overlap != null) form.append('overlap', String(params.overlap))
   form.append('file', params.file)
 
-  return request.post<NovelOutlineJob>('/novel-outline/upload-and-split', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    // 大文件需要放宽超时
-    timeout: 300000
-  })
+  return request.post<NovelOutlineJob>(
+    '/novel-outline/upload-and-split',
+    form,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      // 大文件需要放宽超时
+      timeout: 300000,
+    },
+  )
 }
 
 /**
  * 启动（或续跑）大纲生成
  */
 export function startGenerateOutline(jobId: string) {
-  return request.post<NovelOutlineJob>('/novel-outline/start-generate', { jobId })
+  return request.post<NovelOutlineJob>('/novel-outline/start-generate', {
+    jobId,
+  })
 }
 
 /**
@@ -100,7 +112,7 @@ export function getOutlineJobStatus(jobId: string) {
 }
 
 /**
- * 中止任务并清理切片
+ * 中止任务，后端保留切片和进度以便续跑
  */
 export function abortOutlineJob(jobId: string) {
   return request.post('/novel-outline/abort-job', { jobId })
@@ -110,12 +122,40 @@ export function abortOutlineJob(jobId: string) {
  * 获取大纲结果
  */
 export function getNovelOutline(novelCode: string) {
-  return request.post<NovelOutlineResult | null>('/novel-outline/get-outline', { novelCode })
+  return request.post<NovelOutlineResult | null>('/novel-outline/get-outline', {
+    novelCode,
+  })
 }
 
 /**
  * 按 novelCode 查询任务列表
  */
 export function listOutlineJobs(novelCode: string) {
-  return request.post<NovelOutlineJob[]>('/novel-outline/list-jobs', { novelCode })
+  return request.post<NovelOutlineJob[]>('/novel-outline/list-jobs', {
+    novelCode,
+  })
+}
+
+/**
+ * 获取待确认的别名候选列表
+ */
+export function getAliasCandidates(novelCode: string) {
+  return request.post<
+    Array<{
+      characterName: string
+      aliases: string[]
+      aliasCandidates: string[]
+    }>
+  >('/novel-outline/get-alias-candidates', { novelCode })
+}
+
+/**
+ * 合并别名（将候选别名确认为正式别名）
+ */
+export function mergeAlias(params: {
+  novelCode: string
+  characterName: string
+  aliasesToConfirm: string[]
+}) {
+  return request.post('/novel-outline/merge-alias', params)
 }

@@ -9,6 +9,8 @@ export type NovelOutlineDocument = NovelOutline & Document;
  */
 export interface OutlineCharacter {
   name: string;
+  aliases?: string[];
+  aliasCandidates?: string[];
   identity?: string;
   personality?: string;
   goals?: string;
@@ -26,7 +28,12 @@ export interface OutlineCharacter {
   collection: 'novel_outlines',
 })
 export class NovelOutline {
-  @Prop({ required: true, unique: true, index: true, comment: '小说唯一识别码' })
+  @Prop({
+    required: true,
+    unique: true,
+    index: true,
+    comment: '小说唯一识别码',
+  })
   novelCode: string;
 
   // 最近一次关联的任务ID，便于溯源
@@ -41,9 +48,9 @@ export class NovelOutline {
   @Prop({ default: '', comment: '世界观与背景设定' })
   worldSetting: string;
 
-  // 主线剧情（高层脉络）
-  @Prop({ default: '', comment: '主线剧情' })
-  plotMainline: string;
+  // 故事中的核心矛盾 / 冲突
+  @Prop({ default: '', comment: '故事矛盾与冲突点' })
+  storyConflicts: string;
 
   // 剧情大纲（章节级/段落级）
   @Prop({ default: '', comment: '分段剧情大纲' })
@@ -54,6 +61,8 @@ export class NovelOutline {
     type: [
       {
         name: { type: String, required: true },
+        aliases: { type: [String], default: [] },
+        aliasCandidates: { type: [String], default: [] },
         identity: { type: String },
         personality: { type: String },
         goals: { type: String },

@@ -1,4 +1,12 @@
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  IsArray,
+  ArrayNotEmpty,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -10,7 +18,7 @@ export class UploadAndSplitDto {
   // 小说唯一识别码（与 NovelConfig.novelCode 对齐）
   novelCode: string;
 
-  // 每块字数，默认 5000
+  // 每个切片的原文总字数上限，默认 15000（包含前后上下文）
   @Type(() => Number)
   @IsInt()
   @Min(500)
@@ -18,7 +26,7 @@ export class UploadAndSplitDto {
   @IsOptional()
   chunkSize?: number;
 
-  // 相邻块之间的重叠字数，默认 300
+  // 每块正文前后附带的上下文字数，默认 300
   @Type(() => Number)
   @IsInt()
   @Min(0)
@@ -49,4 +57,20 @@ export class JobIdDto {
 export class NovelCodeDto {
   @IsString()
   novelCode: string;
+}
+
+/**
+ * 合并别名请求参数
+ */
+export class MergeAliasDto {
+  @IsString()
+  novelCode: string;
+
+  @IsString()
+  characterName: string; // 人物姓名
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  aliasesToConfirm: string[]; // 需要确认合并的候选别名列表
 }

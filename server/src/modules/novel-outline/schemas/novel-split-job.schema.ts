@@ -45,11 +45,11 @@ export class NovelSplitJob {
   @Prop({ default: 0, comment: '原文总字数' })
   totalChars: number;
 
-  // 拆分参数：每块字数 & 相邻块重叠字数
-  @Prop({ default: 5000, comment: '每个切片的字数' })
+  // 拆分参数：每个切片原文总字数上限 & 前后上下文字数
+  @Prop({ default: 15000, comment: '每个切片的原文总字数上限' })
   chunkSize: number;
 
-  @Prop({ default: 300, comment: '相邻切片之间的重叠字数' })
+  @Prop({ default: 300, comment: '每个切片正文前后附带的上下文字数' })
   overlap: number;
 
   // 切片产物所在目录（绝对路径）
@@ -71,6 +71,12 @@ export class NovelSplitJob {
   @Prop({ default: 0, comment: '已被大模型处理的切片数（断点续跑游标）' })
   processedChunks: number;
 
+  @Prop({ default: 0, comment: '当前正在处理的切片序号（便于展示运行进度）' })
+  processingChunkIndex: number;
+
+  @Prop({ default: 0, comment: '最近一次成功完成的切片序号' })
+  lastCompletedChunkIndex: number;
+
   // 任务状态
   @Prop({
     required: true,
@@ -91,6 +97,9 @@ export class NovelSplitJob {
   // 失败原因（仅在 failed 状态下有值）
   @Prop({ default: '', comment: '最近一次失败的错误信息' })
   lastError: string;
+
+  @Prop({ default: '', comment: '最近一次成功处理的切片文件名' })
+  lastCompletedChunkFile: string;
 }
 
 export const NovelSplitJobSchema = SchemaFactory.createForClass(NovelSplitJob);

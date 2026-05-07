@@ -14,6 +14,7 @@ import {
   StartGenerateDto,
   JobIdDto,
   NovelCodeDto,
+  MergeAliasDto,
 } from './dto/novel-outline.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
@@ -56,11 +57,11 @@ export class NovelOutlineController {
       throw new BadRequestException('仅支持 .txt 文件');
     }
 
-    // 参数兜底：默认 5000 字/块，300 字重叠
-    const chunkSize = body.chunkSize ?? 5000;
+    // 参数兜底：默认每个切片最多 15000 字原文，前后各 300 字上下文
+    const chunkSize = body.chunkSize ?? 15000;
     const overlap = body.overlap ?? 300;
-    if (overlap >= chunkSize) {
-      throw new BadRequestException('overlap 必须小于 chunkSize');
+    if (overlap * 2 >= chunkSize) {
+      throw new BadRequestException('overlap * 2 必须小于 chunkSize');
     }
 
     const job = await this.novelOutlineService.createJobAndSplit({
@@ -92,7 +93,7 @@ export class NovelOutlineController {
   }
 
   /**
-   * 中止任务并清理切片
+   * 中止生成任务，保留切片与进度以便续跑
    */
   @Post('abort-job')
   async abortJob(@Body() body: JobIdDto) {
@@ -116,5 +117,25 @@ export class NovelOutlineController {
   async listJobs(@Body() body: NovelCodeDto) {
     const jobs = await this.novelOutlineService.listJobs(body.novelCode);
     return ApiResponseDto.success(jobs);
+  }
+
+  /**
+   * 获取待确认的别名候选列表
+   */
+  @Post('get-alias-candidates')
+  async getAliasCandidates(@Body() body: NovelCodeDto) {
+    const candidates = await this.novelOutlineService.getAliasCandidates(
+      body.novelCode,
+    );
+    return ApiResponseDto.success(candidates);
+  }
+
+  /**
+   * 确认合并别名（将候选别名合并到正式别名）
+   */
+  @Post('merge-alias')
+  async mergeAlias(@Body() body: MergeAliasDto) {
+    await this.novelOutlineService.mergeAlias(body);
+    return ApiResponseDto.success(null, '别名合并成功');
   }
 }

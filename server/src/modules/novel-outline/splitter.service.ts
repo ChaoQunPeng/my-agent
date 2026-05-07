@@ -6,8 +6,8 @@ import * as path from 'path';
  * 拆分参数
  */
 export interface SplitOptions {
-  chunkSize: number; // 每块目标字数
-  overlap: number; // 相邻块重叠字数
+  chunkSize: number; // 每个切片的原文总字数上限（默认15000，包含前后上下文）
+  overlap: number; // 每块正文前后附带的上下文字数（默认300）
 }
 
 /**
@@ -25,23 +25,34 @@ export type ChunkWrittenCallback = (info: {
  * 特性：
  * 1. 以"字数"为主切分单位（使用 Array.from 正确处理中文 / emoji 等多字节字符）
  * 2. 在目标字数附近寻找句末边界（。！？…\n 等），避免在句子中间或名字中间硬切
- * 3. 相邻切片之间保留 overlap 字数的重叠，帮助大模型衔接上下文
+ * 3. 每个切片包含"前文参考 / 本段正文 / 后文参考"，帮助大模型衔接上下文
  */
 @Injectable()
 export class SplitterService {
   private readonly logger = new Logger(SplitterService.name);
 
   // 优先作为切点的句末/段末字符集合（按"强→弱"排序）
-  private readonly sentenceEndChars = ['\n\n', '\n', '。', '！', '？', '…', '!', '?', '.'];
+  private readonly sentenceEndChars = [
+    '\n\n',
+    '\n',
+    '。',
+    '！',
+    '？',
+    '…',
+    '!',
+    '?',
+    '.',
+  ];
 
   /**
    * 根据字数估算切片总数（仅用于初始化进度显示，实际写出个数以循环结果为准）
    */
   estimateChunkCount(totalChars: number, options: SplitOptions): number {
     const { chunkSize, overlap } = options;
-    const step = Math.max(1, chunkSize - overlap);
-    if (totalChars <= chunkSize) return totalChars > 0 ? 1 : 0;
-    return Math.ceil((totalChars - overlap) / step);
+    const bodySize = this.getBodySize(chunkSize, overlap);
+    const step = Math.max(1, bodySize);
+    if (totalChars <= bodySize) return totalChars > 0 ? 1 : 0;
+    return Math.ceil(totalChars / step);
   }
 
   /**
@@ -59,6 +70,7 @@ export class SplitterService {
     onChunkWritten?: ChunkWrittenCallback,
   ): Promise<number> {
     const { chunkSize, overlap } = options;
+    const bodySize = this.getBodySize(chunkSize, overlap);
     // 用 Array.from 按"用户可见字符"切分，避免代理对被拆成两半
     const chars = Array.from(sourceText);
     const total = chars.length;
@@ -72,15 +84,20 @@ export class SplitterService {
     let index = 0;
 
     while (start < total) {
-      // 初步目标结束位置
-      let end = Math.min(start + chunkSize, total);
+      // 初步正文结束位置。正文预算需要给前后 overlap 上下文让出空间。
+      let end = Math.min(start + bodySize, total);
 
-      // 不是最后一段时，向后(或向前)寻找一个更合适的句末边界
+      // 不是最后一段时，只向前寻找句末边界，确保切片原文总量不超过 chunkSize。
       if (end < total) {
-        end = this.findSentenceBoundary(chars, start, end, chunkSize);
+        end = this.findSentenceBoundary(chars, start, end, bodySize);
       }
 
-      const piece = chars.slice(start, end).join('');
+      const contextStart = Math.max(0, start - overlap);
+      const contextEnd = Math.min(total, end + overlap);
+      const beforeContext = chars.slice(contextStart, start).join('');
+      const mainText = chars.slice(start, end).join('');
+      const afterContext = chars.slice(end, contextEnd).join('');
+      const piece = this.formatChunk(beforeContext, mainText, afterContext);
       index += 1;
       const fileName = `chunk-${String(index).padStart(4, '0')}.txt`;
       const filePath = path.join(outDir, fileName);
@@ -98,16 +115,36 @@ export class SplitterService {
       }
 
       if (end >= total) break;
-      // 下一段起点回退 overlap 实现重叠
-      start = Math.max(end - overlap, start + 1);
+      start = Math.max(end, start + 1);
     }
 
     return index;
   }
 
+  private getBodySize(chunkSize: number, overlap: number): number {
+    const wrapperOverhead = Array.from(this.formatChunk('', '', '')).length;
+    return Math.max(1, chunkSize - overlap * 2 - wrapperOverhead);
+  }
+
+  private formatChunk(
+    beforeContext: string,
+    mainText: string,
+    afterContext: string,
+  ): string {
+    return [
+      '【前文参考，请仅用于理解上下文，不要作为新增剧情重复提取】',
+      beforeContext || '（无）',
+      '',
+      '【本段正文，请只分析这一部分并输出增量信息】',
+      mainText,
+      '',
+      '【后文参考，请仅用于理解上下文，不要作为新增剧情重复提取】',
+      afterContext || '（无）',
+    ].join('\n');
+  }
+
   /**
-   * 在 [initialEnd - search, initialEnd + search] 范围内寻找最近的句末/段末字符
-   * 策略：先向后找（保证一定达到 chunkSize），再向前找（保底不超太多）
+   * 在 initialEnd 前寻找最近的句末/段末字符，避免正文超过 chunkSize。
    */
   private findSentenceBoundary(
     chars: string[],
@@ -115,20 +152,10 @@ export class SplitterService {
     initialEnd: number,
     chunkSize: number,
   ): number {
-    const total = chars.length;
     // 搜索半径：不超过 chunkSize 的 20%，且至少 100 字
     const radius = Math.max(100, Math.floor(chunkSize * 0.2));
 
-    // 向后找：initialEnd → initialEnd + radius
-    const forwardLimit = Math.min(total, initialEnd + radius);
-    for (let i = initialEnd; i < forwardLimit; i++) {
-      if (this.isSentenceEnd(chars, i)) {
-        return i + 1; // 切点落在标点之后
-      }
-    }
-
-    // 向前找：initialEnd → start + (chunkSize - radius)
-    const backwardLimit = Math.max(start + Math.floor(chunkSize / 2), start + 1);
+    const backwardLimit = Math.max(initialEnd - radius, start + 1);
     for (let i = initialEnd - 1; i >= backwardLimit; i--) {
       if (this.isSentenceEnd(chars, i)) {
         return i + 1;
