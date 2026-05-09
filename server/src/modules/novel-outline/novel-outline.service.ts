@@ -11,6 +11,7 @@ import * as path from 'path';
 import {
   NovelSplitJob,
   NovelSplitJobDocument,
+  NovelSplitJobStatus,
 } from './schemas/novel-split-job.schema';
 import {
   NovelOutline,
@@ -36,12 +37,28 @@ interface ExtractParams {
   signal?: AbortSignal;
 }
 
+interface SplitJobQueryParams {
+  current?: number;
+  pageSize?: number;
+  novelCode?: string;
+  jobId?: string;
+  status?: string;
+}
+
+interface SplitJobDetailQueryParams {
+  jobId?: string;
+  novelCode?: string;
+}
+
 type ResolvedExtractParams = ExtractParams & {
   jobId: string;
   chunkText: string;
   chunkIndex: number;
   totalChunks: number;
 };
+
+type RawWorldView = Record<string, unknown> | string | undefined;
+
 @Injectable()
 export class NovelOutlineService {
   // 上传根目录（放在 server/uploads/novel-splits 下）
@@ -93,7 +110,7 @@ export class NovelOutlineService {
       overlap,
     });
 
-    const job = await this.jobModel.create({
+    await this.jobModel.create({
       jobId,
       novelCode,
       sourceFileName,
@@ -151,7 +168,9 @@ export class NovelOutlineService {
   private async safeRemoveDir(dir: string): Promise<void> {
     try {
       await fs.rm(dir, { recursive: true, force: true });
-    } catch {}
+    } catch {
+      return;
+    }
   }
 
   /**
@@ -198,6 +217,69 @@ export class NovelOutlineService {
     }
 
     return this.outlineModel.findOne({ novelCode: normalizedNovelCode }).exec();
+  }
+
+  /**
+   * 获取 novel_split_jobs 数据
+   */
+  async findSplitJobs(params: SplitJobQueryParams = {}) {
+    const current = Math.max(1, Number(params.current) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20));
+    const filter: Record<string, unknown> = {};
+
+    const novelCode = params.novelCode?.trim();
+    if (novelCode) {
+      filter.novelCode = novelCode;
+    }
+
+    const jobId = params.jobId?.trim();
+    if (jobId) {
+      filter.jobId = jobId;
+    }
+
+    const status = params.status?.trim() as NovelSplitJobStatus | undefined;
+    if (status) {
+      filter.status = status;
+    }
+
+    const [list, total] = await Promise.all([
+      this.jobModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip((current - 1) * pageSize)
+        .limit(pageSize)
+        .exec(),
+      this.jobModel.countDocuments(filter).exec(),
+    ]);
+
+    return {
+      list,
+      total,
+      current,
+      pageSize,
+    };
+  }
+
+  /**
+   * 根据 jobId 或 novelCode 获取单个 novel_split_jobs 数据
+   */
+  async findSplitJob(
+    params: SplitJobDetailQueryParams,
+  ): Promise<NovelSplitJob | null> {
+    const jobId = params.jobId?.trim();
+    if (jobId) {
+      return this.jobModel.findOne({ jobId }).exec();
+    }
+
+    const novelCode = params.novelCode?.trim();
+    if (novelCode) {
+      return this.jobModel
+        .findOne({ novelCode })
+        .sort({ createdAt: -1 })
+        .exec();
+    }
+
+    throw new BadRequestException('jobId 或 novelCode 不能为空');
   }
 
   /**
@@ -254,17 +336,14 @@ export class NovelOutlineService {
           throw abortError;
         }
 
-        await this.jobModel.updateOne(
-          jobFilter,
-          {
-            $set: {
-              status: 'generating',
-              processingChunkIndex: chunkIndex,
-              totalChunks,
-              lastError: '',
-            },
+        await this.jobModel.updateOne(jobFilter, {
+          $set: {
+            status: 'generating',
+            processingChunkIndex: chunkIndex,
+            totalChunks,
+            lastError: '',
           },
-        );
+        });
 
         const chunkText = await this.readChunkText(job, chunkIndex);
         if (!chunkText.trim()) {
@@ -292,33 +371,27 @@ export class NovelOutlineService {
         });
 
         const nextStatus = chunkIndex >= totalChunks ? 'done' : 'generating';
-        await this.jobModel.updateOne(
-          jobFilter,
-          {
-            $set: {
-              status: nextStatus,
-              processingChunkIndex:
-                nextStatus === 'done' ? totalChunks : chunkIndex + 1,
-              lastCompletedChunkIndex: chunkIndex,
-              lastError: '',
-            },
+        await this.jobModel.updateOne(jobFilter, {
+          $set: {
+            status: nextStatus,
+            processingChunkIndex:
+              nextStatus === 'done' ? totalChunks : chunkIndex + 1,
+            lastCompletedChunkIndex: chunkIndex,
+            lastError: '',
           },
-        );
+        });
       }
 
       return (await this.jobModel.findOne(jobFilter).exec())!;
     } catch (err) {
       const e = err as Error;
       const aborted = e?.name === 'AbortError' || signal?.aborted;
-      await this.jobModel.updateOne(
-        jobFilter,
-        {
-          $set: {
-            status: aborted ? 'aborted' : 'failed',
-            lastError: aborted ? '任务已中止' : e.message,
-          },
+      await this.jobModel.updateOne(jobFilter, {
+        $set: {
+          status: aborted ? 'aborted' : 'failed',
+          lastError: aborted ? '任务已中止' : e.message,
         },
-      );
+      });
       throw err;
     }
   }
@@ -384,25 +457,26 @@ export class NovelOutlineService {
       matched.relations = mergeText(matched.relations, raw.relations);
     }
 
-    const incomingWorld = result.worldResult?.worldview;
+    const incomingWorld = this.normalizeWorldResult(result.worldResult);
     const currentWorld = existing.worldView || {};
     const worldView =
       incomingWorld && typeof incomingWorld === 'object'
         ? {
-            worldType: currentWorld.worldType || '',
+            worldType: mergeText(
+              currentWorld.worldType,
+              incomingWorld.worldType,
+            ),
             summary: uniqueStrings([
               currentWorld.summary || '',
-              ...toStringArray(incomingWorld.cultivationSystem),
-              ...toStringArray(incomingWorld.locations),
-              ...toStringArray(incomingWorld.technologyOrMagic),
+              ...toStringArray(incomingWorld.summary),
             ]).join('\n'),
             socialStructure: uniqueStrings([
               currentWorld.socialStructure || '',
-              ...toStringArray(incomingWorld.factions),
+              ...toStringArray(incomingWorld.socialStructure),
             ]).join('\n'),
             coreRules: uniqueStrings([
               ...(currentWorld.coreRules || []),
-              ...toStringArray(incomingWorld.rules),
+              ...toStringArray(incomingWorld.coreRules),
             ]),
           }
         : currentWorld;
@@ -426,6 +500,93 @@ export class NovelOutlineService {
       events: [...currentEvents, ...incomingEvents],
     });
     await existing.save();
+  }
+
+  private normalizeWorldResult(worldResult: unknown): {
+    worldType?: string;
+    summary?: string[];
+    socialStructure?: string[];
+    coreRules?: string[];
+  } | null {
+    if (!worldResult || typeof worldResult !== 'object') return null;
+
+    const root = worldResult as Record<string, unknown>;
+    const rawWorld = this.pickRawWorldView(root);
+    if (!rawWorld) return null;
+
+    if (typeof rawWorld === 'string') {
+      const summary = toStringArray(rawWorld);
+      return summary.length ? { summary } : null;
+    }
+
+    const worldType = mergeText(
+      rawWorld.worldType,
+      rawWorld.type,
+      rawWorld.genre,
+    );
+    const summary = uniqueStrings([
+      ...toStringArray(rawWorld.summary),
+      ...toStringArray(rawWorld.worldSetting),
+      ...toStringArray(rawWorld.setting),
+      ...toStringArray(rawWorld.background),
+      ...toStringArray(rawWorld.cultivationSystem),
+      ...toStringArray(rawWorld.locations),
+      ...toStringArray(rawWorld.technologyOrMagic),
+    ]);
+    const socialStructure = uniqueStrings([
+      ...toStringArray(rawWorld.socialStructure),
+      ...toStringArray(rawWorld.factions),
+      ...toStringArray(rawWorld.organizations),
+    ]);
+    const coreRules = uniqueStrings([
+      ...toStringArray(rawWorld.coreRules),
+      ...toStringArray(rawWorld.rules),
+    ]);
+
+    if (
+      !worldType &&
+      !summary.length &&
+      !socialStructure.length &&
+      !coreRules.length
+    ) {
+      return null;
+    }
+
+    return {
+      worldType,
+      summary,
+      socialStructure,
+      coreRules,
+    };
+  }
+
+  private pickRawWorldView(root: Record<string, unknown>): RawWorldView {
+    const candidates = [
+      root.worldView,
+      root.worldview,
+      root.world,
+      root.worldSetting,
+      root.setting,
+    ];
+    const nested = candidates.find((candidate) => {
+      if (typeof candidate === 'string') return normalize(candidate);
+      return candidate && typeof candidate === 'object';
+    });
+    if (nested) return nested as RawWorldView;
+
+    const hasFlatWorldFields = [
+      'worldType',
+      'summary',
+      'socialStructure',
+      'coreRules',
+      'cultivationSystem',
+      'factions',
+      'locations',
+      'rules',
+      'technologyOrMagic',
+    ].some((key) => key in root);
+
+    return hasFlatWorldFields ? root : undefined;
   }
 
   /**
@@ -495,7 +656,7 @@ export class NovelOutlineService {
       if (!raw) {
         throw new Error('返回内容为空');
       }
-      return JSON.parse(raw);
+      return JSON.parse(raw) as T;
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
       throw new Error(`LLM返回JSON解析失败: ${errorMsg}`);
@@ -568,20 +729,20 @@ ${chunkText}
 你是小说世界观抽取器，只负责提取【世界设定】。
 
 严格规则：
-- 只能提取世界设定相关内容
-- 禁止提取人物与剧情
-- 输出必须是 JSON
-- 尽量结构化，不要长文本堆叠
+- 只提取本段正文中新增或明确出现的世界设定
+- 世界设定包括：世界类型、时代/社会背景、组织势力、地点、能力体系、技术/魔法/规则、阶层制度
+- 禁止提取人物小传与剧情事件，但可以提取由剧情透露出的设定
+- 如果没有明确世界设定，对应字段输出空字符串或空数组
+- 输出必须是合法 JSON，不要输出解释文字
 
 输出格式：
 
 {
-  "worldview": {
-    "cultivationSystem": [],
-    "factions": [],
-    "locations": [],
-    "rules": [],
-    "technologyOrMagic": []
+  "worldView": {
+    "worldType": "世界类型，如修仙/都市/科幻/西幻；无法判断则为空字符串",
+    "summary": ["世界背景、地点、能力体系、技术或魔法设定"],
+    "socialStructure": ["组织势力、阶层制度、社会关系结构"],
+    "coreRules": ["世界运行规则、限制、能力规则"]
   }
 }
 `;
@@ -595,12 +756,18 @@ ${chunkText}
 `;
 
     const res = await this.callLLM<{
-      worldview: {
-        cultivationSystem: string[];
-        factions: string[];
-        locations: string[];
-        rules: string[];
-        technologyOrMagic: string[];
+      worldView?: {
+        worldType?: string;
+        summary?: string[];
+        socialStructure?: string[];
+        coreRules?: string[];
+      };
+      worldview?: {
+        cultivationSystem?: string[];
+        factions?: string[];
+        locations?: string[];
+        rules?: string[];
+        technologyOrMagic?: string[];
       };
     }>({ system, user, signal });
 

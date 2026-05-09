@@ -14,6 +14,7 @@ import {
   Min,
   IsArray,
   ArrayNotEmpty,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -60,11 +61,54 @@ export class JobIdDto {
 }
 
 /**
+ * 查询单个 novel_split_jobs，支持 jobId 或 novelCode
+ */
+export class SplitJobDetailQueryDto {
+  @IsString()
+  @IsOptional()
+  jobId?: string;
+
+  @IsString()
+  @IsOptional()
+  novelCode?: string;
+}
+
+/**
  * 按 novelCode 查询
  */
 export class NovelCodeDto {
   @IsString()
   novelCode: string;
+}
+
+/**
+ * 查询 novel_split_jobs
+ */
+export class SplitJobQueryDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  current?: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  pageSize?: number;
+
+  @IsString()
+  @IsOptional()
+  novelCode?: string;
+
+  @IsString()
+  @IsOptional()
+  jobId?: string;
+
+  @IsIn(['splitting', 'split_done', 'generating', 'done', 'failed', 'aborted'])
+  @IsOptional()
+  status?: string;
 }
 
 /**

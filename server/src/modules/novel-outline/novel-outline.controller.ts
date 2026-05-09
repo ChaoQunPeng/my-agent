@@ -21,6 +21,8 @@ import {
   UploadAndSplitDto,
   StartExtractDto,
   NovelCodeDto,
+  SplitJobQueryDto,
+  SplitJobDetailQueryDto,
 } from './dto/novel-outline.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
@@ -111,6 +113,24 @@ export class NovelOutlineController {
     const result = await this.novelOutlineService.findByNovelCode(
       body.novelCode,
     );
+    return ApiResponseDto.success(result);
+  }
+
+  /**
+   * 获取 novel_split_jobs 中的数据
+   */
+  @Post('get-split-jobs')
+  async getSplitJobs(@Body() body: SplitJobQueryDto) {
+    const result = await this.novelOutlineService.findSplitJobs(body);
+    return ApiResponseDto.success(result);
+  }
+
+  /**
+   * 根据 jobId 或 novelCode 获取单个 novel_split_jobs 数据
+   */
+  @Post('get-split-job')
+  async getSplitJob(@Body() body: SplitJobDetailQueryDto) {
+    const result = await this.novelOutlineService.findSplitJob(body);
     return ApiResponseDto.success(result);
   }
 }
