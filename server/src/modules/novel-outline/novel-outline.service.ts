@@ -33,14 +33,6 @@ import {
 interface ExtractParams {
   novelCode: string;
 
-  jobId?: string;
-
-  chunkText?: string;
-
-  chunkIndex?: number;
-
-  totalChunks?: number;
-
   signal?: AbortSignal;
 }
 
@@ -214,208 +206,112 @@ export class NovelOutlineService {
   async startExtract(params: ExtractParams) {
     const novelCode = params.novelCode?.trim();
     const { signal } = params;
-    let chunkText = params.chunkText ?? '';
-    let chunkIndex = params.chunkIndex;
-    let totalChunks = params.totalChunks;
     if (!novelCode) {
       throw new BadRequestException('novelCode 不能为空');
     }
 
-    let job: NovelSplitJobDocument | null = null;
-    if (params.jobId) {
-      job = await this.jobModel.findOne({ jobId: params.jobId }).exec();
-      if (!job) {
-        throw new NotFoundException(`任务不存在：${params.jobId}`);
-      }
-      if (job.status === 'splitting') {
-        throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
-      }
-      if (!chunkText.trim()) {
-        throw new BadRequestException('chunkText 不能为空');
-      }
-    } else {
-      job = await this.jobModel
-        .findOne({
-          novelCode,
-          chunkDir: { $ne: '' },
-          totalChunks: { $gt: 0 },
-        })
-        .sort({ createdAt: -1 })
-        .exec();
-      if (!job) {
-        throw new NotFoundException(`未找到小说 ${novelCode} 对应的拆分任务`);
-      }
-      if (job.status === 'splitting') {
-        throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
-      }
-
-      chunkIndex = 1;
-      totalChunks = job.totalChunks;
-      chunkText = await this.readChunkText(job, chunkIndex);
+    const job = await this.jobModel
+      .findOne({
+        novelCode,
+        chunkDir: { $ne: '' },
+        totalChunks: { $gt: 0 },
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+    if (!job) {
+      throw new NotFoundException(`未找到小说 ${novelCode} 对应的拆分任务`);
+    }
+    if (job.status === 'splitting') {
+      throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
     }
 
-    if (!chunkText.trim()) {
-      throw new BadRequestException('chunkText 不能为空');
+    if (job.status === 'done') {
+      return job;
     }
-    if (
-      !chunkIndex ||
-      !totalChunks ||
-      chunkIndex < 1 ||
-      totalChunks < chunkIndex
-    ) {
+
+    const totalChunks = job.totalChunks;
+    const resumeChunkIndex = Math.max(
+      1,
+      Math.min(
+        totalChunks,
+        job.processingChunkIndex || job.lastCompletedChunkIndex + 1 || 1,
+      ),
+    );
+    if (!totalChunks || totalChunks < resumeChunkIndex) {
       throw new BadRequestException('chunkIndex / totalChunks 不合法');
     }
-    if (!job) {
-      throw new NotFoundException('任务不存在');
-    }
-
-    await this.jobModel.updateOne(
-      { jobId: job.jobId },
-      {
-        $set: {
-          status: 'generating',
-          processingChunkIndex: chunkIndex,
-          totalChunks,
-          lastError: '',
-        },
-      },
-    );
-
-    const extractParams: ResolvedExtractParams = {
-      ...params,
-      novelCode,
-      jobId: job.jobId,
-      chunkText,
-      chunkIndex,
-      totalChunks,
-    };
+    const jobFilter = { _id: job._id, novelCode };
 
     try {
-      console.log(`准备提取...`);
-
-      const result = await this.chunkExtractor(extractParams);
-
-      console.log(`提取完成...`);
-
-      const existing =
-        (await this.outlineModel.findOne({ novelCode }).exec()) ??
-        new this.outlineModel({
-          novelCode,
-          characters: [],
-          events: [],
-          worldView: {},
-        });
-
-      const characters = [...(existing.characters || [])];
-      for (const raw of result.characterResult?.characters || []) {
-        const name = normalize(raw?.name);
-        if (!name) continue;
-
-        const aliases = uniqueStrings(raw.aliases || []);
-        const aliasCandidates = uniqueStrings(raw.aliasCandidates || []);
-        const allNames = new Set([name, ...aliases, ...aliasCandidates]);
-        const matched = characters.find((item) =>
-          [item.name, ...(item.aliases || []), ...(item.aliasCandidates || [])]
-            .filter(Boolean)
-            .some((value) => allNames.has(value)),
-        );
-
-        if (!matched) {
-          characters.push({
-            name,
-            aliases,
-            aliasCandidates,
-            identity: normalize(raw.identity),
-            personality: normalize(raw.personality),
-            goals: normalize(raw.goals),
-            traits: normalize(raw.traits),
-            relations: normalize(raw.relations),
-          });
-          continue;
+      for (
+        let chunkIndex = resumeChunkIndex;
+        chunkIndex <= totalChunks;
+        chunkIndex += 1
+      ) {
+        if (signal?.aborted) {
+          const abortError = new Error('任务已中止');
+          abortError.name = 'AbortError';
+          throw abortError;
         }
 
-        matched.aliases = uniqueStrings([
-          ...(matched.aliases || []),
-          ...aliases,
-        ]);
-        matched.aliasCandidates = uniqueStrings([
-          ...(matched.aliasCandidates || []),
-          ...aliasCandidates.filter(
-            (candidate) =>
-              candidate !== matched.name &&
-              !matched.aliases?.includes(candidate),
-          ),
-        ]);
-        matched.identity = mergeText(matched.identity, raw.identity);
-        matched.personality = mergeText(matched.personality, raw.personality);
-        matched.goals = mergeText(matched.goals, raw.goals);
-        matched.traits = mergeText(matched.traits, raw.traits);
-        matched.relations = mergeText(matched.relations, raw.relations);
+        await this.jobModel.updateOne(
+          jobFilter,
+          {
+            $set: {
+              status: 'generating',
+              processingChunkIndex: chunkIndex,
+              totalChunks,
+              lastError: '',
+            },
+          },
+        );
+
+        const chunkText = await this.readChunkText(job, chunkIndex);
+        if (!chunkText.trim()) {
+          throw new BadRequestException('chunkText 不能为空');
+        }
+
+        const extractParams: ResolvedExtractParams = {
+          ...params,
+          novelCode,
+          jobId: job.jobId,
+          chunkText,
+          chunkIndex,
+          totalChunks,
+        };
+
+        console.log(`准备提取第 ${chunkIndex}/${totalChunks} 个切片...`);
+        const result = await this.chunkExtractor(extractParams);
+        console.log(`第 ${chunkIndex}/${totalChunks} 个切片提取完成...`);
+
+        await this.mergeChunkResult({
+          novelCode,
+          jobId: job.jobId,
+          chunkIndex,
+          result,
+        });
+
+        const nextStatus = chunkIndex >= totalChunks ? 'done' : 'generating';
+        await this.jobModel.updateOne(
+          jobFilter,
+          {
+            $set: {
+              status: nextStatus,
+              processingChunkIndex:
+                nextStatus === 'done' ? totalChunks : chunkIndex + 1,
+              lastCompletedChunkIndex: chunkIndex,
+              lastError: '',
+            },
+          },
+        );
       }
 
-      const incomingWorld = result.worldResult?.worldview;
-      const currentWorld = existing.worldView || {};
-      const worldView =
-        incomingWorld && typeof incomingWorld === 'object'
-          ? {
-              worldType: currentWorld.worldType || '',
-              summary: uniqueStrings([
-                currentWorld.summary || '',
-                ...toStringArray(incomingWorld.cultivationSystem),
-                ...toStringArray(incomingWorld.locations),
-                ...toStringArray(incomingWorld.technologyOrMagic),
-              ]).join('\n'),
-              socialStructure: uniqueStrings([
-                currentWorld.socialStructure || '',
-                ...toStringArray(incomingWorld.factions),
-              ]).join('\n'),
-              coreRules: uniqueStrings([
-                ...(currentWorld.coreRules || []),
-                ...toStringArray(incomingWorld.rules),
-              ]),
-            }
-          : currentWorld;
-
-      const currentEvents = (existing.events || []).filter(
-        (event) => event.chunkIndex !== chunkIndex,
-      );
-      const incomingEvents = (result.plotResult?.plotSegments || [])
-        .map((item) => ({
-          title: normalize(item.title),
-          summary: mergeText(item.summary, item.impact),
-          characters: uniqueStrings(item.involvedCharacters || []),
-          chunkIndex,
-        }))
-        .filter((item) => item.title);
-
-      existing.set({
-        lastJobId: job.jobId,
-        characters,
-        worldView,
-        events: [...currentEvents, ...incomingEvents],
-      });
-      await existing.save();
-
-      const nextStatus = chunkIndex >= totalChunks ? 'done' : 'generating';
-      await this.jobModel.updateOne(
-        { jobId: job.jobId },
-        {
-          $set: {
-            status: nextStatus,
-            processingChunkIndex:
-              nextStatus === 'done' ? totalChunks : chunkIndex + 1,
-            lastCompletedChunkIndex: chunkIndex,
-            lastError: '',
-          },
-        },
-      );
-
-      return (await this.jobModel.findOne({ jobId: job.jobId }).exec())!;
+      return (await this.jobModel.findOne(jobFilter).exec())!;
     } catch (err) {
       const e = err as Error;
       const aborted = e?.name === 'AbortError' || signal?.aborted;
       await this.jobModel.updateOne(
-        { jobId: job.jobId },
+        jobFilter,
         {
           $set: {
             status: aborted ? 'aborted' : 'failed',
@@ -425,6 +321,111 @@ export class NovelOutlineService {
       );
       throw err;
     }
+  }
+
+  private async mergeChunkResult(params: {
+    novelCode: string;
+    jobId: string;
+    chunkIndex: number;
+    result: Awaited<ReturnType<NovelOutlineService['chunkExtractor']>>;
+  }) {
+    const { novelCode, jobId, chunkIndex, result } = params;
+    const existing =
+      (await this.outlineModel.findOne({ novelCode }).exec()) ??
+      new this.outlineModel({
+        novelCode,
+        characters: [],
+        events: [],
+        worldView: {},
+      });
+
+    const characters = [...(existing.characters || [])];
+    for (const raw of result.characterResult?.characters || []) {
+      const name = normalize(raw?.name);
+      if (!name) continue;
+
+      const aliases = uniqueStrings((raw.aliases || []) as unknown[]);
+      const aliasCandidates = uniqueStrings(
+        (raw.aliasCandidates || []) as unknown[],
+      );
+      const allNames = new Set([name, ...aliases, ...aliasCandidates]);
+      const matched = characters.find((item) =>
+        [item.name, ...(item.aliases || []), ...(item.aliasCandidates || [])]
+          .filter(Boolean)
+          .some((value) => allNames.has(value)),
+      );
+
+      if (!matched) {
+        characters.push({
+          name,
+          aliases,
+          aliasCandidates,
+          identity: normalize(raw.identity),
+          personality: normalize(raw.personality),
+          goals: normalize(raw.goals),
+          traits: normalize(raw.traits),
+          relations: normalize(raw.relations),
+        });
+        continue;
+      }
+
+      matched.aliases = uniqueStrings([...(matched.aliases || []), ...aliases]);
+      matched.aliasCandidates = uniqueStrings([
+        ...(matched.aliasCandidates || []),
+        ...aliasCandidates.filter(
+          (candidate) =>
+            candidate !== matched.name && !matched.aliases?.includes(candidate),
+        ),
+      ]);
+      matched.identity = mergeText(matched.identity, raw.identity);
+      matched.personality = mergeText(matched.personality, raw.personality);
+      matched.goals = mergeText(matched.goals, raw.goals);
+      matched.traits = mergeText(matched.traits, raw.traits);
+      matched.relations = mergeText(matched.relations, raw.relations);
+    }
+
+    const incomingWorld = result.worldResult?.worldview;
+    const currentWorld = existing.worldView || {};
+    const worldView =
+      incomingWorld && typeof incomingWorld === 'object'
+        ? {
+            worldType: currentWorld.worldType || '',
+            summary: uniqueStrings([
+              currentWorld.summary || '',
+              ...toStringArray(incomingWorld.cultivationSystem),
+              ...toStringArray(incomingWorld.locations),
+              ...toStringArray(incomingWorld.technologyOrMagic),
+            ]).join('\n'),
+            socialStructure: uniqueStrings([
+              currentWorld.socialStructure || '',
+              ...toStringArray(incomingWorld.factions),
+            ]).join('\n'),
+            coreRules: uniqueStrings([
+              ...(currentWorld.coreRules || []),
+              ...toStringArray(incomingWorld.rules),
+            ]),
+          }
+        : currentWorld;
+
+    const currentEvents = (existing.events || []).filter(
+      (event) => event.chunkIndex !== chunkIndex,
+    );
+    const incomingEvents = (result.plotResult?.plotSegments || [])
+      .map((item) => ({
+        title: normalize(item.title),
+        summary: mergeText(item.summary, item.impact),
+        characters: uniqueStrings(item.involvedCharacters || []),
+        chunkIndex,
+      }))
+      .filter((item) => item.title);
+
+    existing.set({
+      lastJobId: jobId,
+      characters,
+      worldView,
+      events: [...currentEvents, ...incomingEvents],
+    });
+    await existing.save();
   }
 
   /**

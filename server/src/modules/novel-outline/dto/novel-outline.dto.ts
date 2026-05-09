@@ -49,26 +49,6 @@ export class UploadAndSplitDto {
 export class StartExtractDto {
   @IsString()
   novelCode: string;
-
-  @IsOptional()
-  @IsString()
-  jobId?: string;
-
-  @IsOptional()
-  @IsString()
-  chunkText?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  chunkIndex?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  totalChunks?: number;
 }
 
 /**
