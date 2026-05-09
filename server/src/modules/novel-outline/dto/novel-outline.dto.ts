@@ -44,11 +44,28 @@ export class UploadAndSplitDto {
 }
 
 /**
- * 启动（或续跑）大纲生成
+ * 单块文本提取
  */
-export class StartGenerateDto {
+export class StartExtractDto {
+  @IsString()
+  novelCode: string;
+
+  @IsOptional()
   @IsString()
   jobId?: string;
+
+  @IsString()
+  chunkText: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  chunkIndex: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  totalChunks: number;
 }
 
 /**

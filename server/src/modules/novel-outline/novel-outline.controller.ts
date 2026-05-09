@@ -17,7 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Express } from 'express';
 import { NovelOutlineService } from './novel-outline.service';
-import { UploadAndSplitDto, StartGenerateDto } from './dto/novel-outline.dto';
+import { UploadAndSplitDto, StartExtractDto } from './dto/novel-outline.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
 /**
@@ -77,11 +77,11 @@ export class NovelOutlineController {
   }
 
   /**
-   * 启动或续跑大纲生成（异步），立即返回任务快照
+   * 提取单个 chunk 并增量写入大纲
    */
-  @Post('start-generate')
-  async startGenerate(@Body() body: StartGenerateDto) {
-    const job = await this.novelOutlineService.startGenerate(body.jobId);
-    return ApiResponseDto.success(job, '已开始生成');
+  @Post('start-extract')
+  async startExtract(@Body() body: StartExtractDto) {
+    const job = await this.novelOutlineService.startExtract(body);
+    return ApiResponseDto.success(job, '提取完成');
   }
 }

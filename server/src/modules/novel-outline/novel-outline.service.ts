@@ -1,6 +1,5 @@
 import {
   Injectable,
-  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -17,7 +16,6 @@ import {
   NovelOutlineDocument,
 } from './schemas/novel-outline.schema';
 import { SplitterService } from './splitter.service';
-import { OutlineGeneratorService } from './outline-generator.service';
 import { OpenaiService } from 'src/shared/openai/openai.service';
 
 /**
@@ -40,16 +38,8 @@ interface ExtractParams {
 }
 @Injectable()
 export class NovelOutlineService {
-  private readonly logger = new Logger(NovelOutlineService.name);
-
   // 上传根目录（放在 server/uploads/novel-splits 下）
   private readonly uploadRoot: string;
-
-  // 进程内正在跑的生成任务 jobId 集合，防止重复启动
-  private readonly runningJobs = new Set<string>();
-
-  // 每个正在生成的任务对应的 AbortController，用于在用户点击"中止"时立即 cancel 底层 LLM 请求
-  private readonly jobControllers = new Map<string, AbortController>();
 
   constructor(
     @InjectModel(NovelSplitJob.name)
@@ -402,97 +392,6 @@ export class NovelOutlineService {
         },
       );
       throw err;
-    }
-  }
-
-  /**
-   * 按拆分文件启动或续跑生成。接口立即返回任务快照，后台继续处理。
-   */
-  async startGenerate(jobId?: string): Promise<NovelSplitJob> {
-    if (!jobId?.trim()) {
-      throw new BadRequestException('jobId 不能为空');
-    }
-
-    const job = await this.jobModel.findOne({ jobId }).exec();
-    if (!job) {
-      throw new NotFoundException(`任务不存在：${jobId}`);
-    }
-    if (job.status === 'splitting') {
-      throw new BadRequestException('任务仍在拆分中，暂不能开始生成');
-    }
-    if (this.runningJobs.has(jobId)) {
-      return job;
-    }
-
-    const controller = new AbortController();
-    this.runningJobs.add(jobId);
-    this.jobControllers.set(jobId, controller);
-
-    await this.jobModel.updateOne(
-      { jobId },
-      {
-        $set: {
-          status: 'generating',
-          processingChunkIndex: Math.max(1, job.lastCompletedChunkIndex + 1),
-          lastError: '',
-        },
-      },
-    );
-
-    void this.runGenerateJob(jobId, controller.signal).finally(() => {
-      this.runningJobs.delete(jobId);
-      this.jobControllers.delete(jobId);
-    });
-
-    return (await this.jobModel.findOne({ jobId }).exec())!;
-  }
-
-  private async runGenerateJob(
-    jobId: string,
-    signal: AbortSignal,
-  ): Promise<void> {
-    const job = await this.jobModel.findOne({ jobId }).exec();
-    if (!job) return;
-
-    try {
-      const startIndex = Math.max(1, job.lastCompletedChunkIndex + 1);
-      for (let index = startIndex; index <= job.totalChunks; index += 1) {
-        if (signal.aborted) {
-          throw new DOMException('Aborted', 'AbortError');
-        }
-
-        const chunkText = await fs.readFile(
-          path.join(
-            job.chunkDir,
-            `chunk-${String(index).padStart(4, '0')}.txt`,
-          ),
-          'utf-8',
-        );
-
-        await this.startExtract({
-          novelCode: job.novelCode,
-          jobId,
-          chunkText,
-          chunkIndex: index,
-          totalChunks: job.totalChunks,
-          signal,
-        });
-      }
-    } catch (err) {
-      const e = err as Error;
-      const aborted = e?.name === 'AbortError' || signal.aborted;
-      await this.jobModel.updateOne(
-        { jobId },
-        {
-          $set: {
-            status: aborted ? 'aborted' : 'failed',
-            lastError: aborted ? '任务已中止' : e.message,
-          },
-        },
-      );
-      if (!aborted) {
-        this.logger.error(`[novel-outline] 生成失败 jobId=${jobId}`, e.stack);
-      }
     }
   }
 
