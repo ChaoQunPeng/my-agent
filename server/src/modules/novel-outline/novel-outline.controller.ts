@@ -48,11 +48,7 @@ export class NovelOutlineController {
     if (!file) {
       throw new BadRequestException('请上传 txt 文件（字段名：file）');
     }
-    // multer 默认按 latin1 解码 originalname，中文会乱码（如 é¾æ[1-3é¨å¨].txt），
-    // 这里统一按 utf-8 重新解码还原真实文件名
-    const originalName = Buffer.from(file.originalname, 'latin1').toString(
-      'utf8',
-    );
+    const originalName = this.normalizeUploadFileName(file.originalname);
     // 简单校验扩展名 & mime
     const name = originalName.toLowerCase();
     if (!name.endsWith('.txt')) {
@@ -74,6 +70,24 @@ export class NovelOutlineController {
       fileBuffer: file.buffer,
     });
     return ApiResponseDto.success(job, '拆分完成');
+  }
+
+  /**
+   * 兼容不同 multer/busboy 版本对中文文件名的处理：
+   * 有些版本拿到的是已正确解码的 UTF-8，有些会把 UTF-8 字节按 latin1 展示成乱码。
+   */
+  private normalizeUploadFileName(fileName: string): string {
+    if (!fileName) return fileName;
+
+    const hasNonLatin1Char = Array.from(fileName).some(
+      (char) => char.charCodeAt(0) > 0xff,
+    );
+    if (hasNonLatin1Char) return fileName;
+
+    const decoded = Buffer.from(fileName, 'latin1').toString('utf8');
+    if (decoded.includes('\uFFFD')) return fileName;
+
+    return decoded;
   }
 
   /**
