@@ -15,7 +15,6 @@ import {
 import {
   NovelOutline,
   NovelOutlineDocument,
-  OutlineCharacter,
 } from './schemas/novel-outline.schema';
 import { SplitterService } from './splitter.service';
 import { OutlineGeneratorService } from './outline-generator.service';
@@ -108,8 +107,6 @@ export class NovelOutlineService {
       chunkDir,
       sourceFilePath,
       totalChunks: estimated,
-      splittedChunks: 0,
-      processedChunks: 0,
       status: 'splitting',
     });
 
@@ -199,21 +196,310 @@ export class NovelOutlineService {
    * 启动生成任务
    */
   async startExtract(params: ExtractParams) {
-    /**
-     * 1. 如果没有jobId，则是新任务，在novel-split-job表中创建新的数据
-     * status状态改为generating，processingChunkIndex也要设置成1
-     *
-     * 如果有jobId，则是断点续跑，从novel-split-job表中查询数据
-     */
-    /**
-     * 2. 执行extractorChunk进行提取，获得结果后，保存到novel-outline.schema
-     */
+    const { novelCode, chunkIndex, totalChunks, chunkText, signal } = params;
+    if (!novelCode?.trim()) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+    if (!chunkText?.trim()) {
+      throw new BadRequestException('chunkText 不能为空');
+    }
+    if (chunkIndex < 1 || totalChunks < chunkIndex) {
+      throw new BadRequestException('chunkIndex / totalChunks 不合法');
+    }
+
+    let job: NovelSplitJobDocument | null = null;
+    if (params.jobId) {
+      job = await this.jobModel.findOne({ jobId: params.jobId }).exec();
+      if (!job) {
+        throw new NotFoundException(`任务不存在：${params.jobId}`);
+      }
+      if (job.status === 'splitting') {
+        throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
+      }
+    } else {
+      const safeNovelCode =
+        novelCode.replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) || 'unknown';
+      const jobId = `extract_${safeNovelCode}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      job = await this.jobModel.create({
+        jobId,
+        novelCode,
+        sourceFileName: '',
+        totalChars: Array.from(chunkText).length,
+        chunkSize: Array.from(chunkText).length,
+        overlap: 0,
+        chunkDir: '',
+        sourceFilePath: '',
+        totalChunks,
+        processingChunkIndex: chunkIndex,
+        lastCompletedChunkIndex: chunkIndex - 1,
+        status: 'generating',
+      });
+    }
+
+    await this.jobModel.updateOne(
+      { jobId: job.jobId },
+      {
+        $set: {
+          status: 'generating',
+          processingChunkIndex: chunkIndex,
+          totalChunks,
+          lastError: '',
+        },
+      },
+    );
+
+    try {
+      const result = await this.chunkExtractor({
+        ...params,
+        jobId: job.jobId,
+      });
+
+      const normalize = (value: unknown): string =>
+        typeof value === 'string' ? value.trim() : '';
+      const uniqueStrings = (values: unknown[]): string[] => {
+        const seen = new Set<string>();
+        const output: string[] = [];
+        for (const value of values) {
+          const text = normalize(value);
+          if (!text || seen.has(text)) continue;
+          seen.add(text);
+          output.push(text);
+        }
+        return output;
+      };
+      const mergeText = (...parts: unknown[]): string =>
+        uniqueStrings(parts.map((part) => normalize(part))).join('\n');
+      const toStringArray = (value: unknown): string[] => {
+        if (Array.isArray(value)) return uniqueStrings(value);
+        const text = normalize(value);
+        return text ? [text] : [];
+      };
+
+      const existing =
+        (await this.outlineModel.findOne({ novelCode }).exec()) ??
+        new this.outlineModel({
+          novelCode,
+          characters: [],
+          events: [],
+          worldView: {},
+        });
+
+      const characters = [...(existing.characters || [])];
+      for (const raw of result.characterResult?.characters || []) {
+        const name = normalize(raw?.name);
+        if (!name) continue;
+
+        const aliases = uniqueStrings(raw.aliases || []);
+        const aliasCandidates = uniqueStrings(raw.aliasCandidates || []);
+        const allNames = new Set([name, ...aliases, ...aliasCandidates]);
+        const matched = characters.find((item) =>
+          [item.name, ...(item.aliases || []), ...(item.aliasCandidates || [])]
+            .filter(Boolean)
+            .some((value) => allNames.has(value)),
+        );
+
+        if (!matched) {
+          characters.push({
+            name,
+            aliases,
+            aliasCandidates,
+            identity: normalize(raw.identity),
+            personality: normalize(raw.personality),
+            goals: normalize(raw.goals),
+            traits: normalize(raw.traits),
+            relations: normalize(raw.relations),
+          });
+          continue;
+        }
+
+        matched.aliases = uniqueStrings([
+          ...(matched.aliases || []),
+          ...aliases,
+        ]);
+        matched.aliasCandidates = uniqueStrings([
+          ...(matched.aliasCandidates || []),
+          ...aliasCandidates.filter(
+            (candidate) =>
+              candidate !== matched.name &&
+              !matched.aliases?.includes(candidate),
+          ),
+        ]);
+        matched.identity = mergeText(matched.identity, raw.identity);
+        matched.personality = mergeText(matched.personality, raw.personality);
+        matched.goals = mergeText(matched.goals, raw.goals);
+        matched.traits = mergeText(matched.traits, raw.traits);
+        matched.relations = mergeText(matched.relations, raw.relations);
+      }
+
+      const incomingWorld = result.worldResult?.worldview;
+      const currentWorld = existing.worldView || {};
+      const worldView =
+        incomingWorld && typeof incomingWorld === 'object'
+          ? {
+              worldType: currentWorld.worldType || '',
+              summary: uniqueStrings([
+                currentWorld.summary || '',
+                ...toStringArray(incomingWorld.cultivationSystem),
+                ...toStringArray(incomingWorld.locations),
+                ...toStringArray(incomingWorld.technologyOrMagic),
+              ]).join('\n'),
+              socialStructure: uniqueStrings([
+                currentWorld.socialStructure || '',
+                ...toStringArray(incomingWorld.factions),
+              ]).join('\n'),
+              coreRules: uniqueStrings([
+                ...(currentWorld.coreRules || []),
+                ...toStringArray(incomingWorld.rules),
+              ]),
+            }
+          : currentWorld;
+
+      const currentEvents = (existing.events || []).filter(
+        (event) => event.chunkIndex !== chunkIndex,
+      );
+      const incomingEvents = (result.plotResult?.plotSegments || [])
+        .map((item) => ({
+          title: normalize(item.title),
+          summary: mergeText(item.summary, item.impact),
+          characters: uniqueStrings(item.involvedCharacters || []),
+          chunkIndex,
+        }))
+        .filter((item) => item.title);
+
+      existing.set({
+        lastJobId: job.jobId,
+        characters,
+        worldView,
+        events: [...currentEvents, ...incomingEvents],
+      });
+      await existing.save();
+
+      const nextStatus = chunkIndex >= totalChunks ? 'done' : 'generating';
+      await this.jobModel.updateOne(
+        { jobId: job.jobId },
+        {
+          $set: {
+            status: nextStatus,
+            processingChunkIndex:
+              nextStatus === 'done' ? totalChunks : chunkIndex + 1,
+            lastCompletedChunkIndex: chunkIndex,
+            lastError: '',
+          },
+        },
+      );
+
+      return (await this.jobModel.findOne({ jobId: job.jobId }).exec())!;
+    } catch (err) {
+      const e = err as Error;
+      const aborted = e?.name === 'AbortError' || signal?.aborted;
+      await this.jobModel.updateOne(
+        { jobId: job.jobId },
+        {
+          $set: {
+            status: aborted ? 'aborted' : 'failed',
+            lastError: aborted ? '任务已中止' : e.message,
+          },
+        },
+      );
+      throw err;
+    }
+  }
+
+  /**
+   * 按拆分文件启动或续跑生成。接口立即返回任务快照，后台继续处理。
+   */
+  async startGenerate(jobId?: string): Promise<NovelSplitJob> {
+    if (!jobId?.trim()) {
+      throw new BadRequestException('jobId 不能为空');
+    }
+
+    const job = await this.jobModel.findOne({ jobId }).exec();
+    if (!job) {
+      throw new NotFoundException(`任务不存在：${jobId}`);
+    }
+    if (job.status === 'splitting') {
+      throw new BadRequestException('任务仍在拆分中，暂不能开始生成');
+    }
+    if (this.runningJobs.has(jobId)) {
+      return job;
+    }
+
+    const controller = new AbortController();
+    this.runningJobs.add(jobId);
+    this.jobControllers.set(jobId, controller);
+
+    await this.jobModel.updateOne(
+      { jobId },
+      {
+        $set: {
+          status: 'generating',
+          processingChunkIndex: Math.max(1, job.lastCompletedChunkIndex + 1),
+          lastError: '',
+        },
+      },
+    );
+
+    void this.runGenerateJob(jobId, controller.signal).finally(() => {
+      this.runningJobs.delete(jobId);
+      this.jobControllers.delete(jobId);
+    });
+
+    return (await this.jobModel.findOne({ jobId }).exec())!;
+  }
+
+  private async runGenerateJob(
+    jobId: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const job = await this.jobModel.findOne({ jobId }).exec();
+    if (!job) return;
+
+    try {
+      const startIndex = Math.max(1, job.lastCompletedChunkIndex + 1);
+      for (let index = startIndex; index <= job.totalChunks; index += 1) {
+        if (signal.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+
+        const chunkText = await fs.readFile(
+          path.join(
+            job.chunkDir,
+            `chunk-${String(index).padStart(4, '0')}.txt`,
+          ),
+          'utf-8',
+        );
+
+        await this.startExtract({
+          novelCode: job.novelCode,
+          jobId,
+          chunkText,
+          chunkIndex: index,
+          totalChunks: job.totalChunks,
+          signal,
+        });
+      }
+    } catch (err) {
+      const e = err as Error;
+      const aborted = e?.name === 'AbortError' || signal.aborted;
+      await this.jobModel.updateOne(
+        { jobId },
+        {
+          $set: {
+            status: aborted ? 'aborted' : 'failed',
+            lastError: aborted ? '任务已中止' : e.message,
+          },
+        },
+      );
+      if (!aborted) {
+        this.logger.error(`[novel-outline] 生成失败 jobId=${jobId}`, e.stack);
+      }
+    }
   }
 
   /**
    * 提取
    */
-  async extractorChunk(params: ExtractParams) {
+  async chunkExtractor(params: ExtractParams) {
     const characterResult = await this.characterExtractor(params);
 
     const worldResult = await this.worldExtractor(params);

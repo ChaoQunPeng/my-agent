@@ -31,10 +31,12 @@ export class OutlineGeneratorService {
       jobId: string;
       novelCode: string;
     },
-    existing: Pick<
-      NovelOutline,
-      'synopsis' | 'worldSetting' | 'plotOutline' | 'storyConflicts'
-    >,
+    existing: {
+      synopsis?: string;
+      worldSetting?: string;
+      plotOutline?: string;
+      storyConflicts?: string;
+    },
     matchedCharacters: OutlineCharacter[],
     chunkIndex: number,
     totalChunks: number,
