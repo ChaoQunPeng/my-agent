@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -17,7 +18,12 @@ import {
 } from './schemas/novel-outline.schema';
 import { SplitterService } from './splitter.service';
 import { OpenaiService } from 'src/shared/openai/openai.service';
-import { Logger } from '@nestjs/common';
+import {
+  mergeText,
+  normalize,
+  toStringArray,
+  uniqueStrings,
+} from './outline-merge.utils';
 
 /**
  * 小说大纲生成核心服务
@@ -291,27 +297,6 @@ export class NovelOutlineService {
 
       console.log(`提取完成...`);
 
-      const normalize = (value: unknown): string =>
-        typeof value === 'string' ? value.trim() : '';
-      const uniqueStrings = (values: unknown[]): string[] => {
-        const seen = new Set<string>();
-        const output: string[] = [];
-        for (const value of values) {
-          const text = normalize(value);
-          if (!text || seen.has(text)) continue;
-          seen.add(text);
-          output.push(text);
-        }
-        return output;
-      };
-      const mergeText = (...parts: unknown[]): string =>
-        uniqueStrings(parts.map((part) => normalize(part))).join('\n');
-      const toStringArray = (value: unknown): string[] => {
-        if (Array.isArray(value)) return uniqueStrings(value);
-        const text = normalize(value);
-        return text ? [text] : [];
-      };
-
       const existing =
         (await this.outlineModel.findOne({ novelCode }).exec()) ??
         new this.outlineModel({
@@ -442,6 +427,9 @@ export class NovelOutlineService {
     }
   }
 
+  /**
+   * 读取块文本
+   */
   private async readChunkText(
     job: NovelSplitJobDocument,
     chunkIndex: number,
@@ -479,6 +467,9 @@ export class NovelOutlineService {
     };
   }
 
+  /**
+   * 调用 LLM
+   */
   private async callLLM<T>(params: {
     system: string;
     user: string;
