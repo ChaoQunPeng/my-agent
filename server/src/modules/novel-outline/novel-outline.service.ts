@@ -70,7 +70,7 @@ export class NovelOutlineService {
       (novelCode || '').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) ||
       'unknown';
     const jobId = `novel_${safeNovelCode}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const chunkDir = path.join(this.uploadRoot, jobId);
+    const chunkDir = path.join(this.uploadRoot, safeNovelCode);
     await fs.mkdir(chunkDir, { recursive: true });
 
     const { text: sourceText, encoding: detectedEncoding } =

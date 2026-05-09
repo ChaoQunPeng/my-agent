@@ -24,7 +24,7 @@ import { Type } from 'class-transformer';
 export class UploadAndSplitDto {
   @IsString()
   // 小说唯一识别码（与 NovelConfig.novelCode 对齐）
-  novelCode: string;
+  novelCode!: string;
 
   // 每个切片的原文总字数上限，默认 15000（包含前后上下文）
   @Type(() => Number)
