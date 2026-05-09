@@ -17,7 +17,11 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Express } from 'express';
 import { NovelOutlineService } from './novel-outline.service';
-import { UploadAndSplitDto, StartExtractDto } from './dto/novel-outline.dto';
+import {
+  UploadAndSplitDto,
+  StartExtractDto,
+  NovelCodeDto,
+} from './dto/novel-outline.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
 /**
@@ -97,5 +101,16 @@ export class NovelOutlineController {
   async startExtract(@Body() body: StartExtractDto) {
     const job = await this.novelOutlineService.startExtract(body);
     return ApiResponseDto.success(job, '提取完成');
+  }
+
+  /**
+   * 根据 novelCode 获取 novel_outlines 中的数据
+   */
+  @Post('find-by-novel-code')
+  async findByNovelCode(@Body() body: NovelCodeDto) {
+    const result = await this.novelOutlineService.findByNovelCode(
+      body.novelCode,
+    );
+    return ApiResponseDto.success(result);
   }
 }

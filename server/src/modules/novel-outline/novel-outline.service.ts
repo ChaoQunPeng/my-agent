@@ -28,14 +28,21 @@ interface ExtractParams {
 
   jobId?: string;
 
-  chunkText: string;
+  chunkText?: string;
 
-  chunkIndex: number;
+  chunkIndex?: number;
 
-  totalChunks: number;
+  totalChunks?: number;
 
   signal?: AbortSignal;
 }
+
+type ResolvedExtractParams = ExtractParams & {
+  jobId: string;
+  chunkText: string;
+  chunkIndex: number;
+  totalChunks: number;
+};
 @Injectable()
 export class NovelOutlineService {
   // 上传根目录（放在 server/uploads/novel-splits 下）
@@ -183,18 +190,28 @@ export class NovelOutlineService {
   }
 
   /**
+   * 根据 novelCode 获取大纲数据
+   */
+  async findByNovelCode(novelCode: string): Promise<NovelOutline | null> {
+    const normalizedNovelCode = novelCode?.trim();
+    if (!normalizedNovelCode) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+
+    return this.outlineModel.findOne({ novelCode: normalizedNovelCode }).exec();
+  }
+
+  /**
    * 启动生成任务
    */
   async startExtract(params: ExtractParams) {
-    const { novelCode, chunkIndex, totalChunks, chunkText, signal } = params;
-    if (!novelCode?.trim()) {
+    const novelCode = params.novelCode?.trim();
+    const { signal } = params;
+    let chunkText = params.chunkText ?? '';
+    let chunkIndex = params.chunkIndex;
+    let totalChunks = params.totalChunks;
+    if (!novelCode) {
       throw new BadRequestException('novelCode 不能为空');
-    }
-    if (!chunkText?.trim()) {
-      throw new BadRequestException('chunkText 不能为空');
-    }
-    if (chunkIndex < 1 || totalChunks < chunkIndex) {
-      throw new BadRequestException('chunkIndex / totalChunks 不合法');
     }
 
     let job: NovelSplitJobDocument | null = null;
@@ -206,24 +223,43 @@ export class NovelOutlineService {
       if (job.status === 'splitting') {
         throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
       }
+      if (!chunkText.trim()) {
+        throw new BadRequestException('chunkText 不能为空');
+      }
     } else {
-      const safeNovelCode =
-        novelCode.replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) || 'unknown';
-      const jobId = `extract_${safeNovelCode}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-      job = await this.jobModel.create({
-        jobId,
-        novelCode,
-        sourceFileName: '',
-        totalChars: Array.from(chunkText).length,
-        chunkSize: Array.from(chunkText).length,
-        overlap: 0,
-        chunkDir: '',
-        sourceFilePath: '',
-        totalChunks,
-        processingChunkIndex: chunkIndex,
-        lastCompletedChunkIndex: chunkIndex - 1,
-        status: 'generating',
-      });
+      job = await this.jobModel
+        .findOne({
+          novelCode,
+          chunkDir: { $ne: '' },
+          totalChunks: { $gt: 0 },
+        })
+        .sort({ createdAt: -1 })
+        .exec();
+      if (!job) {
+        throw new NotFoundException(`未找到小说 ${novelCode} 对应的拆分任务`);
+      }
+      if (job.status === 'splitting') {
+        throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
+      }
+
+      chunkIndex = 1;
+      totalChunks = job.totalChunks;
+      chunkText = await this.readChunkText(job, chunkIndex);
+    }
+
+    if (!chunkText.trim()) {
+      throw new BadRequestException('chunkText 不能为空');
+    }
+    if (
+      !chunkIndex ||
+      !totalChunks ||
+      chunkIndex < 1 ||
+      totalChunks < chunkIndex
+    ) {
+      throw new BadRequestException('chunkIndex / totalChunks 不合法');
+    }
+    if (!job) {
+      throw new NotFoundException('任务不存在');
     }
 
     await this.jobModel.updateOne(
@@ -238,11 +274,21 @@ export class NovelOutlineService {
       },
     );
 
+    const extractParams: ResolvedExtractParams = {
+      ...params,
+      novelCode,
+      jobId: job.jobId,
+      chunkText,
+      chunkIndex,
+      totalChunks,
+    };
+
     try {
-      const result = await this.chunkExtractor({
-        ...params,
-        jobId: job.jobId,
-      });
+      console.log(`准备提取...`);
+
+      const result = await this.chunkExtractor(extractParams);
+
+      console.log(`提取完成...`);
 
       const normalize = (value: unknown): string =>
         typeof value === 'string' ? value.trim() : '';
@@ -395,15 +441,37 @@ export class NovelOutlineService {
     }
   }
 
+  private async readChunkText(
+    job: NovelSplitJobDocument,
+    chunkIndex: number,
+  ): Promise<string> {
+    const chunkFilePath = path.join(
+      job.chunkDir,
+      `chunk-${String(chunkIndex).padStart(4, '0')}.txt`,
+    );
+
+    try {
+      return await fs.readFile(chunkFilePath, 'utf-8');
+    } catch {
+      throw new NotFoundException(`切片文件不存在：${chunkFilePath}`);
+    }
+  }
+
   /**
    * 提取
    */
-  async chunkExtractor(params: ExtractParams) {
+  async chunkExtractor(params: ResolvedExtractParams) {
+    console.log(`开始提取角色`);
     const characterResult = await this.characterExtractor(params);
+    console.log(`角色提取完成`);
 
+    console.log(`开始提取世界观`);
     const worldResult = await this.worldExtractor(params);
+    console.log(`世界观提取完成`);
 
+    console.log(`开始提取剧情`);
     const plotResult = await this.plotExtractor(params);
+    console.log(`剧情提取结束`);
 
     return {
       characterResult,
@@ -446,7 +514,7 @@ export class NovelOutlineService {
   /**
    * 角色提取器
    */
-  async characterExtractor(params: ExtractParams) {
+  async characterExtractor(params: ResolvedExtractParams) {
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 
     const system = `
@@ -496,7 +564,7 @@ ${chunkText}
   /**
    * 世界观提取器
    */
-  async worldExtractor(params: ExtractParams) {
+  async worldExtractor(params: ResolvedExtractParams) {
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 
     const system = `
@@ -543,7 +611,7 @@ ${chunkText}
   /**
    * 剧情提取器
    */
-  async plotExtractor(params: ExtractParams) {
+  async plotExtractor(params: ResolvedExtractParams) {
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 
     const system = `

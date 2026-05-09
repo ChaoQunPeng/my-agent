@@ -54,18 +54,21 @@ export class StartExtractDto {
   @IsString()
   jobId?: string;
 
+  @IsOptional()
   @IsString()
-  chunkText: string;
+  chunkText?: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  chunkIndex: number;
+  chunkIndex?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  totalChunks: number;
+  totalChunks?: number;
 }
 
 /**
