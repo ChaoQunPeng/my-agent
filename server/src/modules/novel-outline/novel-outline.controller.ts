@@ -1,3 +1,11 @@
+/*
+ * @Author: PengChaoQun 1152684231@qq.com
+ * @Date: 2026-04-23 11:20:51
+ * @LastEditors: PengChaoQun 1152684231@qq.com
+ * @LastEditTime: 2026-05-09 10:22:18
+ * @FilePath: /my-agent/server/src/modules/novel-outline/novel-outline.controller.ts
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 import {
   Controller,
   Post,
@@ -9,13 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Express } from 'express';
 import { NovelOutlineService } from './novel-outline.service';
-import {
-  UploadAndSplitDto,
-  StartGenerateDto,
-  JobIdDto,
-  NovelCodeDto,
-  MergeAliasDto,
-} from './dto/novel-outline.dto';
+import { UploadAndSplitDto, StartGenerateDto } from './dto/novel-outline.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
 /**
@@ -81,61 +83,5 @@ export class NovelOutlineController {
   async startGenerate(@Body() body: StartGenerateDto) {
     const job = await this.novelOutlineService.startGenerate(body.jobId);
     return ApiResponseDto.success(job, '已开始生成');
-  }
-
-  /**
-   * 查询任务状态 / 进度
-   */
-  @Post('job-status')
-  async jobStatus(@Body() body: JobIdDto) {
-    const job = await this.novelOutlineService.getJobStatus(body.jobId);
-    return ApiResponseDto.success(job);
-  }
-
-  /**
-   * 中止生成任务，保留切片与进度以便续跑
-   */
-  @Post('abort-job')
-  async abortJob(@Body() body: JobIdDto) {
-    await this.novelOutlineService.abortJob(body.jobId);
-    return ApiResponseDto.success(null, '已中止');
-  }
-
-  /**
-   * 获取小说大纲
-   */
-  @Post('get-outline')
-  async getOutline(@Body() body: NovelCodeDto) {
-    const outline = await this.novelOutlineService.getOutline(body.novelCode);
-    return ApiResponseDto.success(outline);
-  }
-
-  /**
-   * 根据小说编码查询任务列表
-   */
-  @Post('list-jobs')
-  async listJobs(@Body() body: NovelCodeDto) {
-    const jobs = await this.novelOutlineService.listJobs(body.novelCode);
-    return ApiResponseDto.success(jobs);
-  }
-
-  /**
-   * 获取待确认的别名候选列表
-   */
-  @Post('get-alias-candidates')
-  async getAliasCandidates(@Body() body: NovelCodeDto) {
-    const candidates = await this.novelOutlineService.getAliasCandidates(
-      body.novelCode,
-    );
-    return ApiResponseDto.success(candidates);
-  }
-
-  /**
-   * 确认合并别名（将候选别名合并到正式别名）
-   */
-  @Post('merge-alias')
-  async mergeAlias(@Body() body: MergeAliasDto) {
-    await this.novelOutlineService.mergeAlias(body);
-    return ApiResponseDto.success(null, '别名合并成功');
   }
 }
