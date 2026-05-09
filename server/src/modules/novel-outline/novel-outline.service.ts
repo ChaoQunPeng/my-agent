@@ -17,6 +17,7 @@ import {
 } from './schemas/novel-outline.schema';
 import { SplitterService } from './splitter.service';
 import { OpenaiService } from 'src/shared/openai/openai.service';
+import { Logger } from '@nestjs/common';
 
 /**
  * 小说大纲生成核心服务
@@ -47,7 +48,7 @@ type ResolvedExtractParams = ExtractParams & {
 export class NovelOutlineService {
   // 上传根目录（放在 server/uploads/novel-splits 下）
   private readonly uploadRoot: string;
-
+  private readonly logger = new Logger(NovelOutlineService.name);
   constructor(
     @InjectModel(NovelSplitJob.name)
     private jobModel: Model<NovelSplitJobDocument>,
@@ -458,20 +459,18 @@ export class NovelOutlineService {
   }
 
   /**
-   * 提取
+   * 提取（并发执行所有提取任务）
    */
   async chunkExtractor(params: ResolvedExtractParams) {
-    console.log(`开始提取角色`);
-    const characterResult = await this.characterExtractor(params);
-    console.log(`角色提取完成`);
+    this.logger.log(`开始并发提取角色、世界观、剧情...`);
 
-    console.log(`开始提取世界观`);
-    const worldResult = await this.worldExtractor(params);
-    console.log(`世界观提取完成`);
+    const [characterResult, worldResult, plotResult] = await Promise.all([
+      this.characterExtractor(params),
+      this.worldExtractor(params),
+      this.plotExtractor(params),
+    ]);
 
-    console.log(`开始提取剧情`);
-    const plotResult = await this.plotExtractor(params);
-    console.log(`剧情提取结束`);
+    this.logger.log(`第${params.chunkIndex}块切片提取完成`);
 
     return {
       characterResult,
@@ -515,6 +514,7 @@ export class NovelOutlineService {
    * 角色提取器
    */
   async characterExtractor(params: ResolvedExtractParams) {
+    this.logger.log(`正在提取角色...`);
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 
     const system = `
@@ -556,15 +556,20 @@ export class NovelOutlineService {
 ${chunkText}
 `;
 
-    return this.callLLM<{
+    const res = await this.callLLM<{
       characters: any[];
     }>({ system, user, signal });
+
+    this.logger.log(`角色提取结束`);
+
+    return res;
   }
 
   /**
    * 世界观提取器
    */
   async worldExtractor(params: ResolvedExtractParams) {
+    this.logger.log(`正在提取世界观...`);
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 
     const system = `
@@ -597,7 +602,7 @@ ${chunkText}
 ${chunkText}
 `;
 
-    return this.callLLM<{
+    const res = await this.callLLM<{
       worldview: {
         cultivationSystem: string[];
         factions: string[];
@@ -606,12 +611,17 @@ ${chunkText}
         technologyOrMagic: string[];
       };
     }>({ system, user, signal });
+
+    this.logger.log(`世界观提取结束`);
+
+    return res;
   }
 
   /**
    * 剧情提取器
    */
   async plotExtractor(params: ResolvedExtractParams) {
+    this.logger.log(`正在提取剧情...`);
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 
     const system = `
@@ -645,7 +655,7 @@ ${chunkText}
 ${chunkText}
 `;
 
-    return this.callLLM<{
+    const res = await this.callLLM<{
       plotSegments: Array<{
         title: string;
         summary: string;
@@ -653,5 +663,7 @@ ${chunkText}
         impact: string;
       }>;
     }>({ system, user, signal });
+    this.logger.log(`剧情提取结束`);
+    return res;
   }
 }
