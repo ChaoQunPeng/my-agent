@@ -636,31 +636,73 @@ export class NovelOutlineService {
     system: string;
     user: string;
     signal?: AbortSignal;
+    maxAttempts?: number;
   }): Promise<T> {
-    const completion = await this.openaiService.client.chat.completions.create(
-      {
-        model: this.openaiService.model,
-        messages: [
-          { role: 'system', content: params.system },
-          { role: 'user', content: params.user },
-        ],
-        response_format: { type: 'json_object' as const },
-        temperature: 0.3,
-        max_tokens: 12000,
-      },
-      { signal: params.signal },
-    );
+    const maxAttempts = params.maxAttempts ?? 3;
+    let lastError: Error | null = null;
 
-    try {
-      const raw = completion.choices?.[0]?.message?.content?.trim() ?? '';
-      if (!raw) {
-        throw new Error('返回内容为空');
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const completion = await this.openaiService.client.chat.completions.create(
+          {
+            model: this.openaiService.model,
+            messages: [
+              { role: 'system', content: params.system },
+              { role: 'user', content: params.user },
+            ],
+            response_format: { type: 'json_object' as const },
+            temperature: 0.3,
+            max_tokens: 12000,
+          },
+          { signal: params.signal },
+        );
+
+        const raw = completion.choices?.[0]?.message?.content?.trim() ?? '';
+        if (!raw) {
+          throw new Error('返回内容为空');
+        }
+        return JSON.parse(raw) as T;
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        if (error.name === 'AbortError' || params.signal?.aborted) {
+          throw error;
+        }
+
+        lastError = error;
+        if (attempt >= maxAttempts) break;
+
+        this.logger.warn(
+          `LLM调用失败，第 ${attempt}/${maxAttempts} 次，将重试：${error.message}`,
+        );
+        await this.sleep(600 * attempt, params.signal);
       }
-      return JSON.parse(raw) as T;
-    } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      throw new Error(`LLM返回JSON解析失败: ${errorMsg}`);
     }
+
+    throw new Error(
+      `LLM调用失败，已尝试 ${maxAttempts} 次: ${lastError?.message ?? '未知错误'}`,
+    );
+  }
+
+  private async sleep(ms: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      const abortError = new Error('任务已中止');
+      abortError.name = 'AbortError';
+      throw abortError;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(timer);
+          const abortError = new Error('任务已中止');
+          abortError.name = 'AbortError';
+          reject(abortError);
+        },
+        { once: true },
+      );
+    });
   }
 
   /**
