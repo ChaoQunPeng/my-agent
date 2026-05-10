@@ -19,12 +19,7 @@ import {
 } from './schemas/novel-outline.schema';
 import { SplitterService } from './splitter.service';
 import { OpenaiService } from 'src/shared/openai/openai.service';
-import {
-  mergeText,
-  normalize,
-  toStringArray,
-  uniqueStrings,
-} from './outline-merge.utils';
+import { normalize, toStringArray, uniqueStrings } from './outline-merge.utils';
 
 /**
  * 小说大纲生成核心服务
@@ -433,11 +428,11 @@ export class NovelOutlineService {
           name,
           aliases,
           aliasCandidates,
-          identity: normalize(raw.identity),
-          personality: normalize(raw.personality),
-          goals: normalize(raw.goals),
-          traits: normalize(raw.traits),
-          relations: normalize(raw.relations),
+          identity: toStringArray(raw.identity),
+          personality: toStringArray(raw.personality),
+          goals: toStringArray(raw.goals),
+          traits: toStringArray(raw.traits),
+          relations: toStringArray(raw.relations),
         });
         continue;
       }
@@ -450,11 +445,26 @@ export class NovelOutlineService {
             candidate !== matched.name && !matched.aliases?.includes(candidate),
         ),
       ]);
-      matched.identity = mergeText(matched.identity, raw.identity);
-      matched.personality = mergeText(matched.personality, raw.personality);
-      matched.goals = mergeText(matched.goals, raw.goals);
-      matched.traits = mergeText(matched.traits, raw.traits);
-      matched.relations = mergeText(matched.relations, raw.relations);
+      matched.identity = uniqueStrings([
+        ...toStringArray(matched.identity),
+        ...toStringArray(raw.identity),
+      ]);
+      matched.personality = uniqueStrings([
+        ...toStringArray(matched.personality),
+        ...toStringArray(raw.personality),
+      ]);
+      matched.goals = uniqueStrings([
+        ...toStringArray(matched.goals),
+        ...toStringArray(raw.goals),
+      ]);
+      matched.traits = uniqueStrings([
+        ...toStringArray(matched.traits),
+        ...toStringArray(raw.traits),
+      ]);
+      matched.relations = uniqueStrings([
+        ...toStringArray(matched.relations),
+        ...toStringArray(raw.relations),
+      ]);
     }
 
     const incomingWorld = this.normalizeWorldResult(result.worldResult);
@@ -462,20 +472,20 @@ export class NovelOutlineService {
     const worldView =
       incomingWorld && typeof incomingWorld === 'object'
         ? {
-            worldType: mergeText(
-              currentWorld.worldType,
-              incomingWorld.worldType,
-            ),
+            worldType: uniqueStrings([
+              ...toStringArray(currentWorld.worldType),
+              ...toStringArray(incomingWorld.worldType),
+            ]),
             summary: uniqueStrings([
-              currentWorld.summary || '',
+              ...toStringArray(currentWorld.summary),
               ...toStringArray(incomingWorld.summary),
-            ]).join('\n'),
+            ]),
             socialStructure: uniqueStrings([
-              currentWorld.socialStructure || '',
+              ...toStringArray(currentWorld.socialStructure),
               ...toStringArray(incomingWorld.socialStructure),
-            ]).join('\n'),
+            ]),
             coreRules: uniqueStrings([
-              ...(currentWorld.coreRules || []),
+              ...toStringArray(currentWorld.coreRules),
               ...toStringArray(incomingWorld.coreRules),
             ]),
           }
@@ -487,7 +497,10 @@ export class NovelOutlineService {
     const incomingEvents = (result.plotResult?.plotSegments || [])
       .map((item) => ({
         title: normalize(item.title),
-        summary: mergeText(item.summary, item.impact),
+        summary: uniqueStrings([
+          ...toStringArray(item.summary),
+          ...toStringArray(item.impact),
+        ]),
         characters: uniqueStrings(item.involvedCharacters || []),
         chunkIndex,
       }))
@@ -503,7 +516,7 @@ export class NovelOutlineService {
   }
 
   private normalizeWorldResult(worldResult: unknown): {
-    worldType?: string;
+    worldType?: string[];
     summary?: string[];
     socialStructure?: string[];
     coreRules?: string[];
@@ -519,11 +532,11 @@ export class NovelOutlineService {
       return summary.length ? { summary } : null;
     }
 
-    const worldType = mergeText(
-      rawWorld.worldType,
-      rawWorld.type,
-      rawWorld.genre,
-    );
+    const worldType = uniqueStrings([
+      ...toStringArray(rawWorld.worldType),
+      ...toStringArray(rawWorld.type),
+      ...toStringArray(rawWorld.genre),
+    ]);
     const summary = uniqueStrings([
       ...toStringArray(rawWorld.summary),
       ...toStringArray(rawWorld.worldSetting),
@@ -544,7 +557,7 @@ export class NovelOutlineService {
     ]);
 
     if (
-      !worldType &&
+      !worldType.length &&
       !summary.length &&
       !socialStructure.length &&
       !coreRules.length
@@ -643,19 +656,20 @@ export class NovelOutlineService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        const completion = await this.openaiService.client.chat.completions.create(
-          {
-            model: this.openaiService.model,
-            messages: [
-              { role: 'system', content: params.system },
-              { role: 'user', content: params.user },
-            ],
-            response_format: { type: 'json_object' as const },
-            temperature: 0.3,
-            max_tokens: 12000,
-          },
-          { signal: params.signal },
-        );
+        const completion =
+          await this.openaiService.client.chat.completions.create(
+            {
+              model: this.openaiService.model,
+              messages: [
+                { role: 'system', content: params.system },
+                { role: 'user', content: params.user },
+              ],
+              response_format: { type: 'json_object' as const },
+              temperature: 0.3,
+              max_tokens: 12000,
+            },
+            { signal: params.signal },
+          );
 
         const raw = completion.choices?.[0]?.message?.content?.trim() ?? '';
         if (!raw) {
@@ -733,11 +747,11 @@ export class NovelOutlineService {
       "name": "主名称",
       "aliases": ["别名1", "别名2"],
       "aliasCandidates": ["疑似别名"],
-      "identity": "身份/背景",
-      "personality": "性格",
-      "goals": "目标",
-      "traits": "特征",
-      "relations": "关系"
+      "identity": ["身份/背景"],
+      "personality": ["性格"],
+      "goals": ["目标"],
+      "traits": ["特征"],
+      "relations": ["关系"]
     }
   ]
 }
@@ -774,14 +788,14 @@ ${chunkText}
 - 只提取本段正文中新增或明确出现的世界设定
 - 世界设定包括：世界类型、时代/社会背景、组织势力、地点、能力体系、技术/魔法/规则、阶层制度
 - 禁止提取人物小传与剧情事件，但可以提取由剧情透露出的设定
-- 如果没有明确世界设定，对应字段输出空字符串或空数组
+- 如果没有明确世界设定，对应字段输出空数组
 - 输出必须是合法 JSON，不要输出解释文字
 
 输出格式：
 
 {
   "worldView": {
-    "worldType": "世界类型，如修仙/都市/科幻/西幻；无法判断则为空字符串",
+    "worldType": ["世界类型，如修仙/都市/科幻/西幻；无法判断则为空数组"],
     "summary": ["世界背景、地点、能力体系、技术或魔法设定"],
     "socialStructure": ["组织势力、阶层制度、社会关系结构"],
     "coreRules": ["世界运行规则、限制、能力规则"]
@@ -799,7 +813,7 @@ ${chunkText}
 
     const res = await this.callLLM<{
       worldView?: {
-        worldType?: string;
+        worldType?: string[];
         summary?: string[];
         socialStructure?: string[];
         coreRules?: string[];
@@ -840,7 +854,7 @@ ${chunkText}
   "plotSegments": [
     {
       "title": "事件标题",
-      "summary": "发生了什么",
+      "summary": ["发生了什么"],
       "involvedCharacters": ["人物1", "人物2"],
       "impact": "对后续影响"
     }
@@ -859,7 +873,7 @@ ${chunkText}
     const res = await this.callLLM<{
       plotSegments: Array<{
         title: string;
-        summary: string;
+        summary: string[];
         involvedCharacters: string[];
         impact: string;
       }>;

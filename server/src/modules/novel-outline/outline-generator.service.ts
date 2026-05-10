@@ -161,7 +161,7 @@ export class OutlineGeneratorService {
       '2. newPlotSegments：提取本片段发生的剧情概要（本段正文自身），不要输出之前已有的剧情，也不要把前文/后文参考当成新增剧情。',
       '3. storyConflicts：识别本片段中的故事矛盾和冲突点（如人物之间的矛盾、内心挣扎、外部压力等），用简洁的语言描述。',
       '4. characters：识别本片段中出现的所有人物。',
-      '   - 对于每个人物，需要提取：name(主要称呼), aliases(已确认的别名), aliasCandidates(可能的别名候选，待用户确认), identity, personality, goals, traits, relations',
+      '   - 对于每个人物，需要提取：name(主要称呼), aliases(已确认的别名), aliasCandidates(可能的别名候选，待用户确认), identity, personality, goals, traits, relations；其中 identity/personality/goals/traits/relations 均输出字符串数组。',
       '   - 重要：同一人物在不同场景可能有不同称呼（如"张三"、"小张"、"小三"），请将所有可能的称呼都放入 aliasCandidates 数组中，由后续人工确认是否合并到 aliases。',
       '   - 如果某个称呼可能是某个人物的别名但不确定，务必放入 aliasCandidates 而非 aliases。',
       '硬性要求：只输出 JSON，严禁任何解释文字。',
@@ -191,11 +191,11 @@ export class OutlineGeneratorService {
         name: c.name,
         aliases: c.aliases || [],
         aliasCandidates: c.aliasCandidates || [],
-        identity: c.identity || '',
-        personality: c.personality || '',
-        goals: c.goals || '',
-        traits: c.traits || '',
-        relations: c.relations || '',
+        identity: c.identity || [],
+        personality: c.personality || [],
+        goals: c.goals || [],
+        traits: c.traits || [],
+        relations: c.relations || [],
       })),
     });
 
@@ -216,7 +216,7 @@ export class OutlineGeneratorService {
       '  "worldSetting": "仅新增的世界观设定，没有则为空字符串",',
       '  "newPlotSegments": "仅本片段的完整剧情概要",',
       '  "storyConflicts": "本片段中的故事矛盾和冲突点",',
-      '  "characters": [{"name":"","aliases":[],"aliasCandidates":[],"identity":"","personality":"","goals":"","traits":"","relations":""}]',
+      '  "characters": [{"name":"","aliases":[],"aliasCandidates":[],"identity":[],"personality":[],"goals":[],"traits":[],"relations":[]}]',
       '}',
     ].join('\n');
   }

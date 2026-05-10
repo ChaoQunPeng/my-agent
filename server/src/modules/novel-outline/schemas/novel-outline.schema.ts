@@ -26,27 +26,27 @@ export interface OutlineCharacter {
   /**
    * 角色身份（如：学生 / 修士 / 警察 / CEO）
    */
-  identity?: string;
+  identity?: string[];
 
   /**
    * 性格特征（如：冷静 / 冲动 / 理性）
    */
-  personality?: string;
+  personality?: string[];
 
   /**
    * 角色目标 / 动机
    */
-  goals?: string;
+  goals?: string[];
 
   /**
    * 外在或内在特征总结
    */
-  traits?: string;
+  traits?: string[];
 
   /**
    * 与其他角色的关系描述（自由文本）
    */
-  relations?: string;
+  relations?: string[];
 }
 
 /**
@@ -62,7 +62,7 @@ export interface OutlineEvent {
   /**
    * 事件详细描述（发生了什么）
    */
-  summary?: string;
+  summary?: string[];
 
   /**
    * 涉及到的角色名称列表
@@ -83,17 +83,17 @@ export interface OutlineWorldView {
   /**
    * 世界类型（如：修仙 / 都市 / 科幻 / 西幻）
    */
-  worldType?: string;
+  worldType?: string[];
 
   /**
    * 世界观整体描述（AI总结）
    */
-  summary?: string;
+  summary?: string[];
 
   /**
    * 社会结构（如：宗门体系 / 公司社会 / 联邦制度）
    */
-  socialStructure?: string;
+  socialStructure?: string[];
 
   /**
    * 核心规则（世界运行逻辑）
@@ -139,18 +139,18 @@ export class NovelOutline {
   @Prop({
     type: {
       worldType: {
-        type: String,
-        default: '',
+        type: [String],
+        default: [],
         comment: '世界类型（修仙/都市/科幻等）',
       },
       summary: {
-        type: String,
-        default: '',
+        type: [String],
+        default: [],
         comment: '世界观总结描述',
       },
       socialStructure: {
-        type: String,
-        default: '',
+        type: [String],
+        default: [],
         comment: '社会结构（组织/阶级/体系）',
       },
       coreRules: {
@@ -187,28 +187,28 @@ export class NovelOutline {
           comment: '待确认别名列表',
         },
         identity: {
-          type: String,
-          default: '',
+          type: [String],
+          default: [],
           comment: '角色身份',
         },
         personality: {
-          type: String,
-          default: '',
+          type: [String],
+          default: [],
           comment: '角色性格',
         },
         goals: {
-          type: String,
-          default: '',
+          type: [String],
+          default: [],
           comment: '角色目标',
         },
         traits: {
-          type: String,
-          default: '',
+          type: [String],
+          default: [],
           comment: '角色特征',
         },
         relations: {
-          type: String,
-          default: '',
+          type: [String],
+          default: [],
           comment: '角色关系描述',
         },
       },
@@ -231,8 +231,8 @@ export class NovelOutline {
           comment: '事件标题',
         },
         summary: {
-          type: String,
-          default: '',
+          type: [String],
+          default: [],
           comment: '事件描述',
         },
         characters: {
