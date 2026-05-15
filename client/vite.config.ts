@@ -10,6 +10,7 @@ import { OUTPUT_DIR } from './plugins/constants'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
 
 const baseSrc = fileURLToPath(new URL('./src', import.meta.url))
+const clientRoot = fileURLToPath(new URL('.', import.meta.url))
 // https://vitejs.dev/config/
 export default ({ mode }: ConfigEnv): UserConfig => {
   const env = loadEnv(mode, process.cwd())
@@ -89,6 +90,10 @@ export default ({ mode }: ConfigEnv): UserConfig => {
       chunkSizeWarningLimit: 4096,
       outDir: OUTPUT_DIR,
       rollupOptions: {
+        input: {
+          main: resolve(clientRoot, 'index.html'),
+          storyGame: resolve(clientRoot, 'story-game.html')
+        },
         output: {
           advancedChunks: {
             groups: [
@@ -105,6 +110,10 @@ export default ({ mode }: ConfigEnv): UserConfig => {
         }
       },
       rolldownOptions: {
+        input: {
+          main: resolve(clientRoot, 'index.html'),
+          storyGame: resolve(clientRoot, 'story-game.html')
+        },
         output: {
           advancedChunks: {
             groups: [
