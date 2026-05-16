@@ -180,6 +180,19 @@ const restart = () => location.reload()
 </script>
 
 <style>
+/* 全局 CSS 变量定义 */
+:root {
+  --bg: #000000;
+  --white: #ffffff;
+  --dim: #c2c2c2;
+  --border: #27272a;
+}
+
+* {
+  font-family: 'Courier New', Courier, monospace;
+  touch-action: manipulation;
+}
+
 html,
 body {
   margin: 0;
@@ -189,24 +202,10 @@ body {
 </style>
 
 <style scoped>
-:root {
-  --bg: #000000;
-  --white: #ffffff;
-  --dim: #c2c2c2;
-  --border: #27272a;
-  --bg: #000000;
-  --white: #ffffff;
-  --dim: #c2c2c2;
-  --border: #27272a;
-}
-
 .term-raw {
   background-color: var(--bg);
   color: var(--white);
   height: 100vh;
-  padding: 50px 20px;
-  font-family: 'Courier New', Courier, monospace;
-  touch-action: manipulation;
 }
 
 .term-wrapper {
@@ -214,18 +213,29 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: 20px;
+  overflow: hidden;
+  height: 100%;
+}
+
+.main-content {
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 40px;
 }
 
 /* 状态栏 */
 .term-status {
   display: flex;
   gap: 15px;
-  font-size: 13px;
+  font-size: 14px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 15px;
   color: var(--dim);
+  margin-top: 20px;
+  align-items: center;
 }
+
 .status-node {
   color: var(--white);
 }
