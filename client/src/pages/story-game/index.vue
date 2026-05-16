@@ -1,59 +1,67 @@
 <template>
   <main class="term-raw">
     <div class="term-wrapper">
-      <!-- 状态栏：支持移动端自适应换行 -->
-      <section class="term-status" aria-label="状态">
-        <span class="status-node">HP: {{ state.hp }}</span>
-        <span class="status-split">/</span>
-        <span class="status-node">GOLD: {{ state.gold }}</span>
-        <span class="status-split">/</span>
-        <span class="status-node">INV: {{ inventoryText }}</span>
+      <!-- 状态栏 -->
+      <section class="term-status">
+        <span class="status-node"><span class="status-lbl">HP:</span> {{ state.hp }}</span>
+        <span class="status-sep">|</span>
+        <span class="status-node"><span class="status-lbl">GOLD:</span> {{ state.gold }}</span>
+        <span class="status-sep">|</span>
+        <span class="status-node"><span class="status-lbl">INV:</span> {{ inventoryText }}</span>
       </section>
 
-      <!-- 场景文本输出 -->
+      <!-- 剧情显示区 -->
       <section class="term-output">
         <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">█</span></p>
       </section>
 
-      <!-- 指令交互区：针对移动端优化了触摸热区 -->
-      <section class="term-input" :class="{ 'is-blocked': isTyping }" aria-label="指令">
+      <!-- 指令交互区 -->
+      <section class="term-input" :class="{ 'is-blocked': isTyping }">
         <div
           v-for="(option, index) in currentNode.options"
-          :key="option.text"
+          :key="index"
           class="term-cmd"
-          :class="{ 'is-disabled': !canChoose(option) || isTyping }"
-          @click="choose(option)"
+          :class="{
+            'is-selected': selectedOption === option,
+            'is-locked': !canChoose(option)
+          }"
+          @click="selectOption(option)"
         >
-          <!-- 极简原生符号：[ ] 代表复选，( ) 代表单选 -->
+          <!-- 核心修正：确保选中后符号切实切换为实心 -->
           <span class="term-symbol">
-            {{ isCheckboxOption(option) ? '[ ]' : '( )' }}
+            <template v-if="isCheckboxOption(option)">
+              {{ selectedOption === option ? '■' : '□' }}
+            </template>
+            <template v-else>
+              {{ selectedOption === option ? '●' : '○' }}
+            </template>
           </span>
 
           <span class="term-label">0{{ index + 1 }}. {{ option.text }}</span>
-
           <span v-if="!canChoose(option)" class="term-badge">[LOCKED]</span>
         </div>
+
+        <!-- 确认按钮区 -->
+        <transition name="fade">
+          <div v-if="selectedOption && !isTyping" class="confirm-area">
+            <button class="execute-btn" @click="confirmChoice">> CONFIRM EXECUTION_</button>
+          </div>
+        </transition>
       </section>
 
-      <!-- 历史流水日志 -->
-      <section class="term-logs" aria-label="历史">
-        <div v-for="(item, index) in logs" :key="item + index" class="term-log-line">> {{ item }}</div>
+      <!-- 历史日志区 -->
+      <section class="term-logs">
+        <div v-for="(log, i) in logs" :key="i" class="log-line">>> {{ log }}</div>
       </section>
     </div>
 
-    <!-- 结算大幕（全设备覆盖） -->
-    <transition name="raw-fade">
+    <!-- 结算层 -->
+    <transition name="fade">
       <section v-if="isGameOver || isGameWon" class="raw-overlay">
         <div class="raw-box">
-          <p class="raw-title">== {{ isGameWon ? 'PROCESS COMPLETED' : 'PROCESS TERMINATED' }} ==</p>
-          <p class="raw-desc">
-            {{ isGameWon ? '所有核心数据已成功同步，连接安全关闭。' : '数据中断，本次进程已被迫终止。' }}
-          </p>
-          <div class="raw-dump">
-            <div>GOLD: {{ state.gold }}</div>
-            <div>ITEMS: {{ state.inventory.length }}</div>
-          </div>
-          <button class="raw-btn" type="button" @click="restart">[ RESTART ]</button>
+          <p class="raw-title">{{ isGameWon ? '== SUCCESS ==' : '== SYSTEM FAILURE ==' }}</p>
+          <p class="raw-desc">{{ isGameWon ? 'All protocols executed successfully.' : 'Life support systems offline.' }}</p>
+          <button class="reboot-btn" @click="restart">[ REBOOT SYSTEM ]</button>
         </div>
       </section>
     </transition>
@@ -64,121 +72,91 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { createInitialState, storyData, type StoryNode, type StoryOption } from './story-data'
 
+// --- 游戏状态管理 ---
 const state = reactive(createInitialState())
 const currentId = ref('start')
 const logs = ref<string[]>([])
-
 const displayedText = ref('')
 const isTyping = ref(false)
-let typingTimer: number | null = null
+const selectedOption = ref<StoryOption | null>(null)
+let typingTimer: any = null
 
+// --- 计算属性 ---
+const currentNode = computed(() => storyData.get(currentId.value)!)
+const inventoryText = computed(() => state.inventory.join(', ') || 'NONE')
 const isGameOver = computed(() => state.hp <= 0)
 const isGameWon = computed(() => !!state.flags.gameFinished)
+const isCheckboxOption = (opt: StoryOption) => opt.nextId === currentId.value
 
-const getNode = (id: string): StoryNode => {
-  const node = storyData.get(id)
-  if (!node) throw new Error(`Node "${id}" not found.`)
-  return node
-}
-
-const currentNode = computed(() => getNode(currentId.value))
-const inventoryText = computed(() => (state.inventory.length ? state.inventory.join(', ') : 'NONE'))
-
-const isCheckboxOption = (option: StoryOption) => option.nextId === currentId.value
-
-const startTypingEffect = (text: string) => {
+// --- 打字机效果 ---
+const startTyping = (text: string) => {
   if (typingTimer) clearInterval(typingTimer)
   displayedText.value = ''
   isTyping.value = true
+  selectedOption.value = null
 
-  let index = 0
-  typingTimer = window.setInterval(() => {
-    if (index < text.length) {
-      displayedText.value += text.charAt(index)
-      index++
+  let i = 0
+  typingTimer = setInterval(() => {
+    if (i < text.length) {
+      displayedText.value += text.charAt(i)
+      i++
     } else {
-      if (typingTimer) clearInterval(typingTimer)
+      clearInterval(typingTimer)
       isTyping.value = false
     }
   }, 25)
 }
 
-watch(
-  currentId,
-  () => {
-    startTypingEffect(currentNode.value.text)
-  },
-  { immediate: true }
-)
+watch(currentId, () => startTyping(currentNode.value.text), { immediate: true })
+
+// --- 交互逻辑 ---
+const selectOption = (opt: StoryOption) => {
+  if (isTyping.value || !canChoose(opt)) return
+  selectedOption.value = opt
+}
+
+const confirmChoice = () => {
+  if (!selectedOption.value) return
+  const opt = selectedOption.value
+
+  currentNode.value.onExit?.(state)
+  opt.action?.(state)
+
+  if (state.hp <= 0) return
+
+  if (opt.nextId !== currentId.value) {
+    currentId.value = opt.nextId
+    currentNode.value.onEnter?.(state)
+  } else {
+    selectedOption.value = null
+    log('指令已处理')
+  }
+}
+
+const canChoose = (opt: StoryOption) => !opt.condition || opt.condition(state)
 
 const log = (msg: string) => {
   logs.value.unshift(msg)
   logs.value = logs.value.slice(0, 3)
 }
 
-watch(
-  () => ({ hp: state.hp, gold: state.gold, invLength: state.inventory.length }),
-  (newVal, oldVal) => {
-    if (newVal.hp !== oldVal.hp) log(`HP changed to ${newVal.hp}`)
-    if (newVal.gold !== oldVal.gold) log(`GOLD changed to ${newVal.gold}`)
-    if (newVal.invLength > oldVal.invLength) {
-      log(`ADDED: ${state.inventory[state.inventory.length - 1]}`)
-    }
-  }
-)
-
-const enterNode = (nextId: string) => {
-  currentId.value = nextId
-  currentNode.value.onEnter?.(state)
-}
-
-const canChoose = (option: StoryOption) => !option.condition || option.condition(state)
-
-const choose = (option: StoryOption) => {
-  if (!canChoose(option) || isTyping.value) return
-
-  currentNode.value.onExit?.(state)
-  option.action?.(state)
-
-  if (state.hp <= 0) return
-  enterNode(option.nextId)
-}
-
-const restart = () => {
-  const freshState = createInitialState()
-  state.hp = freshState.hp
-  state.gold = freshState.gold
-  state.inventory = freshState.inventory
-  state.flags = freshState.flags
-  logs.value = []
-  enterNode('start')
-}
+const restart = () => location.reload()
 </script>
 
-<style>
-html,
-body {
-  margin: 0;
-  padding: 0;
-}
-</style>
-
 <style scoped>
+/* 核心变量：黑白极简 */
 .term-raw {
   --bg: #000000;
-  --white: #e4e4e7;
-  --gray: #71717a;
-  --dark-gray: #27272a;
+  --white: #ffffff;
+  --gray-light: #f4f4f5;
+  --gray-muted: #71717a;
+  --gray-dark: #27272a;
 
-  min-height: 100vh;
   background-color: var(--bg);
-  color: var(--white);
-  padding: 40px 24px;
-  font-family: monospace;
-  font-size: 14px;
-  line-height: 1.6;
-
-  /* 💡 移动端安全：防止页面在手机上被无意中双击放大 */
+  color: var(--gray-light);
+  min-height: 100vh;
+  padding: 50px 20px;
+  font-family: 'Courier New', Courier, monospace;
   touch-action: manipulation;
 }
 
@@ -187,199 +165,225 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 40px;
 }
 
-/* 状态栏结构化，便于移动端自适应 */
+/* 状态栏 */
 .term-status {
-  color: var(--gray);
-  border-bottom: 1px solid var(--dark-gray);
-  padding-bottom: 12px;
-  font-size: 13px;
-  letter-spacing: -0.02em;
   display: flex;
-  flex-wrap: wrap; /* 💡 屏幕不够宽时自动换行 */
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 15px;
+  color: var(--white);
+  font-size: 13px;
+  letter-spacing: 1px;
+  border: 1px solid var(--gray-dark);
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.02);
 }
-.status-split {
-  color: var(--dark-gray);
+.status-lbl {
+  color: var(--gray-muted);
+}
+.status-sep {
+  color: var(--gray-dark);
 }
 
-/* 场景主文本 */
+/* 剧情显示 */
 .term-output {
-  min-height: 80px;
+  min-height: 120px;
+  padding: 0 4px;
 }
 .term-text {
-  margin: 0;
+  font-size: 16px;
+  line-height: 1.7;
   white-space: pre-wrap;
-  word-break: break-all;
+  margin: 0;
+  letter-spacing: 0.5px;
 }
-
-/* 光标 */
 .term-cursor {
+  margin-left: 6px;
+  animation: blink 0.8s steps(1) infinite;
   color: var(--white);
-  margin-left: 4px;
-  animation: rawBlink 1s infinite steps(1);
-  /* display: none; */
 }
-.term-cursor.is-typing {
-  /* display: inline-block; */
-  animation: none;
-  opacity: 1;
-}
-@keyframes rawBlink {
-  0%,
-  100% {
-    opacity: 1;
-  }
+@keyframes blink {
   50% {
     opacity: 0;
   }
 }
 
-/* 指令列表 */
+/* 指令区 */
 .term-input {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  transition: opacity 0.3s ease;
 }
 .term-input.is-blocked {
-  opacity: 0.1;
+  opacity: 0.15;
   pointer-events: none;
 }
 
-/* 💡 终端文本按钮：重点做了移动端触摸体验适配 */
+/* 选项基础样式 */
 .term-cmd {
   display: flex;
-  align-items: flex-start; /* 适配长文本换行对齐 */
+  align-items: center;
+  padding: 14px 16px;
   cursor: pointer;
-  padding: 8px 0; /* 💡 扩大了垂直方向的触摸热区（从4px增加到8px） */
-  -webkit-tap-highlight-color: transparent; /* 去除手机端点击时的灰色阴影底色 */
+  color: var(--gray-muted);
+  border: 1px solid transparent;
+  transition: all 0.12s ease-in-out;
 }
 
-/* 只有非移动设备下才触发 Hover 效果（防止手机端点击后出现常亮状态） */
-@media (hover: hover) {
-  .term-cmd:hover:not(.is-disabled) {
-    color: #ffffff;
-    text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
-  }
+/* 选中高亮样式：白底黑字 */
+.term-cmd.is-selected {
+  color: #000000 !important;
+  background-color: var(--white) !important;
+  border-color: var(--white) !important;
+  font-weight: bold;
 }
 
+/* 选中时，强制符号颜色也变为黑色，并微微放大，确保能明显看到实心变化 */
+.term-cmd.is-selected .term-symbol {
+  color: #000000;
+  transform: scale(1.1);
+}
+
+/* 悬停未选中的选项 */
+.term-cmd:not(.is-selected):not(.is-locked):hover {
+  color: var(--white);
+  border-color: var(--gray-dark);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* 选项前缀符号 */
 .term-symbol {
-  margin-right: 12px;
-  color: var(--gray);
+  width: 28px;
+  font-size: 16px;
   flex-shrink: 0;
-  user-select: none;
+  display: inline-block;
+  transition: transform 0.1s;
 }
 
 .term-label {
   flex-grow: 1;
-  word-break: break-all;
+  font-size: 15px;
 }
 
-.term-badge {
-  color: var(--gray);
-  font-size: 12px;
-  margin-left: 8px;
-  flex-shrink: 0;
-}
-
-.term-cmd.is-disabled {
-  cursor: not-allowed;
+/* 锁定状态 */
+.term-cmd.is-locked {
   opacity: 0.25;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.term-badge {
+  font-size: 11px;
+  margin-left: 10px;
+  padding: 1px 4px;
+  border: 1px solid #7f1d1d;
+  color: #ef4444;
 }
 
-/* 历史流水日志 */
+/* 确认执行区域 */
+.confirm-area {
+  margin-top: 10px;
+}
+.execute-btn {
+  width: 100%;
+  background: transparent;
+  color: var(--white);
+  border: 1px solid var(--white);
+  padding: 16px;
+  font-family: monospace;
+  font-weight: bold;
+  font-size: 14px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.execute-btn:hover {
+  background: var(--white);
+  color: #000;
+}
+.execute-btn:active {
+  background: var(--gray-light);
+  transform: scale(0.99);
+}
+
+/* 日志区 */
 .term-logs {
-  border-top: 1px dashed var(--dark-gray);
-  padding-top: 20px;
+  border-top: 1px dashed var(--gray-dark);
+  padding-top: 25px;
+  color: rgba(255, 255, 255, 0.15);
+  font-size: 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-.term-log-line {
-  color: var(--gray);
-  font-size: 13px;
+  gap: 6px;
 }
 
-/* 结算大幕 */
+/* 结算弹窗 */
 .raw-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #000;
-  z-index: 100;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  z-index: 1001;
 }
 .raw-box {
-  width: 100%;
-  max-width: 440px;
-  text-align: left;
+  text-align: center;
+  border: 2px solid var(--white);
+  background: #000;
+  padding: 40px 60px;
+  max-width: 90%;
 }
 .raw-title {
+  font-size: 22px;
   font-weight: bold;
-  margin: 0 0 16px;
+  margin-bottom: 15px;
+  letter-spacing: 2px;
 }
 .raw-desc {
-  color: var(--gray);
-  font-size: 13px;
-  margin: 0 0 24px;
+  color: var(--gray-muted);
+  margin-bottom: 35px;
+  font-size: 14px;
 }
-.raw-dump {
-  border: 1px solid var(--dark-gray);
-  padding: 16px;
-  color: var(--gray);
-  font-size: 13px;
-  margin-bottom: 24px;
-}
-.raw-btn {
+.reboot-btn {
   background: transparent;
   border: 1px solid var(--white);
   color: var(--white);
-  padding: 12px 24px; /* 💡 扩大了重开按钮的触摸面积 */
+  padding: 12px 40px;
   font-family: monospace;
+  font-weight: bold;
   cursor: pointer;
-  font-size: 13px;
-  -webkit-tap-highlight-color: transparent;
+  transition: all 0.2s;
 }
-@media (hover: hover) {
-  .raw-btn:hover {
-    background: var(--white);
-    color: #000;
-  }
+.reboot-btn:hover {
+  background: var(--white);
+  color: #000;
 }
 
-.raw-fade-enter-active,
-.raw-fade-leave-active {
-  transition: opacity 0.2s ease;
+/* 动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
 }
-.raw-fade-enter-from,
-.raw-fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 
-/* 💡 移动端小屏精准优化 */
 @media (max-width: 640px) {
   .term-raw {
-    padding: 24px 16px; /* 缩小页面四周外边距，给文本让出更多空间 */
+    padding: 30px 15px;
   }
   .term-wrapper {
-    gap: 24px;
-  }
-  .term-status {
-    font-size: 12px;
-    gap: 4px 8px; /* 换行时紧凑排列 */
-  }
-  .status-split {
-    display: none; /* 💡 手机端换行后，隐藏原本的单行斜杠，保持界面干净 */
+    gap: 30px;
   }
   .term-cmd {
-    padding: 12px 0; /* 💡 手机端进一步放大手指点按区域 */
+    padding: 16px 10px;
+  }
+  .raw-box {
+    padding: 30px 20px;
   }
 }
 </style>
