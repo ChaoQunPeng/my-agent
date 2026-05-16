@@ -16,7 +16,7 @@
         <button class="mode-btn" :class="{ 'is-active': viewMode === 'novel' }" type="button" @click="viewMode = 'novel'">连续小说</button>
       </section>
 
-      <div class="main-content">
+      <div ref="mainContentRef" class="main-content">
         <section class="term-output">
           <p v-if="viewMode === 'chapter'" class="term-text">
             {{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span>
@@ -24,13 +24,13 @@
 
           <article v-else class="novel-flow">
             <section v-for="chapter in completedChapters" :key="chapter.key" class="novel-chapter">
-              <p class="chapter-title">第 {{ chapter.index }} 节</p>
+              <!-- <p class="chapter-title">第 {{ chapter.index }} 节</p> -->
               <p class="term-text">{{ chapter.text }}</p>
-              <p v-if="chapter.choiceText" class="chapter-choice">你选择了：{{ chapter.choiceText }}</p>
+              <p v-if="chapter.choiceText" class="chapter-choice">你：{{ chapter.choiceText }}</p>
             </section>
 
             <section class="novel-chapter is-current">
-              <p class="chapter-title">第 {{ currentChapterIndex }} 节</p>
+              <!-- <p class="chapter-title">第 {{ currentChapterIndex }} 节</p> -->
               <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span></p>
             </section>
           </article>
@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { createInitialState, storyData, type StoryOption } from './story-data'
 
 type ViewMode = 'chapter' | 'novel'
@@ -107,6 +107,7 @@ const viewMode = ref<ViewMode>('chapter')
 const selectedOption = ref<StoryOption | null>(null)
 const selectedOptionKey = ref<string | null>(null)
 const completedChapters = ref<CompletedChapter[]>([])
+const mainContentRef = ref<HTMLElement | null>(null)
 let typingTimer: any = null
 
 const currentNode = computed(() => storyData.get(currentId.value)!)
@@ -114,9 +115,20 @@ const inventoryText = computed(() => state.inventory.join(', ') || 'NONE')
 const isGameOver = computed(() => state.hp <= 0)
 const isGameWon = computed(() => !!state.flags.gameFinished)
 const currentChapterIndex = computed(() => completedChapters.value.length + 1)
-const isCheckboxOption = (opt: StoryOption) => opt.nextId === currentId.value
 const getOptionKey = (opt: StoryOption, index: number) => `${currentId.value}:${index}:${opt.nextId}:${opt.text}`
 const isSelectedOption = (opt: StoryOption, index: number) => selectedOptionKey.value === getOptionKey(opt, index)
+
+const scrollMainContentToBottom = async () => {
+  await nextTick()
+  requestAnimationFrame(() => {
+    const mainContent = mainContentRef.value
+    if (!mainContent) return
+    mainContent.scrollTo({
+      top: mainContent.scrollHeight,
+      behavior: 'smooth'
+    })
+  })
+}
 
 const startTyping = (text: string) => {
   if (typingTimer) clearInterval(typingTimer)
@@ -133,6 +145,7 @@ const startTyping = (text: string) => {
     } else {
       clearInterval(typingTimer)
       isTyping.value = false
+      scrollMainContentToBottom()
     }
   }, 50)
 }
@@ -145,6 +158,7 @@ const selectOption = (opt: StoryOption, index: number) => {
   if (isTyping.value || !canChoose(opt)) return
   selectedOption.value = opt
   selectedOptionKey.value = getOptionKey(opt, index)
+  scrollMainContentToBottom()
 }
 
 const confirmChoice = () => {
@@ -222,6 +236,15 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   padding-bottom: 40px;
+  /* 隐藏滚动条但保持滚动功能 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  padding: 0 20px 40px 20px;
+}
+
+/* Chrome, Safari and Opera */
+.main-content::-webkit-scrollbar {
+  display: none;
 }
 
 /* 状态栏 */
@@ -318,7 +341,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 10px 18px 0 18px;
 }
+
 .term-input.is-blocked {
   display: none;
   pointer-events: none;
