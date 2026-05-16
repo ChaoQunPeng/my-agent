@@ -19,21 +19,21 @@
       <section class="term-input" :class="{ 'is-blocked': isTyping }">
         <div
           v-for="(option, index) in currentNode.options"
-          :key="index"
+          :key="getOptionKey(option, index)"
           class="term-cmd"
           :class="{
-            'is-selected': selectedOption === option,
+            'is-selected': isSelectedOption(option, index),
             'is-locked': !canChoose(option)
           }"
-          @click="selectOption(option)"
+          @click="selectOption(option, index)"
         >
           <!-- 核心修正：确保选中后符号切实切换为实心 -->
           <span class="term-symbol">
             <template v-if="isCheckboxOption(option)">
-              {{ selectedOption === option ? '■' : '□' }}
+              {{ isSelectedOption(option, index) ? '■' : '□' }}
             </template>
             <template v-else>
-              {{ selectedOption === option ? '●' : '○' }}
+              {{ isSelectedOption(option, index) ? '●' : '○' }}
             </template>
           </span>
 
@@ -70,7 +70,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { createInitialState, storyData, type StoryNode, type StoryOption } from './story-data'
+import { createInitialState, storyData, type StoryOption } from './story-data'
 
 // --- 游戏状态管理 ---
 const state = reactive(createInitialState())
@@ -79,6 +79,7 @@ const logs = ref<string[]>([])
 const displayedText = ref('')
 const isTyping = ref(false)
 const selectedOption = ref<StoryOption | null>(null)
+const selectedOptionKey = ref<string | null>(null)
 let typingTimer: any = null
 
 // --- 计算属性 ---
@@ -87,6 +88,8 @@ const inventoryText = computed(() => state.inventory.join(', ') || 'NONE')
 const isGameOver = computed(() => state.hp <= 0)
 const isGameWon = computed(() => !!state.flags.gameFinished)
 const isCheckboxOption = (opt: StoryOption) => opt.nextId === currentId.value
+const getOptionKey = (opt: StoryOption, index: number) => `${currentId.value}:${index}:${opt.nextId}:${opt.text}`
+const isSelectedOption = (opt: StoryOption, index: number) => selectedOptionKey.value === getOptionKey(opt, index)
 
 // --- 打字机效果 ---
 const startTyping = (text: string) => {
@@ -94,6 +97,7 @@ const startTyping = (text: string) => {
   displayedText.value = ''
   isTyping.value = true
   selectedOption.value = null
+  selectedOptionKey.value = null
 
   let i = 0
   typingTimer = setInterval(() => {
@@ -110,9 +114,10 @@ const startTyping = (text: string) => {
 watch(currentId, () => startTyping(currentNode.value.text), { immediate: true })
 
 // --- 交互逻辑 ---
-const selectOption = (opt: StoryOption) => {
+const selectOption = (opt: StoryOption, index: number) => {
   if (isTyping.value || !canChoose(opt)) return
   selectedOption.value = opt
+  selectedOptionKey.value = getOptionKey(opt, index)
 }
 
 const confirmChoice = () => {
@@ -129,6 +134,7 @@ const confirmChoice = () => {
     currentNode.value.onEnter?.(state)
   } else {
     selectedOption.value = null
+    selectedOptionKey.value = null
     log('指令已处理')
   }
 }
@@ -148,9 +154,9 @@ const restart = () => location.reload()
 .term-raw {
   --bg: #000000;
   --white: #ffffff;
-  --gray-light: #f4f4f5;
-  --gray-muted: #71717a;
-  --gray-dark: #27272a;
+  --gray-light: #ffffff;
+  --gray-muted: #ffffff;
+  --gray-dark: #ffffff;
 
   background-color: var(--bg);
   color: var(--gray-light);
@@ -270,7 +276,6 @@ const restart = () => location.reload()
 
 /* 锁定状态 */
 .term-cmd.is-locked {
-  opacity: 0.25;
   cursor: not-allowed;
   text-decoration: line-through;
 }
@@ -312,7 +317,7 @@ const restart = () => location.reload()
 .term-logs {
   border-top: 1px dashed var(--gray-dark);
   padding-top: 25px;
-  color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
   font-size: 12px;
   display: flex;
   flex-direction: column;
