@@ -9,40 +9,59 @@
         <span class="status-node"><span class="status-lbl">INV:</span> {{ inventoryText }}</span>
       </section>
 
-      <section class="term-output">
-        <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span></p>
+      <section class="mode-switch" aria-label="阅读模式">
+        <button class="mode-btn" :class="{ 'is-active': viewMode === 'chapter' }" type="button" @click="viewMode = 'chapter'">
+          当前节点
+        </button>
+        <button class="mode-btn" :class="{ 'is-active': viewMode === 'novel' }" type="button" @click="viewMode = 'novel'">连续小说</button>
       </section>
 
-      <section class="term-input" :class="{ 'is-blocked': isTyping }">
-        <div
-          v-for="(option, index) in currentNode.options"
-          :key="getOptionKey(option, index)"
-          class="term-cmd"
-          :class="{
-            'is-selected': isSelectedOption(option, index),
-            'is-locked': !canChoose(option)
-          }"
-          @click="selectOption(option, index)"
-        >
-          <span class="term-symbol">
-            <template v-if="isCheckboxOption(option)">
-              {{ isSelectedOption(option, index) ? '■' : '□' }}
-            </template>
-            <template v-else>
+      <div class="main-content">
+        <section class="term-output">
+          <p v-if="viewMode === 'chapter'" class="term-text">
+            {{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span>
+          </p>
+
+          <article v-else class="novel-flow">
+            <section v-for="chapter in completedChapters" :key="chapter.key" class="novel-chapter">
+              <p class="chapter-title">第 {{ chapter.index }} 节</p>
+              <p class="term-text">{{ chapter.text }}</p>
+              <p v-if="chapter.choiceText" class="chapter-choice">你选择了：{{ chapter.choiceText }}</p>
+            </section>
+
+            <section class="novel-chapter is-current">
+              <p class="chapter-title">第 {{ currentChapterIndex }} 节</p>
+              <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span></p>
+            </section>
+          </article>
+        </section>
+
+        <section class="term-input" :class="{ 'is-blocked': isTyping }">
+          <div
+            v-for="(option, index) in currentNode.options"
+            :key="getOptionKey(option, index)"
+            class="term-cmd"
+            :class="{
+              'is-selected': isSelectedOption(option, index),
+              'is-locked': !canChoose(option)
+            }"
+            @click="selectOption(option, index)"
+          >
+            <span class="term-symbol">
               {{ isSelectedOption(option, index) ? '●' : '○' }}
-            </template>
-          </span>
+            </span>
 
-          <span class="term-label">0{{ index + 1 }}. {{ option.text }}</span>
-          <!-- <span v-if="!canChoose(option)" class="term-badge">[LOCKED]</span> -->
-        </div>
-
-        <transition name="fade">
-          <div v-if="selectedOption && !isTyping" class="confirm-area">
-            <button class="execute-btn" @click="confirmChoice">继续</button>
+            <span class="term-label">0{{ index + 1 }}. {{ option.text }}</span>
+            <!-- <span v-if="!canChoose(option)" class="term-badge">[LOCKED]</span> -->
           </div>
-        </transition>
-      </section>
+
+          <transition name="fade">
+            <div v-if="selectedOption && !isTyping" class="confirm-area">
+              <button class="execute-btn" @click="confirmChoice">继续</button>
+            </div>
+          </transition>
+        </section>
+      </div>
 
       <!-- <section class="term-logs">
         <div v-for="(log, i) in logs" :key="i" class="log-line">>> {{ log }}</div>
@@ -52,8 +71,12 @@
     <transition name="fade">
       <section v-if="isGameOver || isGameWon" class="raw-overlay">
         <div class="raw-box">
-          <p class="raw-title">{{ isGameWon ? '== SUCCESS ==' : '== SYSTEM FAILURE ==' }}</p>
-          <p class="raw-desc">{{ isGameWon ? 'All protocols executed successfully.' : 'Life support systems offline.' }}</p>
+          <p class="raw-title">
+            {{ isGameWon ? '== SUCCESS ==' : '== SYSTEM FAILURE ==' }}
+          </p>
+          <p class="raw-desc">
+            {{ isGameWon ? 'All protocols executed successfully.' : 'Life support systems offline.' }}
+          </p>
           <button class="reboot-btn" @click="restart">[ REBOOT SYSTEM ]</button>
         </div>
       </section>
@@ -65,19 +88,32 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { createInitialState, storyData, type StoryOption } from './story-data'
 
+type ViewMode = 'chapter' | 'novel'
+
+interface CompletedChapter {
+  key: string
+  index: number
+  id: string
+  text: string
+  choiceText: string
+}
+
 const state = reactive(createInitialState())
 const currentId = ref('start')
 const logs = ref<string[]>([])
 const displayedText = ref('')
 const isTyping = ref(false)
+const viewMode = ref<ViewMode>('chapter')
 const selectedOption = ref<StoryOption | null>(null)
 const selectedOptionKey = ref<string | null>(null)
+const completedChapters = ref<CompletedChapter[]>([])
 let typingTimer: any = null
 
 const currentNode = computed(() => storyData.get(currentId.value)!)
 const inventoryText = computed(() => state.inventory.join(', ') || 'NONE')
 const isGameOver = computed(() => state.hp <= 0)
 const isGameWon = computed(() => !!state.flags.gameFinished)
+const currentChapterIndex = computed(() => completedChapters.value.length + 1)
 const isCheckboxOption = (opt: StoryOption) => opt.nextId === currentId.value
 const getOptionKey = (opt: StoryOption, index: number) => `${currentId.value}:${index}:${opt.nextId}:${opt.text}`
 const isSelectedOption = (opt: StoryOption, index: number) => selectedOptionKey.value === getOptionKey(opt, index)
@@ -101,7 +137,9 @@ const startTyping = (text: string) => {
   }, 50)
 }
 
-watch(currentId, () => startTyping(currentNode.value.text), { immediate: true })
+watch(currentId, () => startTyping(currentNode.value.text), {
+  immediate: true
+})
 
 const selectOption = (opt: StoryOption, index: number) => {
   if (isTyping.value || !canChoose(opt)) return
@@ -112,10 +150,18 @@ const selectOption = (opt: StoryOption, index: number) => {
 const confirmChoice = () => {
   if (!selectedOption.value) return
   const opt = selectedOption.value
+  const fromNode = currentNode.value
   currentNode.value.onExit?.(state)
   opt.action?.(state)
   if (state.hp <= 0) return
   if (opt.nextId !== currentId.value) {
+    completedChapters.value.push({
+      key: `${fromNode.id}:${completedChapters.value.length}:${Date.now()}`,
+      index: completedChapters.value.length + 1,
+      id: fromNode.id,
+      text: fromNode.text,
+      choiceText: opt.text
+    })
     currentId.value = opt.nextId
     currentNode.value.onEnter?.(state)
   } else {
@@ -143,15 +189,21 @@ body {
 </style>
 
 <style scoped>
-.term-raw {
+:root {
   --bg: #000000;
   --white: #ffffff;
   --dim: #c2c2c2;
   --border: #27272a;
+  --bg: #000000;
+  --white: #ffffff;
+  --dim: #c2c2c2;
+  --border: #27272a;
+}
 
+.term-raw {
   background-color: var(--bg);
   color: var(--white);
-  min-height: 100vh;
+  height: 100vh;
   padding: 50px 20px;
   font-family: 'Courier New', Courier, monospace;
   touch-action: manipulation;
@@ -182,6 +234,30 @@ body {
   margin-right: 4px;
 }
 
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--border);
+}
+.mode-btn {
+  min-height: 38px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mode-btn:last-child {
+  border-right: 0;
+}
+.mode-btn.is-active {
+  background: var(--white);
+  color: var(--bg);
+  font-weight: bold;
+}
+
 /* 剧情显示 */
 .term-output {
   min-height: 100px;
@@ -190,6 +266,7 @@ body {
   font-size: 16px;
   line-height: 1.7;
   margin: 0;
+  white-space: pre-wrap;
 }
 .term-cursor {
   margin-left: 6px;
@@ -199,6 +276,31 @@ body {
   50% {
     opacity: 0;
   }
+}
+
+.novel-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+.novel-chapter {
+  border-left: 1px solid var(--border);
+  padding-left: 18px;
+}
+.novel-chapter.is-current {
+  border-left-color: var(--white);
+}
+.chapter-title {
+  margin: 0 0 10px;
+  color: var(--dim);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.chapter-choice {
+  margin: 14px 0 0;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 /* 指令区 */
