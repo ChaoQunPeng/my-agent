@@ -92,7 +92,8 @@ export default ({ mode }: ConfigEnv): UserConfig => {
       rollupOptions: {
         input: {
           main: resolve(clientRoot, 'index.html'),
-          storyGame: resolve(clientRoot, 'story-game.html')
+          storyGame: resolve(clientRoot, 'story-game.html'),
+          storyEditor: resolve(clientRoot, 'story-editor.html')
         },
         output: {
           advancedChunks: {
@@ -112,7 +113,8 @@ export default ({ mode }: ConfigEnv): UserConfig => {
       rolldownOptions: {
         input: {
           main: resolve(clientRoot, 'index.html'),
-          storyGame: resolve(clientRoot, 'story-game.html')
+          storyGame: resolve(clientRoot, 'story-game.html'),
+          storyEditor: resolve(clientRoot, 'story-editor.html')
         },
         output: {
           advancedChunks: {

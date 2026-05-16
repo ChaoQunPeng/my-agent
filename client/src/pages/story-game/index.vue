@@ -10,7 +10,7 @@
       </section>
 
       <section class="term-output">
-        <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">█</span></p>
+        <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span></p>
       </section>
 
       <section class="term-input" :class="{ 'is-blocked': isTyping }">
@@ -44,9 +44,9 @@
         </transition>
       </section>
 
-      <section class="term-logs">
+      <!-- <section class="term-logs">
         <div v-for="(log, i) in logs" :key="i" class="log-line">>> {{ log }}</div>
-      </section>
+      </section> -->
     </div>
 
     <transition name="fade">
@@ -98,7 +98,7 @@ const startTyping = (text: string) => {
       clearInterval(typingTimer)
       isTyping.value = false
     }
-  }, 25)
+  }, 50)
 }
 
 watch(currentId, () => startTyping(currentNode.value.text), { immediate: true })
@@ -260,17 +260,18 @@ body {
   margin-top: 20px;
   border-top: 1px dashed var(--border);
   padding-top: 20px;
-  text-align: right;
+  text-align: center;
 }
 .execute-btn {
   background: transparent;
   color: var(--white);
   border: 1px solid var(--white);
-  padding: 14px;
+  padding: 10px 24px;
   font-family: monospace;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 1px;
   cursor: pointer;
+  border-radius: 2px;
 }
 .execute-btn:hover {
   background: var(--white);

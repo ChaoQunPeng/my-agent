@@ -44,7 +44,7 @@ export const storyData = new Map<string, StoryNode>([
       },
       options: [
         {
-          text: '🧪 别无选择，一口喝下那瓶温热的血液药水 (痛觉麻木，精神恢复，留下空试管)',
+          text: '别无选择，一口喝下那瓶温热的血液药水 (痛觉麻木，精神恢复，留下空试管)',
           nextId: 'corridor',
           action: state => {
             state.hp += 20
@@ -52,7 +52,7 @@ export const storyData = new Map<string, StoryNode>([
           }
         },
         {
-          text: '🚶 强忍着伤口和眩晕，不碰来路不明的东西，推开沉重的铁门走向走廊',
+          text: '强忍着伤口和眩晕，不碰来路不明的东西，推开沉重的铁门走向走廊',
           nextId: 'corridor'
         }
       ]
@@ -71,7 +71,7 @@ export const storyData = new Map<string, StoryNode>([
       options: [
         {
           // 惊悚改动：需要极高的理智/生命值才敢正面冲过去
-          text: '⚔️ 赌一把！从他身边强行冲过去 (需精神意志 > 100)',
+          text: '赌一把！从他身边强行冲过去 (需精神意志 > 100)',
           nextId: 'win',
           condition: state => state.hp > 100,
           action: state => {
@@ -81,7 +81,7 @@ export const storyData = new Map<string, StoryNode>([
         },
         {
           // 惊悚改动：这里的金币变成了用来买命的冥币/死人筹码
-          text: '🪙 扔出死人筹码制造声响，引开畸形人 (需要 10 枚铜质筹码)',
+          text: '扔出死人筹码制造声响，引开畸形人 (需要 10 枚铜质筹码)',
           nextId: 'win',
           condition: state => state.gold >= 10,
           action: state => {
@@ -89,16 +89,16 @@ export const storyData = new Map<string, StoryNode>([
           }
         },
         {
-          text: '🤫 披上那件散发着尸臭的“剥皮雨衣”，屏住呼吸潜行绕开',
+          text: '披上那件散发着尸臭的“剥皮雨衣”，屏住呼吸潜行绕开',
           nextId: 'win',
           condition: state => state.inventory.includes('剥皮雨衣')
         },
         {
-          text: '🏃 惊恐之下，你慌不择路地推开一扇侧门，滑入了黑漆漆的地下排水废墟',
+          text: '惊恐之下，你慌不择路地推开一扇侧门，滑入了黑漆漆的地下排水废墟',
           nextId: 'ruins'
         },
         {
-          text: '🔙 恐惧战胜了理智，你尖叫着逃回刚才醒来的解剖室 (惊恐导致大汗淋漓，体力-5)',
+          text: '恐惧战胜了理智，你尖叫着逃回刚才醒来的解剖室 (惊恐导致大汗淋漓，体力-5)',
           nextId: 'start',
           action: state => {
             state.hp = Math.max(1, state.hp - 5)
@@ -194,7 +194,7 @@ export const storyData = new Map<string, StoryNode>([
       },
       options: [
         {
-          text: '🔄 噩梦重塑……（再次醒来，直面轮回）',
+          text: '噩梦重塑……（再次醒来，直面轮回）',
           nextId: 'start',
           action: state => {
             state.hp = 90

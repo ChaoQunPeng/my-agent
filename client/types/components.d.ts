@@ -8,19 +8,9 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    AAlert: typeof import('ant-design-vue/es')['Alert']
     AApp: typeof import('ant-design-vue/es')['App']
-    AButton: typeof import('ant-design-vue/es')['Button']
     Access: typeof import('./../src/components/access/index.vue')['default']
-    ACheckbox: typeof import('ant-design-vue/es')['Checkbox']
     AConfigProvider: typeof import('ant-design-vue/es')['ConfigProvider']
-    ADivider: typeof import('ant-design-vue/es')['Divider']
-    AForm: typeof import('ant-design-vue/es')['Form']
-    AFormItem: typeof import('ant-design-vue/es')['FormItem']
-    AInput: typeof import('ant-design-vue/es')['Input']
-    AInputPassword: typeof import('ant-design-vue/es')['InputPassword']
-    ATabPane: typeof import('ant-design-vue/es')['TabPane']
-    ATabs: typeof import('ant-design-vue/es')['Tabs']
     BaseLoading: typeof import('./../src/components/base-loading/index.vue')['default']
     CarbonLanguage: typeof import('./../src/components/icons/carbon-language.vue')['default']
     CarbonMoon: typeof import('./../src/components/icons/carbon-moon.vue')['default']
