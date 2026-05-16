@@ -203,7 +203,7 @@ const restart = () => location.reload()
 }
 
 * {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: serif;
   touch-action: manipulation;
 }
 
