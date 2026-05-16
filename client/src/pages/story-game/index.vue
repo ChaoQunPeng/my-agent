@@ -1,7 +1,6 @@
 <template>
   <main class="term-raw">
     <div class="term-wrapper">
-      <!-- 状态栏 -->
       <section class="term-status">
         <span class="status-node"><span class="status-lbl">HP:</span> {{ state.hp }}</span>
         <span class="status-sep">|</span>
@@ -10,12 +9,10 @@
         <span class="status-node"><span class="status-lbl">INV:</span> {{ inventoryText }}</span>
       </section>
 
-      <!-- 剧情显示区 -->
       <section class="term-output">
         <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">█</span></p>
       </section>
 
-      <!-- 指令交互区 -->
       <section class="term-input" :class="{ 'is-blocked': isTyping }">
         <div
           v-for="(option, index) in currentNode.options"
@@ -27,7 +24,6 @@
           }"
           @click="selectOption(option, index)"
         >
-          <!-- 核心修正：确保选中后符号切实切换为实心 -->
           <span class="term-symbol">
             <template v-if="isCheckboxOption(option)">
               {{ isSelectedOption(option, index) ? '■' : '□' }}
@@ -38,24 +34,21 @@
           </span>
 
           <span class="term-label">0{{ index + 1 }}. {{ option.text }}</span>
-          <span v-if="!canChoose(option)" class="term-badge">[LOCKED]</span>
+          <!-- <span v-if="!canChoose(option)" class="term-badge">[LOCKED]</span> -->
         </div>
 
-        <!-- 确认按钮区 -->
         <transition name="fade">
           <div v-if="selectedOption && !isTyping" class="confirm-area">
-            <button class="execute-btn" @click="confirmChoice">> CONFIRM EXECUTION_</button>
+            <button class="execute-btn" @click="confirmChoice">继续</button>
           </div>
         </transition>
       </section>
 
-      <!-- 历史日志区 -->
       <section class="term-logs">
         <div v-for="(log, i) in logs" :key="i" class="log-line">>> {{ log }}</div>
       </section>
     </div>
 
-    <!-- 结算层 -->
     <transition name="fade">
       <section v-if="isGameOver || isGameWon" class="raw-overlay">
         <div class="raw-box">
@@ -72,7 +65,6 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { createInitialState, storyData, type StoryOption } from './story-data'
 
-// --- 游戏状态管理 ---
 const state = reactive(createInitialState())
 const currentId = ref('start')
 const logs = ref<string[]>([])
@@ -82,7 +74,6 @@ const selectedOption = ref<StoryOption | null>(null)
 const selectedOptionKey = ref<string | null>(null)
 let typingTimer: any = null
 
-// --- 计算属性 ---
 const currentNode = computed(() => storyData.get(currentId.value)!)
 const inventoryText = computed(() => state.inventory.join(', ') || 'NONE')
 const isGameOver = computed(() => state.hp <= 0)
@@ -91,7 +82,6 @@ const isCheckboxOption = (opt: StoryOption) => opt.nextId === currentId.value
 const getOptionKey = (opt: StoryOption, index: number) => `${currentId.value}:${index}:${opt.nextId}:${opt.text}`
 const isSelectedOption = (opt: StoryOption, index: number) => selectedOptionKey.value === getOptionKey(opt, index)
 
-// --- 打字机效果 ---
 const startTyping = (text: string) => {
   if (typingTimer) clearInterval(typingTimer)
   displayedText.value = ''
@@ -113,7 +103,6 @@ const startTyping = (text: string) => {
 
 watch(currentId, () => startTyping(currentNode.value.text), { immediate: true })
 
-// --- 交互逻辑 ---
 const selectOption = (opt: StoryOption, index: number) => {
   if (isTyping.value || !canChoose(opt)) return
   selectedOption.value = opt
@@ -123,12 +112,9 @@ const selectOption = (opt: StoryOption, index: number) => {
 const confirmChoice = () => {
   if (!selectedOption.value) return
   const opt = selectedOption.value
-
   currentNode.value.onExit?.(state)
   opt.action?.(state)
-
   if (state.hp <= 0) return
-
   if (opt.nextId !== currentId.value) {
     currentId.value = opt.nextId
     currentNode.value.onEnter?.(state)
@@ -140,26 +126,31 @@ const confirmChoice = () => {
 }
 
 const canChoose = (opt: StoryOption) => !opt.condition || opt.condition(state)
-
 const log = (msg: string) => {
   logs.value.unshift(msg)
   logs.value = logs.value.slice(0, 3)
 }
-
 const restart = () => location.reload()
 </script>
 
+<style>
+html,
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+</style>
+
 <style scoped>
-/* 核心变量：黑白极简 */
 .term-raw {
   --bg: #000000;
   --white: #ffffff;
-  --gray-light: #ffffff;
-  --gray-muted: #ffffff;
-  --gray-dark: #ffffff;
+  --dim: #c2c2c2;
+  --border: #27272a;
 
   background-color: var(--bg);
-  color: var(--gray-light);
+  color: var(--white);
   min-height: 100vh;
   padding: 50px 20px;
   font-family: 'Courier New', Courier, monospace;
@@ -177,38 +168,32 @@ const restart = () => location.reload()
 /* 状态栏 */
 .term-status {
   display: flex;
-  flex-wrap: wrap;
   gap: 15px;
-  color: var(--white);
   font-size: 13px;
-  letter-spacing: 1px;
-  border: 1px solid var(--gray-dark);
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 15px;
+  color: var(--dim);
+}
+.status-node {
+  color: var(--white);
 }
 .status-lbl {
-  color: var(--gray-muted);
-}
-.status-sep {
-  color: var(--gray-dark);
+  color: var(--dim);
+  margin-right: 4px;
 }
 
 /* 剧情显示 */
 .term-output {
-  min-height: 120px;
-  padding: 0 4px;
+  min-height: 100px;
 }
 .term-text {
   font-size: 16px;
   line-height: 1.7;
-  white-space: pre-wrap;
   margin: 0;
-  letter-spacing: 0.5px;
 }
 .term-cursor {
   margin-left: 6px;
   animation: blink 0.8s steps(1) infinite;
-  color: var(--white);
 }
 @keyframes blink {
   50% {
@@ -220,53 +205,36 @@ const restart = () => location.reload()
 .term-input {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  transition: opacity 0.3s ease;
+  gap: 4px;
 }
 .term-input.is-blocked {
-  opacity: 0.15;
+  display: none;
   pointer-events: none;
 }
 
-/* 选项基础样式 */
+/* 选项样式 - 精简版 */
 .term-cmd {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
+  padding: 10px 0; /* 去掉左右内边距，靠左对齐 */
   cursor: pointer;
-  color: var(--gray-muted);
-  border: 1px solid transparent;
-  transition: all 0.12s ease-in-out;
+  color: var(--dim);
+  transition: all 0.1s ease;
 }
 
-/* 选中高亮样式：白底黑字 */
+/* 选中态：仅通过颜色、加粗和位移来强调 */
 .term-cmd.is-selected {
-  color: #000000 !important;
-  background-color: var(--white) !important;
-  border-color: var(--white) !important;
-  font-weight: bold;
-}
-
-/* 选中时，强制符号颜色也变为黑色，并微微放大，确保能明显看到实心变化 */
-.term-cmd.is-selected .term-symbol {
-  color: #000000;
-  transform: scale(1.1);
-}
-
-/* 悬停未选中的选项 */
-.term-cmd:not(.is-selected):not(.is-locked):hover {
   color: var(--white);
-  border-color: var(--gray-dark);
-  background: rgba(255, 255, 255, 0.03);
+  font-weight: bold;
+  /* 选中时轻轻向右滑，增加动效 */
+  transform: translateX(4px);
 }
 
-/* 选项前缀符号 */
 .term-symbol {
-  width: 28px;
-  font-size: 16px;
+  width: 24px;
+  font-size: 18px;
   flex-shrink: 0;
-  display: inline-block;
-  transition: transform 0.1s;
+  text-align: left;
 }
 
 .term-label {
@@ -274,7 +242,7 @@ const restart = () => location.reload()
   font-size: 15px;
 }
 
-/* 锁定状态 */
+/* 锁定与徽章 */
 .term-cmd.is-locked {
   cursor: not-allowed;
   text-decoration: line-through;
@@ -282,113 +250,78 @@ const restart = () => location.reload()
 .term-badge {
   font-size: 11px;
   margin-left: 10px;
-  padding: 1px 4px;
-  border: 1px solid #7f1d1d;
   color: #ef4444;
+  border: 1px solid #7f1d1d;
+  padding: 0 4px;
 }
 
-/* 确认执行区域 */
+/* 确认区域 */
 .confirm-area {
-  margin-top: 10px;
+  margin-top: 20px;
+  border-top: 1px dashed var(--border);
+  padding-top: 20px;
+  text-align: right;
 }
 .execute-btn {
-  width: 100%;
   background: transparent;
   color: var(--white);
   border: 1px solid var(--white);
-  padding: 16px;
+  padding: 14px;
   font-family: monospace;
-  font-weight: bold;
-  font-size: 14px;
-  letter-spacing: 2px;
+  font-size: 13px;
+  letter-spacing: 1px;
   cursor: pointer;
-  transition: all 0.1s;
 }
 .execute-btn:hover {
   background: var(--white);
   color: #000;
 }
-.execute-btn:active {
-  background: var(--gray-light);
-  transform: scale(0.99);
-}
 
 /* 日志区 */
 .term-logs {
-  border-top: 1px dashed var(--gray-dark);
-  padding-top: 25px;
-  color: #ffffff;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  color: var(--dim);
   font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 /* 结算弹窗 */
 .raw-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.95);
+  background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1001;
+  z-index: 100;
 }
 .raw-box {
   text-align: center;
-  border: 2px solid var(--white);
-  background: #000;
-  padding: 40px 60px;
-  max-width: 90%;
+  border: 1px solid var(--white);
+  padding: 40px;
 }
 .raw-title {
-  font-size: 22px;
-  font-weight: bold;
-  margin-bottom: 15px;
-  letter-spacing: 2px;
+  font-size: 20px;
+  margin-bottom: 10px;
 }
 .raw-desc {
-  color: var(--gray-muted);
-  margin-bottom: 35px;
-  font-size: 14px;
+  color: var(--dim);
+  margin-bottom: 30px;
 }
 .reboot-btn {
   background: transparent;
   border: 1px solid var(--white);
   color: var(--white);
-  padding: 12px 40px;
-  font-family: monospace;
-  font-weight: bold;
+  padding: 10px 30px;
   cursor: pointer;
-  transition: all 0.2s;
-}
-.reboot-btn:hover {
-  background: var(--white);
-  color: #000;
 }
 
-/* 动画 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s;
 }
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-@media (max-width: 640px) {
-  .term-raw {
-    padding: 30px 15px;
-  }
-  .term-wrapper {
-    gap: 30px;
-  }
-  .term-cmd {
-    padding: 16px 10px;
-  }
-  .raw-box {
-    padding: 30px 20px;
-  }
 }
 </style>
