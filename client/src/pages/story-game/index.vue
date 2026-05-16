@@ -1,106 +1,59 @@
 <template>
-  <main class="story-page">
-    <section class="story-shell">
-      <!-- 游戏头部 -->
-      <header class="story-header">
-        <div>
-          <p class="eyebrow">// TEXT ADVENTURE</p>
-          <h1 class="game-title">地下城文字游戏</h1>
-        </div>
-        <button class="ghost-button" type="button" @click="restart">RESET</button>
-      </header>
-
-      <!-- 角色状态栏 -->
-      <section class="status-grid" aria-label="角色状态">
-        <div class="status-item" :class="{ 'low-hp': state.hp <= 25 }">
-          <span class="status-label">HP.</span>
-          <strong class="status-value">{{ state.hp }}</strong>
-        </div>
-        <div class="status-item">
-          <span class="status-label">GOLD.</span>
-          <strong class="status-value">{{ state.gold }}</strong>
-        </div>
-        <div class="status-item inventory-card">
-          <span class="status-label">INV.</span>
-          <strong class="status-value inventory-text">{{ inventoryText }}</strong>
-        </div>
+  <main class="term-raw">
+    <div class="term-wrapper">
+      <!-- 状态栏：支持移动端自适应换行 -->
+      <section class="term-status" aria-label="状态">
+        <span class="status-node">HP: {{ state.hp }}</span>
+        <span class="status-split">/</span>
+        <span class="status-node">GOLD: {{ state.gold }}</span>
+        <span class="status-split">/</span>
+        <span class="status-node">INV: {{ inventoryText }}</span>
       </section>
 
-      <!-- 场景描述面板 -->
-      <section class="scene-panel">
-        <div class="scene-mark-wrapper">
-          <span class="scene-mark"># {{ currentNode.id }}</span>
-        </div>
-        <!-- 💡 动态输出打字机文本 -->
-        <p class="scene-text">{{ displayedText }}<span v-if="isTyping" class="type-cursor">_</span></p>
+      <!-- 场景文本输出 -->
+      <section class="term-output">
+        <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">█</span></p>
       </section>
 
-      <!-- 行动选项 -->
-      <section class="option-list" :class="{ 'is-waiting': isTyping }" aria-label="行动选项">
-        <button
+      <!-- 指令交互区：针对移动端优化了触摸热区 -->
+      <section class="term-input" :class="{ 'is-blocked': isTyping }" aria-label="指令">
+        <div
           v-for="(option, index) in currentNode.options"
           :key="option.text"
-          class="option-button"
-          :class="{
-            'is-disabled': !canChoose(option) || isTyping,
-            'is-checkbox': isCheckboxOption(option),
-            'is-radio': !isCheckboxOption(option)
-          }"
-          type="button"
-          :disabled="!canChoose(option) || isTyping"
+          class="term-cmd"
+          :class="{ 'is-disabled': !canChoose(option) || isTyping }"
           @click="choose(option)"
         >
-          <!-- 极简几何选择器 -->
-          <div class="choice-indicator">
-            <!-- 多选/复选：极简正方形 -->
-            <div v-if="isCheckboxOption(option)" class="mock-checkbox"></div>
-            <!-- 单选：极简圆圈 -->
-            <div v-else class="mock-radio"></div>
-          </div>
-
-          <span class="option-text">
-            <span class="option-index">0{{ index + 1 }}.</span>
-            {{ option.text }}
+          <!-- 极简原生符号：[ ] 代表复选，( ) 代表单选 -->
+          <span class="term-symbol">
+            {{ isCheckboxOption(option) ? '[ ]' : '( )' }}
           </span>
 
-          <span v-if="!canChoose(option)" class="badge-disabled">LOCKED</span>
-          <span v-else class="option-arrow">::</span>
-        </button>
-      </section>
+          <span class="term-label">0{{ index + 1 }}. {{ option.text }}</span>
 
-      <!-- 冒险日志 -->
-      <section class="journal" aria-label="冒险日志">
-        <div class="journal-title">// LOGS</div>
-        <transition-group name="log-list" tag="ol" class="journal-list">
-          <li v-for="(item, index) in logs" :key="item + index" class="journal-item">
-            {{ item }}
-          </li>
-        </transition-group>
-      </section>
-    </section>
-
-    <!-- 极简通知悬浮窗 -->
-    <div class="toast-container">
-      <transition-group name="toast-fade">
-        <div v-for="toast in toasts" :key="toast.id" class="toast-item" :class="toast.type">
-          {{ toast.message }}
+          <span v-if="!canChoose(option)" class="term-badge">[LOCKED]</span>
         </div>
-      </transition-group>
+      </section>
+
+      <!-- 历史流水日志 -->
+      <section class="term-logs" aria-label="历史">
+        <div v-for="(item, index) in logs" :key="item + index" class="term-log-line">> {{ item }}</div>
+      </section>
     </div>
 
-    <!-- 全屏极简结算大幕 -->
-    <transition name="fade">
-      <section v-if="isGameOver || isGameWon" class="end-screen-overlay" :class="{ 'is-win': isGameWon }">
-        <div class="end-screen-content">
-          <h2 class="end-title">{{ isGameWon ? 'SUCCESS' : 'TERMINATED' }}</h2>
-          <p class="end-desc">
-            {{ isGameWon ? '你解开了所有的谜题，成功撤离地下城。' : '生命体征归零，本次探索已终止。' }}
+    <!-- 结算大幕（全设备覆盖） -->
+    <transition name="raw-fade">
+      <section v-if="isGameOver || isGameWon" class="raw-overlay">
+        <div class="raw-box">
+          <p class="raw-title">== {{ isGameWon ? 'PROCESS COMPLETED' : 'PROCESS TERMINATED' }} ==</p>
+          <p class="raw-desc">
+            {{ isGameWon ? '所有核心数据已成功同步，连接安全关闭。' : '数据中断，本次进程已被迫终止。' }}
           </p>
-          <div class="end-stats">
-            <span>GOLD: {{ state.gold }}</span>
-            <span>ITEMS: {{ state.inventory.length }}</span>
+          <div class="raw-dump">
+            <div>GOLD: {{ state.gold }}</div>
+            <div>ITEMS: {{ state.inventory.length }}</div>
           </div>
-          <button class="primary-button" type="button" @click="restart">RESTART</button>
+          <button class="raw-btn" type="button" @click="restart">[ RESTART ]</button>
         </div>
       </section>
     </transition>
@@ -111,19 +64,10 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { createInitialState, storyData, type StoryNode, type StoryOption } from './story-data'
 
-interface Toast {
-  id: number
-  message: string
-  type: 'gain' | 'lose' | 'info'
-}
-
 const state = reactive(createInitialState())
 const currentId = ref('start')
 const logs = ref<string[]>([])
-const toasts = ref<Toast[]>([])
-let toastIdCounter = 0
 
-// 打字机逻辑控制
 const displayedText = ref('')
 const isTyping = ref(false)
 let typingTimer: number | null = null
@@ -133,16 +77,15 @@ const isGameWon = computed(() => !!state.flags.gameFinished)
 
 const getNode = (id: string): StoryNode => {
   const node = storyData.get(id)
-  if (!node) throw new Error(`Story node "${id}" does not exist.`)
+  if (!node) throw new Error(`Node "${id}" not found.`)
   return node
 }
 
 const currentNode = computed(() => getNode(currentId.value))
-const inventoryText = computed(() => (state.inventory.length ? state.inventory.join(' / ') : 'NONE'))
+const inventoryText = computed(() => (state.inventory.length ? state.inventory.join(', ') : 'NONE'))
 
 const isCheckboxOption = (option: StoryOption) => option.nextId === currentId.value
 
-// 💡 极简打字机效果核心函数
 const startTypingEffect = (text: string) => {
   if (typingTimer) clearInterval(typingTimer)
   displayedText.value = ''
@@ -157,33 +100,9 @@ const startTypingEffect = (text: string) => {
       if (typingTimer) clearInterval(typingTimer)
       isTyping.value = false
     }
-  }, 35) // 每个字打印速度（毫秒）
+  }, 25)
 }
 
-const showToast = (message: string, type: 'gain' | 'lose' | 'info' = 'info') => {
-  const id = toastIdCounter++
-  toasts.value.push({ id, message, type })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter(t => t.id !== id)
-  }, 2000)
-}
-
-// 状态变动监控
-watch(
-  () => ({ hp: state.hp, gold: state.gold, invLength: state.inventory.length }),
-  (newVal, oldVal) => {
-    if (newVal.hp > oldVal.hp) showToast(`[ STATUS ] HP +${newVal.hp - oldVal.hp}`, 'gain')
-    if (newVal.hp < oldVal.hp) showToast(`[ STATUS ] HP -${oldVal.hp - newVal.hp}`, 'lose')
-    if (newVal.gold > oldVal.gold) showToast(`[ ASSETS ] GOLD +${newVal.gold - oldVal.gold}`, 'gain')
-    if (newVal.gold < oldVal.gold) showToast(`[ ASSETS ] GOLD -${oldVal.gold - newVal.gold}`, 'lose')
-    if (newVal.invLength > oldVal.invLength) {
-      const newItem = state.inventory[state.inventory.length - 1]
-      showToast(`[ POCKET ] ADDED: ${newItem}`, 'gain')
-    }
-  }
-)
-
-// 监听场景切换触发打字机
 watch(
   currentId,
   () => {
@@ -192,15 +111,25 @@ watch(
   { immediate: true }
 )
 
-const log = (message: string) => {
-  logs.value.unshift(message)
-  logs.value = logs.value.slice(0, 5)
+const log = (msg: string) => {
+  logs.value.unshift(msg)
+  logs.value = logs.value.slice(0, 3)
 }
+
+watch(
+  () => ({ hp: state.hp, gold: state.gold, invLength: state.inventory.length }),
+  (newVal, oldVal) => {
+    if (newVal.hp !== oldVal.hp) log(`HP changed to ${newVal.hp}`)
+    if (newVal.gold !== oldVal.gold) log(`GOLD changed to ${newVal.gold}`)
+    if (newVal.invLength > oldVal.invLength) {
+      log(`ADDED: ${state.inventory[state.inventory.length - 1]}`)
+    }
+  }
+)
 
 const enterNode = (nextId: string) => {
   currentId.value = nextId
   currentNode.value.onEnter?.(state)
-  log(`ENTERED: [${nextId.toUpperCase()}]`)
 }
 
 const canChoose = (option: StoryOption) => !option.condition || option.condition(state)
@@ -210,7 +139,6 @@ const choose = (option: StoryOption) => {
 
   currentNode.value.onExit?.(state)
   option.action?.(state)
-  log(`ACTION: ${option.text}`)
 
   if (state.hp <= 0) return
   enterNode(option.nextId)
@@ -223,152 +151,83 @@ const restart = () => {
   state.inventory = freshState.inventory
   state.flags = freshState.flags
   logs.value = []
-  toasts.value = []
   enterNode('start')
 }
 </script>
 
+<style>
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+</style>
+
 <style scoped>
-/* 极致极简变量：全黑背景与冷白文本 */
-.story-page {
-  --bg-main: #0a0a0c;
-  --border-subtle: #222226;
-  --text-main: #e4e4e7;
-  --text-muted: #71717a;
-  --accent-blue: #3b82f6;
-  --accent-purple: #a855f7;
+.term-raw {
+  --bg: #000000;
+  --white: #e4e4e7;
+  --gray: #71717a;
+  --dark-gray: #27272a;
 
   min-height: 100vh;
-  background-color: var(--bg-main);
-  color: var(--text-main);
-  padding: 50px 24px;
-  /* 采用经典等宽及现代无衬线字体组合 */
-  font-family: 'Courier New', Courier, Menlo, Monaco, Consolas, monospace;
-  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg);
+  color: var(--white);
+  padding: 40px 24px;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.6;
+
+  /* 💡 移动端安全：防止页面在手机上被无意中双击放大 */
+  touch-action: manipulation;
 }
 
-.story-shell {
-  width: min(760px, 100%);
+.term-wrapper {
+  max-width: 680px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 32px;
 }
 
-/* 游戏头部 */
-.story-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 16px;
-}
-
-.eyebrow {
-  margin: 0 0 4px;
-  color: var(--text-muted);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-}
-
-.game-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 400;
-  color: var(--text-main);
-}
-
-.ghost-button {
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 11px;
-  padding: 6px 14px;
-  cursor: pointer;
-  letter-spacing: 0.05em;
-  transition: all 0.15s ease;
-}
-.ghost-button:hover {
-  border-color: #ef4444;
-  color: #ef4444;
-}
-
-/* 角色状态栏 */
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background-color: var(--border-subtle);
-}
-
-.status-item {
-  background-color: var(--bg-main);
-  padding: 14px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.status-label {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.status-value {
-  font-size: 18px;
-  font-weight: 400;
-}
-
-.low-hp .status-value {
-  color: #f87171;
-  animation: blink 1s infinite steps(1);
-}
-@keyframes blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-
-.inventory-card .inventory-text {
+/* 状态栏结构化，便于移动端自适应 */
+.term-status {
+  color: var(--gray);
+  border-bottom: 1px solid var(--dark-gray);
+  padding-bottom: 12px;
   font-size: 13px;
-  color: var(--text-main);
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: -0.02em;
+  display: flex;
+  flex-wrap: wrap; /* 💡 屏幕不够宽时自动换行 */
+  gap: 8px;
+}
+.status-split {
+  color: var(--dark-gray);
 }
 
-/* 场景描述面板 */
-.scene-panel {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border-subtle);
+/* 场景主文本 */
+.term-output {
+  min-height: 80px;
 }
-.scene-mark-wrapper {
-  margin-bottom: 16px;
-}
-.scene-mark {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.scene-text {
+.term-text {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.8;
-  color: var(--text-main);
   white-space: pre-wrap;
+  word-break: break-all;
 }
 
-/* 打字机光标动画 */
-.type-cursor {
-  font-weight: bold;
-  animation: cursorBlink 0.8s infinite;
+/* 光标 */
+.term-cursor {
+  color: var(--white);
+  margin-left: 4px;
+  animation: rawBlink 1s infinite steps(1);
+  /* display: none; */
 }
-@keyframes cursorBlink {
+.term-cursor.is-typing {
+  /* display: inline-block; */
+  animation: none;
+  opacity: 1;
+}
+@keyframes rawBlink {
   0%,
   100% {
     opacity: 1;
@@ -378,258 +237,149 @@ const restart = () => {
   }
 }
 
-/* 行动选项列表 */
-.option-list {
+/* 指令列表 */
+.term-input {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  transition: opacity 0.25s ease;
+  gap: 4px;
 }
-/* 打字未完成时，降低选项区域的不透明度 */
-.option-list.is-waiting {
-  opacity: 0.25;
+.term-input.is-blocked {
+  opacity: 0.1;
   pointer-events: none;
 }
 
-.option-button {
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  padding: 14px 18px;
-  color: var(--text-main);
+/* 💡 终端文本按钮：重点做了移动端触摸体验适配 */
+.term-cmd {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: flex-start; /* 适配长文本换行对齐 */
   cursor: pointer;
-  text-align: left;
-  transition: all 0.2s ease;
+  padding: 8px 0; /* 💡 扩大了垂直方向的触摸热区（从4px增加到8px） */
+  -webkit-tap-highlight-color: transparent; /* 去除手机端点击时的灰色阴影底色 */
 }
 
-/* 极简悬停：只变动线条颜色 */
-.option-button:hover:not(:disabled).is-radio {
-  border-color: var(--accent-blue);
-}
-.option-button:hover:not(:disabled).is-checkbox {
-  border-color: var(--accent-purple);
-}
-
-.choice-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* 只有非移动设备下才触发 Hover 效果（防止手机端点击后出现常亮状态） */
+@media (hover: hover) {
+  .term-cmd:hover:not(.is-disabled) {
+    color: #ffffff;
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+  }
 }
 
-/* 极简正方形复选框 */
-.mock-checkbox {
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--text-muted);
-  transition: all 0.2s;
-}
-.is-checkbox:hover:not(:disabled) .mock-checkbox {
-  border-color: var(--accent-purple);
-  background: var(--accent-purple);
+.term-symbol {
+  margin-right: 12px;
+  color: var(--gray);
+  flex-shrink: 0;
+  user-select: none;
 }
 
-/* 极简圆形单选框 */
-.mock-radio {
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--text-muted);
-  border-radius: 50%;
-  transition: all 0.2s;
-}
-.is-radio:hover:not(:disabled) .mock-radio {
-  border-color: var(--accent-blue);
-  background: var(--accent-blue);
-}
-
-.option-text {
-  font-size: 14px;
+.term-label {
   flex-grow: 1;
-  color: var(--text-main);
-}
-.option-index {
-  color: var(--text-muted);
-  margin-right: 4px;
-}
-.option-arrow {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.option-button:hover:not(:disabled) .option-arrow {
-  color: var(--text-main);
+  word-break: break-all;
 }
 
-.option-button.is-disabled {
+.term-badge {
+  color: var(--gray);
+  font-size: 12px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.term-cmd.is-disabled {
   cursor: not-allowed;
-  opacity: 0.3;
-  border-color: var(--border-subtle);
-}
-.badge-disabled {
-  font-size: 11px;
-  color: #ef4444;
-  letter-spacing: 0.05em;
+  opacity: 0.25;
 }
 
-/* 冒险日志 */
-.journal {
-  border-top: 1px dashed var(--border-subtle);
-  padding-top: 24px;
-}
-.journal-title {
-  color: var(--text-muted);
-  font-size: 11px;
-  margin-bottom: 12px;
-  letter-spacing: 0.05em;
-}
-.journal-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+/* 历史流水日志 */
+.term-logs {
+  border-top: 1px dashed var(--dark-gray);
+  padding-top: 20px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
-.journal-item {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.journal-item:first-child {
-  color: var(--text-main);
+.term-log-line {
+  color: var(--gray);
+  font-size: 13px;
 }
 
-.log-list-enter-active {
-  transition: all 0.25s ease;
-}
-.log-list-enter-from {
-  opacity: 0;
-  transform: translateY(4px);
-}
-
-/* 极简浮动通知 */
-.toast-container {
-  position: fixed;
-  bottom: 32px;
-  right: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 100;
-}
-.toast-item {
-  padding: 10px 16px;
-  border: 1px solid #333;
-  background: #000;
-  font-size: 11px;
-  color: #fff;
-}
-.toast-item.gain {
-  border-color: #22c55e;
-  color: #22c55e;
-}
-.toast-item.lose {
-  border-color: #ef4444;
-  color: #ef4444;
-}
-.toast-fade-enter-active,
-.toast-fade-leave-active {
-  transition: all 0.2s ease;
-}
-.toast-fade-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
-}
-.toast-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-/* 极简全屏大幕 */
-.end-screen-overlay {
+/* 结算大幕 */
+.raw-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: #000;
-  z-index: 200;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
 }
-.end-screen-content {
-  max-width: 400px;
-  text-align: center;
-  padding: 0 20px;
+.raw-box {
+  width: 100%;
+  max-width: 440px;
+  text-align: left;
 }
-.end-title {
-  font-size: 28px;
-  font-weight: 300;
-  margin: 0 0 12px;
-  letter-spacing: 4px;
+.raw-title {
+  font-weight: bold;
+  margin: 0 0 16px;
 }
-.is-win .end-title {
-  color: #60a5fa;
-}
-.end-desc {
-  color: var(--text-muted);
+.raw-desc {
+  color: var(--gray);
   font-size: 13px;
-  line-height: 1.6;
-  margin: 0 0 32px;
+  margin: 0 0 24px;
 }
-.end-stats {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 32px;
+.raw-dump {
+  border: 1px solid var(--dark-gray);
+  padding: 16px;
+  color: var(--gray);
+  font-size: 13px;
+  margin-bottom: 24px;
 }
-.primary-button {
+.raw-btn {
   background: transparent;
-  border: 1px solid var(--text-main);
-  color: var(--text-main);
-  padding: 12px 40px;
-  font-size: 13px;
+  border: 1px solid var(--white);
+  color: var(--white);
+  padding: 12px 24px; /* 💡 扩大了重开按钮的触摸面积 */
+  font-family: monospace;
   cursor: pointer;
-  transition: all 0.2s;
+  font-size: 13px;
+  -webkit-tap-highlight-color: transparent;
 }
-.primary-button:hover {
-  background: var(--text-main);
-  color: #000;
+@media (hover: hover) {
+  .raw-btn:hover {
+    background: var(--white);
+    color: #000;
+  }
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
+.raw-fade-enter-active,
+.raw-fade-leave-active {
+  transition: opacity 0.2s ease;
 }
-.fade-enter-from,
-.fade-leave-to {
+.raw-fade-enter-from,
+.raw-fade-leave-to {
   opacity: 0;
 }
 
-/* 响应式设计适配 */
+/* 💡 移动端小屏精准优化 */
 @media (max-width: 640px) {
-  .story-page {
-    padding: 32px 16px;
+  .term-raw {
+    padding: 24px 16px; /* 缩小页面四周外边距，给文本让出更多空间 */
   }
-  .status-grid {
-    grid-template-columns: 1fr;
-    gap: 1px;
+  .term-wrapper {
+    gap: 24px;
   }
-  .status-item {
-    padding: 10px 14px;
+  .term-status {
+    font-size: 12px;
+    gap: 4px 8px; /* 换行时紧凑排列 */
   }
-  .inventory-card .inventory-text {
-    max-width: none;
+  .status-split {
+    display: none; /* 💡 手机端换行后，隐藏原本的单行斜杠，保持界面干净 */
   }
-  .toast-container {
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
-  }
-  .toast-item {
-    text-align: center;
+  .term-cmd {
+    padding: 12px 0; /* 💡 手机端进一步放大手指点按区域 */
   }
 }
 </style>
