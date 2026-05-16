@@ -196,14 +196,16 @@ const restart = () => location.reload()
 <style>
 /* 全局 CSS 变量定义 */
 :root {
-  --bg: #000000;
-  --white: #ffffff;
+  --bg: #121212;
+  /* --white: #d4d4d4; e2e2e2*/
+  --white: #e2e2e2;
   --dim: #c2c2c2;
   --border: #27272a;
 }
 
 * {
-  font-family: serif;
+  /* font-family: serif; */
+  font-family: 'Courier New', Courier, monospace;
   touch-action: manipulation;
 }
 
@@ -215,7 +217,7 @@ body {
 }
 </style>
 
-<style scoped>
+<style lang="less" scoped>
 .term-raw {
   background-color: var(--bg);
   color: var(--white);
@@ -341,7 +343,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px 18px 0 18px;
+  padding: 10px 0 0 0;
 }
 
 .term-input.is-blocked {
@@ -352,7 +354,7 @@ body {
 /* 选项样式 - 精简版 */
 .term-cmd {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding: 10px 0; /* 去掉左右内边距，靠左对齐 */
   cursor: pointer;
   color: var(--dim);
@@ -365,6 +367,10 @@ body {
   font-weight: bold;
   /* 选中时轻轻向右滑，增加动效 */
   transform: translateX(4px);
+
+  .term-label {
+    opacity: 1;
+  }
 }
 
 .term-symbol {
@@ -372,11 +378,17 @@ body {
   font-size: 18px;
   flex-shrink: 0;
   text-align: left;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1.1;
 }
 
 .term-label {
   flex-grow: 1;
   font-size: 15px;
+  opacity: 0.85;
+  padding-left: 4px;
 }
 
 /* 锁定与徽章 */
