@@ -142,7 +142,7 @@ type ThemeMode = 'horror' | 'romance' | 'slice'
  * romance = 恋爱 / 青春
  * slice   = 日常 / 治愈
  */
-const THEME: ThemeMode = 'romance'
+const THEME: ThemeMode = 'horror'
 
 interface CompletedChapter {
   key: string
@@ -366,6 +366,28 @@ body {
   transition:
     background-color 0.25s ease,
     color 0.25s ease;
+
+  position: relative;
+  overflow: hidden;
+}
+
+.term-raw::before {
+  content: '';
+
+  position: absolute;
+  inset: 0;
+
+  pointer-events: none;
+
+  opacity: 0.035;
+
+  z-index: 1;
+
+  background-image: radial-gradient(#000 0.5px, transparent 0.5px);
+
+  background-size: 4px 4px;
+
+  mix-blend-mode: multiply;
 }
 
 .term-wrapper {
@@ -380,6 +402,9 @@ body {
   overflow: hidden;
 
   height: 100%;
+
+  position: relative;
+  z-index: 2;
 }
 
 .main-content {
