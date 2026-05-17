@@ -18,26 +18,63 @@
 
       <div ref="mainContentRef" class="main-content">
         <section class="term-output">
-          <p v-if="viewMode === 'chapter'" class="term-text">
-            {{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span>
-          </p>
+          <!-- chapter 模式 -->
+          <template v-if="viewMode === 'chapter'">
+            <p class="term-text">
+              {{ displayedText }}
+              <span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span>
+            </p>
+          </template>
 
+          <!-- novel 模式 -->
           <article v-else class="novel-flow">
-            <section v-for="chapter in completedChapters" :key="chapter.key" class="novel-chapter">
-              <!-- <p class="chapter-title">第 {{ chapter.index }} 节</p> -->
-              <p class="term-text">{{ chapter.text }}</p>
-              <p v-if="chapter.choiceText" class="chapter-choice">你：{{ chapter.choiceText }}</p>
+            <!-- 当前章节 -->
+            <section class="novel-chapter is-current">
+              <p class="chapter-title">No.{{ currentChapterIndex }}</p>
+
+              <p class="term-text">
+                {{ displayedText }}
+                <span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span>
+              </p>
+
+              <!-- novel 模式下，把输入区放这里 -->
+              <section class="term-input" :class="{ 'is-blocked': isTyping }">
+                <div
+                  v-for="(option, index) in currentNode.options"
+                  :key="getOptionKey(option, index)"
+                  class="term-cmd"
+                  :class="{
+                    'is-selected': isSelectedOption(option, index),
+                    'is-locked': !canChoose(option)
+                  }"
+                  @click="selectOption(option, index)"
+                >
+                  <span class="term-symbol">
+                    {{ isSelectedOption(option, index) ? '●' : '○' }}
+                  </span>
+
+                  <span class="term-label">0{{ index + 1 }}. {{ option.text }}</span>
+                </div>
+
+                <transition name="fade">
+                  <div v-if="selectedOption && !isTyping" class="confirm-area">
+                    <button class="execute-btn" @click="confirmChoice">确认选择</button>
+                  </div>
+                </transition>
+              </section>
             </section>
 
-            <section class="novel-chapter is-current">
-              <!-- <p class="chapter-title">第 {{ currentChapterIndex }} 节</p> -->
-              <p class="chapter-title">No.{{ currentChapterIndex }}</p>
-              <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span></p>
+            <!-- 历史章节 -->
+            <section v-for="chapter in [...completedChapters].reverse()" :key="chapter.key" class="novel-chapter">
+              <p class="chapter-title">No.{{ chapter.index }}</p>
+              <p class="term-text">{{ chapter.text }}</p>
+
+              <p v-if="chapter.choiceText" class="chapter-choice">你：{{ chapter.choiceText }}</p>
             </section>
           </article>
         </section>
 
-        <section class="term-input" :class="{ 'is-blocked': isTyping }">
+        <section v-if="viewMode === 'chapter'" class="term-input" :class="{ 'is-blocked': isTyping }">
           <div
             v-for="(option, index) in currentNode.options"
             :key="getOptionKey(option, index)"
@@ -104,7 +141,7 @@ const currentId = ref('start')
 const logs = ref<string[]>([])
 const displayedText = ref('')
 const isTyping = ref(false)
-const viewMode = ref<ViewMode>('chapter')
+const viewMode = ref<ViewMode>('novel')
 const selectedOption = ref<StoryOption | null>(null)
 const selectedOptionKey = ref<string | null>(null)
 const completedChapters = ref<CompletedChapter[]>([])
@@ -120,10 +157,15 @@ const getOptionKey = (opt: StoryOption, index: number) => `${currentId.value}:${
 const isSelectedOption = (opt: StoryOption, index: number) => selectedOptionKey.value === getOptionKey(opt, index)
 
 const scrollMainContentToBottom = async () => {
+  // novel 模式不自动滚动
+  if (viewMode.value === 'novel') return
+
   await nextTick()
+
   requestAnimationFrame(() => {
     const mainContent = mainContentRef.value
     if (!mainContent) return
+
     mainContent.scrollTo({
       top: mainContent.scrollHeight,
       behavior: 'smooth'
