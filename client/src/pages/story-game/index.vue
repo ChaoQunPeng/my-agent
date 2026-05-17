@@ -10,11 +10,12 @@
 
         <section class="mode-switch" aria-label="阅读模式">
           <button class="mode-btn" :class="{ 'is-active': viewMode === 'chapter' }" type="button" @click="viewMode = 'chapter'">
-            当前节点
+            单节
           </button>
-          <button class="mode-btn" :class="{ 'is-active': viewMode === 'novel' }" type="button" @click="viewMode = 'novel'">
-            连续小说
-          </button>
+
+          <span class="mode-divider">|</span>
+
+          <button class="mode-btn" :class="{ 'is-active': viewMode === 'novel' }" type="button" @click="viewMode = 'novel'">长卷</button>
         </section>
       </section>
 
@@ -97,7 +98,7 @@
 
           <transition name="fade">
             <div v-if="selectedOption && !isTyping" class="confirm-area">
-              <button class="execute-btn" @click="confirmChoice">继续</button>
+              <button class="execute-btn" @click="confirmChoice">我选好了</button>
             </div>
           </transition>
         </section>
@@ -315,28 +316,39 @@ body {
 }
 
 .mode-switch {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-left: auto;
+  font-size: 12px;
+  color: var(--dim);
 }
+
 .mode-btn {
-  min-height: 38px;
   background: transparent;
   border: 0;
-  border-right: 1px solid var(--border);
+  padding: 0;
   color: var(--dim);
   font-family: inherit;
-  font-size: 13px;
+  font-size: inherit;
   cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
+  opacity: 0.5;
 }
-.mode-btn:last-child {
-  border-right: 0;
+
+.mode-btn:hover {
+  opacity: 0.8;
 }
+
 .mode-btn.is-active {
-  background: var(--white);
-  color: var(--bg);
-  font-weight: bold;
+  color: var(--white);
+  opacity: 1;
+}
+
+.mode-divider {
+  opacity: 0.3;
 }
 
 /* 剧情显示 */
