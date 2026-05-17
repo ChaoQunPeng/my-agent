@@ -98,7 +98,7 @@
 
           <transition name="fade">
             <div v-if="selectedOption && !isTyping" class="confirm-area">
-              <button class="execute-btn" @click="confirmChoice">我选好了</button>
+              <button class="execute-btn" @click="confirmChoice">确认选择</button>
             </div>
           </transition>
         </section>
@@ -241,15 +241,15 @@ const selectOption = (opt: StoryOption, index: number) => {
  */
 const confirmChoice = () => {
   if (!selectedOption.value) return // 如果没有选中选项，直接返回
-  
+
   const opt = selectedOption.value
   const fromNode = currentNode.value
-  
+
   currentNode.value.onExit?.(state) // 执行当前节点的退出回调（如果存在）
   opt.action?.(state) // 执行选项的动作回调（如果存在），可能修改游戏状态
-  
+
   if (state.hp <= 0) return // 如果生命值归零，不再继续
-  
+
   // 如果跳转到不同节点，记录当前章节到历史
   if (opt.nextId !== currentId.value) {
     completedChapters.value.push({
@@ -530,7 +530,7 @@ body {
   background: transparent;
   color: var(--white);
   border: 1px solid var(--white);
-  padding: 10px 24px;
+  padding: 6px 20px;
   font-family: monospace;
   font-size: 14px;
   letter-spacing: 1px;
