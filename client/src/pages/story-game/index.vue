@@ -151,14 +151,32 @@ const completedChapters = ref<CompletedChapter[]>([])
 const mainContentRef = ref<HTMLElement | null>(null)
 let typingTimer: any = null
 
-const currentNode = computed(() => storyData.get(currentId.value)!)
-const inventoryText = computed(() => state.inventory.join(', ') || 'NONE')
-const isGameOver = computed(() => state.hp <= 0)
-const isGameWon = computed(() => !!state.flags.gameFinished)
-const currentChapterIndex = computed(() => completedChapters.value.length + 1)
+const currentNode = computed(() => storyData.get(currentId.value)!) // 获取当前剧情节点数据
+const inventoryText = computed(() => state.inventory.join(', ') || 'NONE') // 将背包物品数组转换为显示文本，为空时显示'NONE'
+const isGameOver = computed(() => state.hp <= 0) // 判断游戏是否结束（生命值小于等于0）
+const isGameWon = computed(() => !!state.flags.gameFinished) // 判断游戏是否胜利（完成标志位是否为true）
+const currentChapterIndex = computed(() => completedChapters.value.length + 1) // 计算当前章节序号（已完成章节数+1）
+
+/**
+ * 生成选项的唯一标识键
+ * @param opt - 故事选项对象
+ * @param index - 选项在列表中的索引
+ * @returns 唯一标识字符串，格式为"当前节点ID:索引:下一节点ID:选项文本"
+ */
 const getOptionKey = (opt: StoryOption, index: number) => `${currentId.value}:${index}:${opt.nextId}:${opt.text}`
+
+/**
+ * 判断指定选项是否被选中
+ * @param opt - 故事选项对象
+ * @param index - 选项在列表中的索引
+ * @returns 是否为当前选中的选项
+ */
 const isSelectedOption = (opt: StoryOption, index: number) => selectedOptionKey.value === getOptionKey(opt, index)
 
+/**
+ * 将主内容区域滚动到底部
+ * 仅在chapter模式下执行滚动，novel模式不自动滚动
+ */
 const scrollMainContentToBottom = async () => {
   // novel 模式不自动滚动
   if (viewMode.value === 'novel') return
@@ -176,66 +194,100 @@ const scrollMainContentToBottom = async () => {
   })
 }
 
+/**
+ * 开始打字机效果显示文本
+ * @param text - 需要显示的文本内容
+ */
 const startTyping = (text: string) => {
-  if (typingTimer) clearInterval(typingTimer)
-  displayedText.value = ''
-  isTyping.value = true
-  selectedOption.value = null
-  selectedOptionKey.value = null
+  if (typingTimer) clearInterval(typingTimer) // 清除之前的定时器
+  displayedText.value = '' // 清空已显示文本
+  isTyping.value = true // 标记正在打字
+  selectedOption.value = null // 重置选中选项
+  selectedOptionKey.value = null // 重置选中选项的key
 
   let i = 0
   typingTimer = setInterval(() => {
     if (i < text.length) {
-      displayedText.value += text.charAt(i)
+      displayedText.value += text.charAt(i) // 逐字添加文本
       i++
     } else {
-      clearInterval(typingTimer)
-      isTyping.value = false
-      scrollMainContentToBottom()
+      clearInterval(typingTimer) // 打字完成，清除定时器
+      isTyping.value = false // 标记打字完成
+      scrollMainContentToBottom() // 滚动到底部
     }
-  }, 50)
+  }, 50) // 每50ms显示一个字符
 }
 
+// 监听当前节点变化，当节点切换时自动开始打字效果显示新文本
 watch(currentId, () => startTyping(currentNode.value.text), {
   immediate: true
 })
 
+/**
+ * 选择一个选项
+ * @param opt - 被选择的故事选项
+ * @param index - 选项在列表中的索引
+ */
 const selectOption = (opt: StoryOption, index: number) => {
-  if (isTyping.value || !canChoose(opt)) return
-  selectedOption.value = opt
-  selectedOptionKey.value = getOptionKey(opt, index)
-  scrollMainContentToBottom()
+  if (isTyping.value || !canChoose(opt)) return // 如果正在打字或选项不可选，则直接返回
+  selectedOption.value = opt // 设置选中的选项
+  selectedOptionKey.value = getOptionKey(opt, index) // 设置选中选项的key
+  scrollMainContentToBottom() // 滚动到底部
 }
 
+/**
+ * 确认选择的选项并执行相应操作
+ * 处理状态更新、章节记录、节点跳转等逻辑
+ */
 const confirmChoice = () => {
-  if (!selectedOption.value) return
+  if (!selectedOption.value) return // 如果没有选中选项，直接返回
+  
   const opt = selectedOption.value
   const fromNode = currentNode.value
-  currentNode.value.onExit?.(state)
-  opt.action?.(state)
-  if (state.hp <= 0) return
+  
+  currentNode.value.onExit?.(state) // 执行当前节点的退出回调（如果存在）
+  opt.action?.(state) // 执行选项的动作回调（如果存在），可能修改游戏状态
+  
+  if (state.hp <= 0) return // 如果生命值归零，不再继续
+  
+  // 如果跳转到不同节点，记录当前章节到历史
   if (opt.nextId !== currentId.value) {
     completedChapters.value.push({
-      key: `${fromNode.id}:${completedChapters.value.length}:${Date.now()}`,
-      index: completedChapters.value.length + 1,
-      id: fromNode.id,
-      text: fromNode.text,
-      choiceText: opt.text
+      key: `${fromNode.id}:${completedChapters.value.length}:${Date.now()}`, // 生成唯一key
+      index: completedChapters.value.length + 1, // 章节序号
+      id: fromNode.id, // 节点ID
+      text: fromNode.text, // 节点文本
+      choiceText: opt.text // 选择的选项文本
     })
-    currentId.value = opt.nextId
-    currentNode.value.onEnter?.(state)
+    currentId.value = opt.nextId // 切换到下一个节点
+    currentNode.value.onEnter?.(state) // 执行新节点的进入回调（如果存在）
   } else {
+    // 如果是同一节点（刷新状态），重置选择
     selectedOption.value = null
     selectedOptionKey.value = null
-    log('指令已处理')
+    log('指令已处理') // 记录日志
   }
 }
 
+/**
+ * 判断选项是否可选
+ * @param opt - 故事选项
+ * @returns 如果选项没有条件或条件满足则返回true
+ */
 const canChoose = (opt: StoryOption) => !opt.condition || opt.condition(state)
+
+/**
+ * 添加系统日志
+ * @param msg - 日志消息内容
+ */
 const log = (msg: string) => {
-  logs.value.unshift(msg)
-  logs.value = logs.value.slice(0, 3)
+  logs.value.unshift(msg) // 在日志开头添加新消息
+  logs.value = logs.value.slice(0, 3) // 只保留最近3条日志
 }
+
+/**
+ * 重启游戏（重新加载页面）
+ */
 const restart = () => location.reload()
 </script>
 
