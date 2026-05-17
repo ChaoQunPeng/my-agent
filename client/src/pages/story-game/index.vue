@@ -7,13 +7,15 @@
         <span class="status-node"><span class="status-lbl">GOLD:</span> {{ state.gold }}</span>
         <span class="status-sep">|</span>
         <span class="status-node"><span class="status-lbl">INV:</span> {{ inventoryText }}</span>
-      </section>
 
-      <section class="mode-switch" aria-label="阅读模式">
-        <button class="mode-btn" :class="{ 'is-active': viewMode === 'chapter' }" type="button" @click="viewMode = 'chapter'">
-          当前节点
-        </button>
-        <button class="mode-btn" :class="{ 'is-active': viewMode === 'novel' }" type="button" @click="viewMode = 'novel'">连续小说</button>
+        <section class="mode-switch" aria-label="阅读模式">
+          <button class="mode-btn" :class="{ 'is-active': viewMode === 'chapter' }" type="button" @click="viewMode = 'chapter'">
+            当前节点
+          </button>
+          <button class="mode-btn" :class="{ 'is-active': viewMode === 'novel' }" type="button" @click="viewMode = 'novel'">
+            连续小说
+          </button>
+        </section>
       </section>
 
       <div ref="mainContentRef" class="main-content">
@@ -316,6 +318,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border: 1px solid var(--border);
+  margin-left: auto;
 }
 .mode-btn {
   min-height: 38px;
