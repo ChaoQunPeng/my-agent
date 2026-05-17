@@ -179,7 +179,7 @@ const themeClass = computed(() => `theme-${THEME}`)
 const cursorSymbol = computed(() => {
   switch (THEME) {
     case 'romance':
-      return '♡'
+      return '_'
 
     case 'slice':
       return '▋'
@@ -341,12 +341,12 @@ body {
 }
 
 .theme-romance {
-  --bg: #fff7fa;
-  --white: #4a3b42;
-  --dim: #9f7f8a;
-  --border: #f1d4de;
+  --bg: #f6f2eb;
+  --white: #5b5147;
+  --dim: #9a8f84;
+  --border: #ddd4c7;
 
-  --font: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  --font: 'PingFang SC', sans-serif;
 }
 
 .theme-slice {
