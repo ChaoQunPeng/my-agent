@@ -31,6 +31,7 @@
 
             <section class="novel-chapter is-current">
               <!-- <p class="chapter-title">第 {{ currentChapterIndex }} 节</p> -->
+              <p class="chapter-title">No.{{ currentChapterIndex }}</p>
               <p class="term-text">{{ displayedText }}<span class="term-cursor" :class="{ 'is-typing': isTyping }">_</span></p>
             </section>
           </article>
@@ -304,8 +305,13 @@ body {
   white-space: pre-wrap;
 }
 .term-cursor {
+  // display: none;
   margin-left: 6px;
   animation: blink 0.8s steps(1) infinite;
+
+  &.is-typing {
+    display: inline-block;
+  }
 }
 @keyframes blink {
   50% {
