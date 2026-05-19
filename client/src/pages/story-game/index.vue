@@ -1,5 +1,5 @@
 <template>
-  <main class="term-raw" :class="themeClass">
+  <main class="term-raw" :class="[themeClass, fxClass]">
     <div class="term-wrapper">
       <section class="term-status">
         <span class="status-node"><span class="status-lbl">HP:</span> {{ state.hp }}</span>
@@ -25,6 +25,7 @@
           <template v-if="viewMode === 'chapter'">
             <p class="term-text">
               {{ displayedText }}
+
               <span class="term-cursor" :class="{ 'is-typing': isTyping }">
                 {{ cursorSymbol }}
               </span>
@@ -136,13 +137,21 @@ type ViewMode = 'chapter' | 'novel'
 
 type ThemeMode = 'horror' | 'romance' | 'slice'
 
+type FxMode = 'grain' | 'scanline' | 'crt'
+
 /**
  * 主题配置
- * horror  = 悬疑 / 恐怖 / 惊悚
- * romance = 恋爱 / 青春
- * slice   = 日常 / 治愈
  */
 const THEME: ThemeMode = 'horror'
+
+/**
+ * FX 氛围效果
+ *
+ * grain     = 胶片颗粒
+ * scanline  = 扫描线
+ * crt       = CRT闪烁
+ */
+const FX: FxMode[] = ['scanline']
 
 interface CompletedChapter {
   key: string
@@ -175,6 +184,8 @@ const mainContentRef = ref<HTMLElement | null>(null)
 let typingTimer: any = null
 
 const themeClass = computed(() => `theme-${THEME}`)
+
+const fxClass = computed(() => FX.map(item => `fx-${item}`).join(' '))
 
 const cursorSymbol = computed(() => {
   switch (THEME) {
@@ -358,6 +369,62 @@ body {
   --font: 'Noto Serif SC', serif;
 }
 
+/* FX ====================== */
+
+.fx-grain::before {
+  content: '';
+
+  position: absolute;
+  inset: 0;
+
+  pointer-events: none;
+
+  opacity: 0.025;
+
+  z-index: 1;
+
+  background-image: radial-gradient(#000 0.5px, transparent 0.5px);
+
+  background-size: 4px 4px;
+
+  mix-blend-mode: multiply;
+}
+
+.fx-scanline::after {
+  content: '';
+
+  position: absolute;
+  inset: 0;
+
+  pointer-events: none;
+
+  opacity: 0.06;
+
+  z-index: 2;
+
+  background: repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(255, 255, 255, 0.03) 3px);
+}
+
+.fx-crt {
+  animation: crt-flicker 0.12s infinite;
+}
+
+@keyframes crt-flicker {
+  0% {
+    opacity: 0.985;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.99;
+  }
+}
+
+/* ====================== */
+
 .term-raw {
   background-color: var(--bg);
   color: var(--white);
@@ -369,25 +436,6 @@ body {
 
   position: relative;
   overflow: hidden;
-}
-
-.term-raw::before {
-  content: '';
-
-  position: absolute;
-  inset: 0;
-
-  pointer-events: none;
-
-  opacity: 0.035;
-
-  z-index: 1;
-
-  background-image: radial-gradient(#000 0.5px, transparent 0.5px);
-
-  background-size: 4px 4px;
-
-  mix-blend-mode: multiply;
 }
 
 .term-wrapper {
@@ -404,7 +452,7 @@ body {
   height: 100%;
 
   position: relative;
-  z-index: 2;
+  z-index: 5;
 }
 
 .main-content {
