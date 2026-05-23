@@ -117,28 +117,6 @@ export class NovelOutlineController {
   }
 
   /**
-   * 根据 novelCode 获取 novel_outline_compressed 中的数据
-   */
-  @Post('find-compressed-by-novel-code')
-  async findCompressedByNovelCode(@Body() body: NovelCodeDto) {
-    const result = await this.novelOutlineService.findCompressedByNovelCode(
-      body.novelCode,
-    );
-    return ApiResponseDto.success(result);
-  }
-
-  /**
-   * 根据 novelCode 生成 compressed 层
-   */
-  @Post('build-compressed')
-  async buildCompressed(@Body() body: NovelCodeDto) {
-    const result = await this.novelOutlineService.buildCompressedByNovelCode(
-      body.novelCode,
-    );
-    return ApiResponseDto.success(result, 'compressed 层生成完成');
-  }
-
-  /**
    * 获取 novel_split_jobs 中的数据
    */
   @Post('get-split-jobs')

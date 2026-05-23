@@ -1,6 +1,8 @@
 <template>
   <div class="novel-outline-page">
+    <!-- 左侧：上传 + 任务控制 -->
     <div class="left-panel">
+      <!-- 恢复任务：在后端重启 / 页面刷新后，通过 jobId 重新挂上某个历史任务 -->
       <a-card title="0. 恢复任务" size="small" class="mb-12">
         <a-form layout="vertical">
           <a-form-item label="小说编码 novelCode">
@@ -12,10 +14,10 @@
               @search="handleListJobs"
             />
           </a-form-item>
-          <a-form-item label="选择历史任务">
+          <a-form-item label="选择历史任务 jobId">
             <a-select
               v-model:value="recoverForm.jobId"
-              placeholder="先点上方“列出任务”"
+              placeholder="先点上方'列出任务'"
               :options="jobOptions"
               :disabled="!jobOptions.length"
               style="width: 100%"
@@ -41,8 +43,8 @@
         </a-form>
       </a-card>
 
-      <a-card title="1. 上传 TXT 并拆分" size="small" class="mb-12">
-        <a-form layout="vertical">
+      <a-card title="1. 上传 TXT 并拆分" size="small">
+        <a-form layout="vertical" :model="form">
           <a-form-item label="小说编码 novelCode" required>
             <a-input
               v-model:value="form.novelCode"
@@ -90,515 +92,359 @@
         </a-form>
       </a-card>
 
-      <a-card title="2. 提取与压缩" size="small" class="mb-12">
-        <a-space direction="vertical" style="width: 100%">
-          <a-input-search
-            v-model:value="operationForm.novelCode"
-            placeholder="输入 novelCode 后可直接提取或压缩"
-            enter-button="加载任务与数据"
-            :loading="loadingKnowledge"
-            @search="handleLoadOperationNovelCode"
-          />
-          <a-alert
-            type="info"
-            show-icon
-            message="已有 novel_outlines 数据时，也可以直接输入 novelCode 继续提取或生成 compressed，不必先恢复任务。"
-          />
-          <a-button
-            type="primary"
-            block
-            :loading="extracting"
-            :disabled="!canStartExtract"
-            @click="handleStartExtract"
-          >
-            {{ extractButtonText }}
-          </a-button>
-          <a-button
-            block
-            :loading="compressing"
-            :disabled="!activeNovelCode"
-            @click="handleBuildCompressed"
-          >
-            生成 compressed 层
-          </a-button>
-          <a-button block :disabled="!activeNovelCode" @click="handleLoadKnowledge">
-            刷新原始层与压缩层
-          </a-button>
-        </a-space>
-      </a-card>
-
-      <a-card v-if="currentJob" title="3. 当前任务" size="small">
+      <a-card v-if="currentJob" title="2. 任务进度" size="small" class="mt-12">
         <a-descriptions :column="1" size="small" bordered>
-          <a-descriptions-item label="jobId">
-            <span class="mono">{{ currentJob.jobId }}</span>
-          </a-descriptions-item>
-          <a-descriptions-item label="小说编码">
-            <span class="mono">{{ currentJob.novelCode }}</span>
-          </a-descriptions-item>
-          <a-descriptions-item label="原文文件">
-            {{ currentJob.sourceFileName }}
-          </a-descriptions-item>
+          <a-descriptions-item label="jobId">{{
+            currentJob.jobId
+          }}</a-descriptions-item>
+          <a-descriptions-item label="原文文件">{{
+            currentJob.sourceFileName
+          }}</a-descriptions-item>
+          <a-descriptions-item label="原文字数">{{
+            currentJob.totalChars
+          }}</a-descriptions-item>
           <a-descriptions-item label="状态">
-            <a-tag :color="statusColor(currentJob.status)">
-              {{ statusText(currentJob.status) }}
-            </a-tag>
+            <a-tag :color="statusColor(currentJob.status)">{{
+              statusText(currentJob.status)
+            }}</a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="拆分参数">
-            {{ currentJob.chunkSize }} / overlap {{ currentJob.overlap }}
+          <a-descriptions-item label="拆分进度">
+            {{ currentJob.splittedChunks }} / {{ currentJob.totalChunks }}
           </a-descriptions-item>
-          <a-descriptions-item label="总字数">
-            {{ currentJob.totalChars }}
-          </a-descriptions-item>
-          <a-descriptions-item label="chunk 进度">
-            <div class="progress-meta">
-              <a-progress
-                :percent="genPercent"
-                :status="currentJob.status === 'failed' ? 'exception' : undefined"
-                size="small"
-              />
-              <span class="fs-12">
-                {{ processedChunks(currentJob) }} / {{ currentJob.totalChunks }}
-              </span>
-            </div>
-          </a-descriptions-item>
-          <a-descriptions-item label="处理中 chunk">
-            {{ currentJob.processingChunkIndex || '-' }}
+          <a-descriptions-item label="生成进度">
+            <a-progress
+              :percent="genPercent"
+              :status="currentJob.status === 'failed' ? 'exception' : undefined"
+              size="small"
+            />
+            <span class="fs-12"
+              >{{ currentJob.processedChunks }} /
+              {{ currentJob.totalChunks }} 块</span
+            >
           </a-descriptions-item>
           <a-descriptions-item v-if="currentJob.lastError" label="错误信息">
-            <span class="error-text">{{ currentJob.lastError }}</span>
+            <span style="color: #ff4d4f">{{ currentJob.lastError }}</span>
           </a-descriptions-item>
         </a-descriptions>
 
         <div class="action-row">
-          <a-button @click="handleRefreshJob">刷新任务</a-button>
-          <a-button :disabled="!activeNovelCode" @click="handleLoadKnowledge">
-            刷新数据
+          <a-button
+            type="primary"
+            :loading="generating"
+            :disabled="!canGenerate"
+            @click="handleGenerate"
+          >
+            {{
+              currentJob.processedChunks > 0 ? '继续生成大纲' : '开始生成大纲'
+            }}
           </a-button>
+          <a-button danger :disabled="!canAbort" @click="handleAbort"
+            >中止生成</a-button
+          >
+          <a-button @click="handleRefresh">刷新</a-button>
         </div>
       </a-card>
     </div>
 
+    <!-- 右侧：大纲结果 -->
     <div class="right-panel">
-      <a-card size="small" class="result-card">
-        <template #title>
-          <div class="title-row">
-            <span>小说知识库总览</span>
-            <a-tag color="blue">raw + compressed</a-tag>
-          </div>
-        </template>
-
+      <a-card title="3. 大纲结果" size="small">
         <template #extra>
-          <a-space wrap>
-            <a-input-search
+          <a-space>
+            <a-input
               v-model:value="queryNovelCode"
-              placeholder="输入 novelCode 查询"
-              enter-button="查询"
-              style="width: 260px"
-              :loading="loadingKnowledge"
-              @search="handleLoadKnowledge"
+              placeholder="输入 novelCode"
+              style="width: 200px"
             />
-            <a-button :disabled="!activeNovelCode" @click="handleBuildCompressed">
-              更新 compressed
-            </a-button>
+            <a-button size="small" @click="loadOutline">查询</a-button>
           </a-space>
         </template>
 
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-label">原始人物</div>
-            <div class="metric-value">{{ outline?.characters?.length || 0 }}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">原始事件</div>
-            <div class="metric-value">{{ outline?.events?.length || 0 }}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">压缩人物</div>
-            <div class="metric-value">
-              {{ compressedOutline?.characters?.length || 0 }}
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">压缩事件</div>
-            <div class="metric-value">
-              {{ compressedOutline?.events?.length || 0 }}
-            </div>
-          </div>
-        </div>
+        <a-empty v-if="!outline" description="暂无大纲，请先上传并生成" />
 
-        <a-empty
-          v-if="!outline && !compressedOutline"
-          description="暂无数据，请先上传/提取，或输入 novelCode 查询"
-        />
-
-        <a-tabs v-else>
-          <a-tab-pane key="outline" tab="原始层 novel_outlines">
-            <a-tabs>
-              <a-tab-pane key="raw-world" tab="世界观">
-                <a-empty
-                  v-if="!outline?.worldView || !hasWorldView(outline.worldView)"
-                  description="暂无世界观数据"
-                />
-                <a-descriptions v-else :column="1" bordered size="small">
-                  <a-descriptions-item label="世界类型">
-                    {{ joinList(outline.worldView.worldType) }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="设定摘要">
-                    <div class="multiline">
-                      {{ formatMultiPoint(joinList(outline.worldView.summary)) }}
-                    </div>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="社会结构">
-                    <div class="multiline">
-                      {{
-                        formatMultiPoint(joinList(outline.worldView.socialStructure))
-                      }}
-                    </div>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="核心规则">
-                    <div class="multiline">
-                      {{ formatMultiPoint(joinList(outline.worldView.coreRules)) }}
-                    </div>
-                  </a-descriptions-item>
-                </a-descriptions>
-              </a-tab-pane>
-
-              <a-tab-pane
-                key="raw-characters"
-                :tab="`人物 (${outline?.characters?.length || 0})`"
-              >
-                <a-empty v-if="!outline?.characters?.length" />
-                <a-table
-                  v-else
-                  :columns="rawCharacterColumns"
-                  :data-source="outline.characters"
-                  :pagination="{ pageSize: 8, hideOnSinglePage: true }"
-                  size="small"
-                  row-key="name"
-                  bordered
-                  :scroll="{ x: 1180 }"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.dataIndex === 'aliases'">
-                      <a-space wrap v-if="record.aliases?.length">
-                        <a-tag v-for="alias in record.aliases" :key="alias" color="blue">
-                          {{ alias }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </template>
-                    <template v-else-if="column.dataIndex === 'aliasCandidates'">
-                      <a-space wrap v-if="record.aliasCandidates?.length">
-                        <a-tag
-                          v-for="alias in record.aliasCandidates"
-                          :key="alias"
-                          color="orange"
-                        >
-                          {{ alias }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </template>
-                    <template v-else-if="column.dataIndex === 'name'">
-                      <span class="strong-text">{{ record.name }}</span>
-                    </template>
-                    <template v-else>
-                      <div class="cell-multiline">
-                        {{ formatMultiPoint(joinList(record[column.dataIndex as keyof typeof record] as string[])) || '-' }}
-                      </div>
-                    </template>
-                  </template>
-                </a-table>
-              </a-tab-pane>
-
-              <a-tab-pane key="raw-events" :tab="`事件 (${outline?.events?.length || 0})`">
-                <a-empty v-if="!outline?.events?.length" />
-                <a-table
-                  v-else
-                  :columns="rawEventColumns"
-                  :data-source="outline.events"
-                  :pagination="{ pageSize: 8, hideOnSinglePage: true }"
-                  size="small"
-                  row-key="title"
-                  bordered
-                  :scroll="{ x: 1100 }"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.dataIndex === 'characters'">
-                      <a-space wrap v-if="record.characters?.length">
-                        <a-tag v-for="name in record.characters" :key="name">{{ name }}</a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </template>
-                    <template v-else-if="column.dataIndex === 'summary'">
-                      <div class="cell-multiline">
-                        {{ formatMultiPoint(joinList(record.summary)) || '-' }}
-                      </div>
-                    </template>
-                    <template v-else>
-                      {{ record[column.dataIndex as keyof typeof record] || '-' }}
-                    </template>
-                  </template>
-                </a-table>
-              </a-tab-pane>
-            </a-tabs>
-          </a-tab-pane>
-
-          <a-tab-pane key="compressed" tab="压缩层 novel_outline_compressed">
-            <a-empty
-              v-if="!compressedOutline"
-              description="compressed 层尚未生成"
+        <template v-else>
+          <a-tabs>
+            <a-tab-pane key="synopsis" tab="故事简介">
+              <pre class="outline-text">{{
+                formatMultiPoint(outline.synopsis) || '（空）'
+              }}</pre>
+            </a-tab-pane>
+            <a-tab-pane key="world" tab="世界观">
+              <pre class="outline-text">{{
+                formatMultiPoint(outline.worldSetting) || '（空）'
+              }}</pre>
+            </a-tab-pane>
+            <a-tab-pane key="outline" tab="剧情大纲">
+              <pre class="outline-text">{{
+                formatMultiPoint(outline.plotOutline) || '（空）'
+              }}</pre>
+            </a-tab-pane>
+            <a-tab-pane key="conflicts" tab="故事矛盾">
+              <pre class="outline-text">{{
+                formatMultiPoint(outline.storyConflicts) || '（空）'
+              }}</pre>
+            </a-tab-pane>
+            <a-tab-pane
+              :key="`chars`"
+              :tab="`人物 (${outline.characters.length})`"
             >
-              <a-button type="primary" :disabled="!activeNovelCode" @click="handleBuildCompressed">
-                立即生成 compressed
-              </a-button>
-            </a-empty>
+              <a-empty v-if="!outline.characters.length" />
+              <a-table
+                v-else
+                :columns="characterColumns"
+                :data-source="outline.characters"
+                :pagination="false"
+                size="small"
+                row-key="name"
+                bordered
+                :scroll="{ x: 1080 }"
+                class="char-table"
+              >
+                <template #bodyCell="{ column, text, record }">
+                  <!-- 姓名 / 身份 保持原文 -->
+                  <template
+                    v-if="
+                      column.dataIndex === 'name' ||
+                      column.dataIndex === 'identity'
+                    "
+                  >
+                    {{ text || '-' }}
+                  </template>
+                  <!-- 别名列：显示为标签 -->
+                  <template v-else-if="column.dataIndex === 'aliases'">
+                    <a-space
+                      wrap
+                      v-if="record.aliases && record.aliases.length > 0"
+                    >
+                      <a-tag
+                        v-for="alias in record.aliases"
+                        :key="alias"
+                        color="blue"
+                        >{{ alias }}</a-tag
+                      >
+                    </a-space>
+                    <span v-else>-</span>
+                  </template>
+                  <!-- 其余长文本字段做分点预处理，保留换行 -->
+                  <template v-else>
+                    <div class="cell-multiline">
+                      {{ formatMultiPoint(text) || '-' }}
+                    </div>
+                  </template>
+                </template>
+              </a-table>
+            </a-tab-pane>
+            <a-tab-pane key="aliases" tab="别名管理">
+              <div style="padding: 16px 0">
+                <a-button
+                  type="primary"
+                  size="small"
+                  :loading="loadingAliasCandidates"
+                  @click="loadAliasCandidates"
+                >
+                  刷新候选列表
+                </a-button>
 
-            <a-tabs v-else>
-              <a-tab-pane key="compressed-world" tab="世界观">
                 <a-empty
-                  v-if="
-                    !compressedOutline.worldView ||
-                    !hasWorldView(compressedOutline.worldView)
-                  "
-                  description="暂无压缩世界观"
+                  v-if="!aliasCandidates.length && !loadingAliasCandidates"
+                  description="暂无待确认的别名候选"
+                  style="margin-top: 24px"
                 />
-                <a-descriptions v-else :column="1" bordered size="small">
-                  <a-descriptions-item label="世界类型">
-                    {{ joinList(compressedOutline.worldView.worldType) }}
-                  </a-descriptions-item>
-                  <a-descriptions-item label="设定摘要">
-                    <div class="multiline">
-                      {{ formatMultiPoint(joinList(compressedOutline.worldView.summary)) }}
-                    </div>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="社会结构">
-                    <div class="multiline">
-                      {{
-                        formatMultiPoint(
-                          joinList(compressedOutline.worldView.socialStructure),
-                        )
-                      }}
-                    </div>
-                  </a-descriptions-item>
-                  <a-descriptions-item label="核心规则">
-                    <div class="multiline">
-                      {{ formatMultiPoint(joinList(compressedOutline.worldView.coreRules)) }}
-                    </div>
-                  </a-descriptions-item>
-                </a-descriptions>
-              </a-tab-pane>
 
-              <a-tab-pane
-                key="compressed-characters"
-                :tab="`人物 (${compressedOutline.characters?.length || 0})`"
-              >
-                <a-empty v-if="!compressedOutline.characters?.length" />
-                <a-table
-                  v-else
-                  :columns="rawCharacterColumns"
-                  :data-source="compressedOutline.characters"
-                  :pagination="{ pageSize: 8, hideOnSinglePage: true }"
-                  size="small"
-                  row-key="name"
-                  bordered
-                  :scroll="{ x: 1180 }"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.dataIndex === 'aliases'">
-                      <a-space wrap v-if="record.aliases?.length">
-                        <a-tag v-for="alias in record.aliases" :key="alias" color="blue">
-                          {{ alias }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </template>
-                    <template v-else-if="column.dataIndex === 'aliasCandidates'">
-                      <a-space wrap v-if="record.aliasCandidates?.length">
+                <template v-else>
+                  <a-divider>待确认的别名候选</a-divider>
+                  <a-collapse v-model:activeKey="activeAliasCollapse" accordion>
+                    <a-collapse-panel
+                      v-for="(item, index) in aliasCandidates"
+                      :key="index"
+                      :header="`${item.characterName} (已有${item.aliases.length}个别名, ${item.aliasCandidates.length}个候选)`"
+                    >
+                      <div
+                        v-if="item.aliases.length > 0"
+                        style="margin-bottom: 12px"
+                      >
+                        <strong>已确认别名：</strong>
                         <a-tag
-                          v-for="alias in record.aliasCandidates"
+                          v-for="alias in item.aliases"
                           :key="alias"
-                          color="orange"
+                          color="blue"
+                          >{{ alias }}</a-tag
                         >
-                          {{ alias }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </template>
-                    <template v-else-if="column.dataIndex === 'name'">
-                      <span class="strong-text">{{ record.name }}</span>
-                    </template>
-                    <template v-else>
-                      <div class="cell-multiline">
-                        {{ formatMultiPoint(joinList(record[column.dataIndex as keyof typeof record] as string[])) || '-' }}
                       </div>
-                    </template>
-                  </template>
-                </a-table>
-              </a-tab-pane>
 
-              <a-tab-pane
-                key="compressed-events"
-                :tab="`事件 (${compressedOutline.events?.length || 0})`"
-              >
-                <a-empty v-if="!compressedOutline.events?.length" />
-                <a-table
-                  v-else
-                  :columns="rawEventColumns"
-                  :data-source="compressedOutline.events"
-                  :pagination="{ pageSize: 8, hideOnSinglePage: true }"
-                  size="small"
-                  row-key="title"
-                  bordered
-                  :scroll="{ x: 1100 }"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.dataIndex === 'characters'">
-                      <a-space wrap v-if="record.characters?.length">
-                        <a-tag v-for="name in record.characters" :key="name">{{ name }}</a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </template>
-                    <template v-else-if="column.dataIndex === 'summary'">
-                      <div class="cell-multiline">
-                        {{ formatMultiPoint(joinList(record.summary)) || '-' }}
+                      <div v-if="item.aliasCandidates.length > 0">
+                        <strong>候选别名（请勾选确认为同一人的别名）：</strong>
+                        <div style="margin-top: 8px">
+                          <a-checkbox-group
+                            v-model:value="selectedAliases[item.characterName]"
+                            style="display: flex; flex-wrap: wrap; gap: 8px"
+                          >
+                            <a-checkbox
+                              v-for="candidate in item.aliasCandidates"
+                              :key="candidate"
+                              :value="candidate"
+                            >
+                              {{ candidate }}
+                            </a-checkbox>
+                          </a-checkbox-group>
+                        </div>
+
+                        <div style="margin-top: 12px">
+                          <a-button
+                            type="primary"
+                            size="small"
+                            :disabled="
+                              !selectedAliases[item.characterName] ||
+                              selectedAliases[item.characterName].length === 0
+                            "
+                            @click="confirmMergeAliases(item.characterName)"
+                          >
+                            合并选中别名
+                          </a-button>
+                        </div>
                       </div>
-                    </template>
-                    <template v-else>
-                      {{ record[column.dataIndex as keyof typeof record] || '-' }}
-                    </template>
-                  </template>
-                </a-table>
-              </a-tab-pane>
-            </a-tabs>
-          </a-tab-pane>
-
-          <a-tab-pane key="raw-json" tab="原始层 JSON">
-            <pre class="json-block">{{ formatJson(outline) }}</pre>
-          </a-tab-pane>
-
-          <a-tab-pane key="compressed-json" tab="压缩层 JSON">
-            <pre class="json-block">{{ formatJson(compressedOutline) }}</pre>
-          </a-tab-pane>
-        </a-tabs>
+                    </a-collapse-panel>
+                  </a-collapse>
+                </template>
+              </div>
+            </a-tab-pane>
+          </a-tabs>
+        </template>
       </a-card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, watch } from 'vue'
 import { message as antMessage } from 'ant-design-vue'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import type { UploadFile } from 'ant-design-vue'
 import {
-  buildCompressedNovelOutline,
-  findCompressedNovelOutline,
-  findNovelOutline,
-  getOutlineJob,
-  getOutlineJobs,
-  startExtractNovelOutline,
   uploadAndSplitNovel,
-  type NovelOutlineCompressedResult,
+  startGenerateOutline,
+  getOutlineJobStatus,
+  abortOutlineJob,
+  getNovelOutline,
+  listOutlineJobs,
+  getAliasCandidates,
+  mergeAlias,
   type NovelOutlineJob,
   type NovelOutlineResult,
-  type OutlineWorldView,
 } from '@/api/novel-outline'
 
+// 表单数据：novelCode + 拆分参数
 const form = reactive({
   novelCode: '',
-  chunkSize: 15000,
-  overlap: 300,
+  chunkSize: 15000, // 默认每块最多15000字原文，包含前后上下文
+  overlap: 300, // 每块前后各保留300字上下文
 })
 
+// Upload 组件文件列表
+const fileList = ref<UploadFile[]>([])
+// 真实的 File 对象（antd upload 用 fileList 不能直接拿到原生 File）
+const pickedFile = ref<File | null>(null)
+
+// 当前任务 & 大纲
+const currentJob = ref<NovelOutlineJob | null>(null)
+const outline = ref<NovelOutlineResult | null>(null)
+// 右侧查询用 novelCode（和上传 form 的 novelCode 可以不同）
+const queryNovelCode = ref('')
+
+const uploading = ref(false)
+const generating = ref(false)
+
+// 恢复任务相关状态：用户输入 novelCode，查询历史 job 列表，选中后恢复为 currentJob
 const recoverForm = reactive({
   novelCode: '',
   jobId: '',
 })
-
-const operationForm = reactive({
-  novelCode: '',
-})
-
-const fileList = ref<UploadFile[]>([])
-const pickedFile = ref<File | null>(null)
-
-const currentJob = ref<NovelOutlineJob | null>(null)
-const outline = ref<NovelOutlineResult | null>(null)
-const compressedOutline = ref<NovelOutlineCompressedResult | null>(null)
-const queryNovelCode = ref('')
-
-const uploading = ref(false)
-const extracting = ref(false)
-const compressing = ref(false)
-const loadingKnowledge = ref(false)
 const listingJobs = ref(false)
 const recovering = ref(false)
-const jobOptions = ref<Array<{ value: string; label: string; desc: string }>>([])
-
-let pollTimer: ReturnType<typeof setInterval> | null = null
-let pollBusy = false
-
-const rawCharacterColumns = [
-  { title: '姓名', dataIndex: 'name', key: 'name', width: 120, fixed: 'left' as const },
-  { title: '别名', dataIndex: 'aliases', key: 'aliases', width: 180 },
-  {
-    title: '待确认别名',
-    dataIndex: 'aliasCandidates',
-    key: 'aliasCandidates',
-    width: 190,
-  },
-  { title: '身份', dataIndex: 'identity', key: 'identity', width: 180 },
-  { title: '性格', dataIndex: 'personality', key: 'personality', width: 220 },
-  { title: '目标', dataIndex: 'goals', key: 'goals', width: 220 },
-  { title: '特征', dataIndex: 'traits', key: 'traits', width: 220 },
-  { title: '关系', dataIndex: 'relations', key: 'relations', width: 260 },
-]
-
-const rawEventColumns = [
-  { title: '标题', dataIndex: 'title', key: 'title', width: 180, fixed: 'left' as const },
-  { title: '描述', dataIndex: 'summary', key: 'summary', width: 520 },
-  { title: '涉及人物', dataIndex: 'characters', key: 'characters', width: 220 },
-  { title: 'chunk', dataIndex: 'chunkIndex', key: 'chunkIndex', width: 90 },
-]
-
-const activeNovelCode = computed(() =>
-  operationForm.novelCode.trim() ||
-  queryNovelCode.value.trim() ||
-  currentJob.value?.novelCode ||
-  form.novelCode.trim(),
+// 下拉可选项（来自 listOutlineJobs 的返回）
+const jobOptions = ref<Array<{ value: string; label: string; desc: string }>>(
+  [],
 )
+
+// 轮询定时器
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const canUpload = computed(
-  () => !!form.novelCode.trim() && !!pickedFile.value && !uploading.value,
+  () => !!form.novelCode && !!pickedFile.value && !uploading.value,
+)
+// 允许续跑的状态：
+// - split_done / failed / aborted：常规可续跑
+// - generating：后端重启后残留的"假在跑"任务，允许强制再次拉起（后端有二次校验）
+const canGenerate = computed(
+  () =>
+    !!currentJob.value &&
+    (currentJob.value.status === 'split_done' ||
+      currentJob.value.status === 'failed' ||
+      currentJob.value.status === 'aborted' ||
+      currentJob.value.status === 'generating') &&
+    currentJob.value.processedChunks < currentJob.value.totalChunks,
+)
+const canAbort = computed(
+  () =>
+    !!currentJob.value &&
+    (currentJob.value.status === 'splitting' ||
+      currentJob.value.status === 'generating'),
 )
 
-const canStartExtract = computed(() => {
-  return !!activeNovelCode.value && !extracting.value
-})
-
-const extractButtonText = computed(() => {
-  if (!currentJob.value || currentJob.value.novelCode !== activeNovelCode.value) {
-    return '按 novelCode 开始提取'
-  }
-  return processedChunks(currentJob.value) > 0 ? '继续提取大纲' : '开始提取大纲'
-})
-
 const genPercent = computed(() => {
-  if (!currentJob.value?.totalChunks) return 0
+  if (!currentJob.value || !currentJob.value.totalChunks) return 0
   return Math.floor(
-    (processedChunks(currentJob.value) / currentJob.value.totalChunks) * 100,
+    (currentJob.value.processedChunks / currentJob.value.totalChunks) * 100,
   )
 })
 
-function processedChunks(job: NovelOutlineJob) {
-  return Math.max(
-    0,
-    Math.min(job.lastCompletedChunkIndex || 0, job.totalChunks || 0),
-  )
+/**
+ * 大模型经常把分点内容压成一段（如 "1. 背景 2. 冲突 3. 结局"），前端展示时补换行
+ * 命中几类常见分点标志就在其前面加上 \n：
+ *   - 阿拉伯数字序号：1. / 2、 / 3) / 4：
+ *   - 带括号形式：(1) （2） [3]
+ *   - 圈号：① ② ③ ...
+ *   - 项目符号：- / • / * （前面必须是空格）
+ * 注意：都要求分点标志前面有"已存在的非换行字符"，避免首个分点也多一个空行
+ */
+function formatMultiPoint(text: string | undefined | null): string {
+  if (!text) return ''
+  let out = text
+  // 阿拉伯数字 + 分隔符（.、:：)）
+  out = out.replace(/([^\n])\s+(\d{1,2}[.、:：)])\s*/g, '$1\n$2 ')
+  // (1) （1） [1] 形式
+  out = out.replace(/([^\n])\s+([([（【]\s*\d{1,2}\s*[)\]）】])\s*/g, '$1\n$2 ')
+  // 圈号 ①-⑳
+  out = out.replace(/([^\n])\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/g, '$1\n$2 ')
+  // 前面有空格的短横线 / 圆点 / 星号项目符号
+  out = out.replace(/([^\n])\s+([-•*])\s+/g, '$1\n$2 ')
+  return out
 }
 
-function statusColor(status: NovelOutlineJob['status']) {
+/**
+ * 人物表格列定义：固定姓名/身份，其余长文本列允许自然换行（不省略）
+ * 长文本统一用 formatMultiPoint 把"1.xxx 2.xxx"预处理为多行，再靠 css white-space: pre-wrap 渲染换行
+ */
+const characterColumns = [
+  {
+    title: '姓名',
+    dataIndex: 'name',
+    key: 'name',
+    width: 100,
+    fixed: 'left' as const,
+  },
+  { title: '别名', dataIndex: 'aliases', key: 'aliases', width: 150 },
+  { title: '身份', dataIndex: 'identity', key: 'identity', width: 140 },
+  { title: '性格', dataIndex: 'personality', key: 'personality', width: 200 },
+  { title: '目标', dataIndex: 'goals', key: 'goals', width: 200 },
+  { title: '特征', dataIndex: 'traits', key: 'traits', width: 200 },
+  { title: '关系', dataIndex: 'relations', key: 'relations', width: 240 },
+]
+
+/**
+ * 状态对应的展示色
+ */
+function statusColor(s: NovelOutlineJob['status']) {
   return (
     {
       splitting: 'processing',
@@ -607,58 +453,30 @@ function statusColor(status: NovelOutlineJob['status']) {
       done: 'success',
       failed: 'error',
       aborted: 'default',
-    }[status] || 'default'
+    }[s] || 'default'
   )
 }
-
-function statusText(status: NovelOutlineJob['status']) {
+function statusText(s: NovelOutlineJob['status']) {
   return (
     {
       splitting: '拆分中',
       split_done: '拆分完成',
-      generating: '提取中',
+      generating: '生成中',
       done: '已完成',
       failed: '失败',
       aborted: '已中止',
-    }[status] || status
+    }[s] || s
   )
 }
 
-function joinList(value?: string[] | null) {
-  if (!value?.length) return '-'
-  return value.filter(Boolean).join('；')
-}
-
-function formatMultiPoint(text?: string | null) {
-  if (!text) return ''
-  let out = text
-  out = out.replace(/([^\n])\s+(\d{1,2}[.、:：)])\s*/g, '$1\n$2 ')
-  out = out.replace(/([^\n])\s+([([（【]\s*\d{1,2}\s*[)\]）】])\s*/g, '$1\n$2 ')
-  out = out.replace(/([^\n])\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s*/g, '$1\n$2 ')
-  out = out.replace(/([^\n])\s+([-•*])\s+/g, '$1\n$2 ')
-  return out
-}
-
-function hasWorldView(worldView?: OutlineWorldView | null) {
-  if (!worldView) return false
-  return Boolean(
-    worldView.worldType?.length ||
-      worldView.summary?.length ||
-      worldView.socialStructure?.length ||
-      worldView.coreRules?.length,
-  )
-}
-
-function formatJson(data: unknown) {
-  return data ? JSON.stringify(data, null, 2) : '（空）'
-}
-
+/**
+ * antd Upload 的 beforeUpload：阻止自动上传，同时拿到 File 对象
+ */
 function onBeforeUpload(file: File) {
   if (!file.name.toLowerCase().endsWith('.txt')) {
     antMessage.error('仅支持 .txt 文件')
-    return false as never
+    return false as any
   }
-
   pickedFile.value = file
   fileList.value = [
     {
@@ -667,236 +485,89 @@ function onBeforeUpload(file: File) {
       status: 'done',
     } as UploadFile,
   ]
-  return false as never
+  return false
 }
-
 function onRemoveFile() {
   pickedFile.value = null
   fileList.value = []
   return true
 }
 
+/**
+ * 上传并拆分
+ */
 async function handleUpload() {
   if (!pickedFile.value) return
   uploading.value = true
   try {
     const res = await uploadAndSplitNovel({
-      novelCode: form.novelCode.trim(),
+      novelCode: form.novelCode,
       chunkSize: form.chunkSize,
       overlap: form.overlap,
       file: pickedFile.value,
     })
+    // axios 拦截器已返回后端的 { code, msg, data }，非 200 会走 catch
     if (res.data) {
       currentJob.value = res.data
       queryNovelCode.value = res.data.novelCode
       antMessage.success(`拆分完成，共 ${res.data.totalChunks} 块`)
-      await loadKnowledge(res.data.novelCode, { syncJob: true })
+      // 拆分完了就预加载一下已有大纲（可能是之前生成的）
+      await loadOutline()
     }
-  } catch (error: any) {
-    antMessage.error(error?.response?.data?.msg || error?.message || '上传失败')
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '上传失败')
   } finally {
     uploading.value = false
   }
 }
 
-async function handleStartExtract() {
-  const code = activeNovelCode.value
-  if (!code) {
-    antMessage.warning('请先输入或选择 novelCode')
-    return
-  }
-
-  extracting.value = true
-  startPolling(code)
-
-  try {
-    const res = await startExtractNovelOutline(code)
-    if (res.data) {
-      currentJob.value = res.data
-    }
-    antMessage.success('大纲提取完成')
-  } catch (error: any) {
-    antMessage.error(error?.response?.data?.msg || error?.message || '提取失败')
-  } finally {
-    extracting.value = false
-    stopPolling()
-    await loadKnowledge(code, { syncJob: true, silent: true })
-  }
-}
-
-async function handleBuildCompressed() {
-  const code = activeNovelCode.value
-  if (!code) {
-    antMessage.warning('请先输入或选择 novelCode')
-    return
-  }
-
-  compressing.value = true
-  try {
-    const res = await buildCompressedNovelOutline(code)
-    compressedOutline.value = res.data ?? null
-    antMessage.success('compressed 层生成完成')
-    await loadKnowledge(code, { syncJob: true, silent: true })
-  } catch (error: any) {
-    antMessage.error(
-      error?.response?.data?.msg || error?.message || 'compressed 生成失败',
-    )
-  } finally {
-    compressing.value = false
-  }
-}
-
-async function handleRefreshJob() {
+/**
+ * 启动/续跑生成，并开启轮询
+ */
+async function handleGenerate() {
   if (!currentJob.value) return
+  generating.value = true
   try {
-    const res = await getOutlineJob({ jobId: currentJob.value.jobId })
+    const res = await startGenerateOutline(currentJob.value.jobId)
     if (res.data) {
       currentJob.value = res.data
+      startPolling()
     }
-  } catch (error: any) {
-    antMessage.error(
-      error?.response?.data?.msg || error?.message || '刷新任务失败',
-    )
-  }
-}
-
-async function handleLoadKnowledge() {
-  const code = activeNovelCode.value
-  if (!code) {
-    antMessage.warning('请输入 novelCode')
-    return
-  }
-
-  await loadKnowledge(code, { syncJob: true })
-}
-
-async function handleLoadOperationNovelCode() {
-  const code = operationForm.novelCode.trim()
-  if (!code) {
-    antMessage.warning('请输入 novelCode')
-    return
-  }
-
-  await loadKnowledge(code, { syncJob: true })
-}
-
-async function loadKnowledge(
-  novelCode: string,
-  options: { syncJob?: boolean; silent?: boolean } = {},
-) {
-  loadingKnowledge.value = true
-  try {
-    const tasks: Promise<unknown>[] = [
-      findNovelOutline(novelCode),
-      findCompressedNovelOutline(novelCode),
-    ]
-
-    if (options.syncJob) {
-      tasks.push(getOutlineJob({ novelCode }))
-    }
-
-    const [outlineRes, compressedRes, jobRes] = await Promise.all(tasks)
-    outline.value = (outlineRes as Awaited<ReturnType<typeof findNovelOutline>>)
-      .data ?? null
-    compressedOutline.value = (
-      compressedRes as Awaited<ReturnType<typeof findCompressedNovelOutline>>
-    ).data ?? null
-
-    if (options.syncJob) {
-      currentJob.value =
-        (jobRes as Awaited<ReturnType<typeof getOutlineJob>>)?.data ?? null
-    }
-
-    queryNovelCode.value = novelCode
-    operationForm.novelCode = novelCode
-    if (outline.value?.novelCode) {
-      form.novelCode = outline.value.novelCode
-    }
-    if (!options.silent) {
-      antMessage.success('数据已刷新')
-    }
-  } catch (error: any) {
-    if (!options.silent) {
-      antMessage.error(
-        error?.response?.data?.msg || error?.message || '查询失败',
-      )
-    }
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '启动失败')
   } finally {
-    loadingKnowledge.value = false
+    generating.value = false
   }
 }
 
-async function handleListJobs() {
-  const code = recoverForm.novelCode.trim()
-  if (!code) {
-    antMessage.warning('请先输入 novelCode')
-    return
-  }
-
-  listingJobs.value = true
-  try {
-    const res = await getOutlineJobs({
-      novelCode: code,
-      current: 1,
-      pageSize: 100,
-    })
-    const jobs = res.data?.list || []
-    jobOptions.value = jobs.map((job) => ({
-      value: job.jobId,
-      label: `${job.jobId} [${statusText(job.status)}] ${processedChunks(job)}/${job.totalChunks}`,
-      desc: `原文：${job.sourceFileName} · 创建：${formatTime(job.createdAt)}`,
-    }))
-    recoverForm.jobId = ''
-    if (!jobs.length) {
-      antMessage.info('该 novelCode 没有历史任务')
-    } else {
-      antMessage.success(`共 ${jobs.length} 条历史任务`)
-    }
-  } catch (error: any) {
-    antMessage.error(error?.response?.data?.msg || error?.message || '查询失败')
-  } finally {
-    listingJobs.value = false
-  }
-}
-
-async function handleRecover() {
-  if (!recoverForm.jobId) return
-  recovering.value = true
-  try {
-    const res = await getOutlineJob({ jobId: recoverForm.jobId })
-    if (!res.data) {
-      antMessage.error('未查到该任务')
-      return
-    }
-
-    currentJob.value = res.data
-    queryNovelCode.value = res.data.novelCode
-    operationForm.novelCode = res.data.novelCode
-    form.novelCode = res.data.novelCode
-    await loadKnowledge(res.data.novelCode, { syncJob: false, silent: true })
-    antMessage.success('任务已恢复')
-  } catch (error: any) {
-    antMessage.error(error?.response?.data?.msg || error?.message || '恢复失败')
-  } finally {
-    recovering.value = false
-  }
-}
-
-function startPolling(novelCode: string) {
+/**
+ * 轮询当前任务状态 + 最新大纲
+ */
+function startPolling() {
   stopPolling()
   pollTimer = setInterval(async () => {
-    if (pollBusy) return
-    pollBusy = true
+    if (!currentJob.value) return
     try {
-      await loadKnowledge(novelCode, { syncJob: true, silent: true })
-      const status = currentJob.value?.status
-      if (status && ['done', 'failed', 'aborted'].includes(status)) {
+      const [jobRes, outlineRes] = await Promise.all([
+        getOutlineJobStatus(currentJob.value.jobId),
+        getNovelOutline(currentJob.value.novelCode),
+      ])
+      if (jobRes.data) currentJob.value = jobRes.data
+      outline.value = outlineRes.data ?? null
+
+      // 终态则停止轮询
+      const s = currentJob.value.status
+      if (s === 'done' || s === 'failed' || s === 'aborted') {
         stopPolling()
+        if (s === 'done') antMessage.success('大纲生成完成')
+        if (s === 'failed')
+          antMessage.error(
+            '生成失败：' + (currentJob.value.lastError || '未知错误'),
+          )
       }
-    } catch {
-      // ignore
-    } finally {
-      pollBusy = false
+    } catch (e) {
+      // 轮询错误不打断，下一轮继续
+      console.warn('轮询失败', e)
     }
   }, 3000)
 }
@@ -908,23 +579,189 @@ function stopPolling() {
   }
 }
 
-function formatTime(value?: string) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  const pad = (num: number) => String(num).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+/**
+ * 中止任务
+ * 关键：后端会保留切片文件和 processedChunks，后续可继续生成。
+ */
+async function handleAbort() {
+  if (!currentJob.value) return
+  // 先停轮询：即便接口失败，也不要继续每 3s 去查状态（接口 500 会不停刷错误提示）
+  stopPolling()
+  try {
+    await abortOutlineJob(currentJob.value.jobId)
+    antMessage.success('已中止')
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '中止失败')
+  } finally {
+    // 无论成功失败，都拉一次最新状态，把 UI 刷到最新（后端可能已经置为 aborted）
+    try {
+      await handleRefresh()
+    } catch {
+      // handleRefresh 失败就不再追加提示，避免叠加 toast
+    }
+  }
 }
 
+/**
+ * 手动刷新任务状态
+ */
+async function handleRefresh() {
+  if (!currentJob.value) return
+  const res = await getOutlineJobStatus(currentJob.value.jobId)
+  if (res.data) currentJob.value = res.data
+  await loadOutline()
+}
+
+/**
+ * 加载大纲（右侧查询）
+ */
+async function loadOutline() {
+  const code = queryNovelCode.value || currentJob.value?.novelCode
+  if (!code) return
+  try {
+    const res = await getNovelOutline(code)
+    outline.value = res.data ?? null
+  } catch (e) {
+    // ignore
+  }
+}
+
+/**
+ * 别名管理相关状态
+ */
+const aliasCandidates = ref<
+  Array<{ characterName: string; aliases: string[]; aliasCandidates: string[] }>
+>([])
+const loadingAliasCandidates = ref(false)
+const selectedAliases = ref<Record<string, string[]>>({}) // 记录每个人物选中的候选别名
+const activeAliasCollapse = ref<number | undefined>(undefined) // 当前展开的折叠面板
+
+/**
+ * 加载别名候选列表
+ */
+async function loadAliasCandidates() {
+  const code = queryNovelCode.value || currentJob.value?.novelCode
+  if (!code) return
+  loadingAliasCandidates.value = true
+  try {
+    const res = await getAliasCandidates(code)
+    aliasCandidates.value = res.data || []
+    // 初始化选中状态
+    selectedAliases.value = {}
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '加载别名候选失败')
+  } finally {
+    loadingAliasCandidates.value = false
+  }
+}
+
+/**
+ * 确认合并选中的别名
+ */
+async function confirmMergeAliases(characterName: string) {
+  const code = queryNovelCode.value || currentJob.value?.novelCode
+  if (!code) return
+
+  const toConfirm = selectedAliases.value[characterName]
+  if (!toConfirm || toConfirm.length === 0) {
+    antMessage.warning('请先选择要合并的别名')
+    return
+  }
+
+  try {
+    await mergeAlias({
+      novelCode: code,
+      characterName,
+      aliasesToConfirm: toConfirm,
+    })
+    antMessage.success('别名合并成功')
+    // 重新加载大纲和别名候选
+    await loadOutline()
+    await loadAliasCandidates()
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '合并失败')
+  }
+}
+
+/**
+ * 列出指定 novelCode 的历史任务，填充下拉选项
+ */
+async function handleListJobs() {
+  const code = recoverForm.novelCode.trim()
+  if (!code) {
+    antMessage.warning('请先输入 novelCode')
+    return
+  }
+  listingJobs.value = true
+  try {
+    const res = await listOutlineJobs(code)
+    const jobs = res.data || []
+    jobOptions.value = jobs.map((j) => ({
+      value: j.jobId,
+      // 下拉关闭时显示的紧凑文案
+      label: `${j.jobId}  [${j.status}]  ${j.processedChunks}/${j.totalChunks}`,
+      // 下拉展开时副标题，便于区分同一 novelCode 下的多次上传
+      desc: `原文：${j.sourceFileName}  · 创建：${formatTime(j.createdAt)}`,
+    }))
+    recoverForm.jobId = ''
+    if (!jobs.length) antMessage.info('该 novelCode 没有历史任务')
+    else antMessage.success(`共 ${jobs.length} 条历史任务`)
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '查询失败')
+  } finally {
+    listingJobs.value = false
+  }
+}
+
+/**
+ * 根据选中的 jobId 恢复任务：拉取 job 快照 + 大纲，按状态决定是否重启轮询
+ */
+async function handleRecover() {
+  if (!recoverForm.jobId) return
+  recovering.value = true
+  try {
+    const res = await getOutlineJobStatus(recoverForm.jobId)
+    if (!res.data) {
+      antMessage.error('未查到该任务')
+      return
+    }
+    currentJob.value = res.data
+    queryNovelCode.value = res.data.novelCode
+    // 同步到上传表单的 novelCode，便于后续继续生成 / 中止按钮的语义统一
+    form.novelCode = res.data.novelCode
+    await loadOutline()
+    // 若任务仍被标记为生成中（可能是后端重启后残留），打开轮询让 UI 感知最新状态
+    if (res.data.status === 'generating') {
+      startPolling()
+      antMessage.warning(
+        '任务状态仍为 generating，若确认后端已停止，请点击"继续生成大纲"强制续跑',
+      )
+    } else {
+      antMessage.success('任务已恢复')
+    }
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '恢复失败')
+  } finally {
+    recovering.value = false
+  }
+}
+
+/**
+ * 格式化时间戳为短文本（下拉副标题用）
+ */
+function formatTime(t?: string): string {
+  if (!t) return '-'
+  const d = new Date(t)
+  if (Number.isNaN(d.getTime())) return t
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// 切换 novelCode 时自动清掉旧大纲
 watch(
   () => form.novelCode,
-  (value) => {
-    if (value && !queryNovelCode.value) {
-      queryNovelCode.value = value
-    }
-    if (value && !operationForm.novelCode) {
-      operationForm.novelCode = value
-    }
+  (v) => {
+    if (v && !queryNovelCode.value) queryNovelCode.value = v
   },
 )
 
@@ -935,152 +772,75 @@ onBeforeUnmount(() => {
 
 <style lang="less" scoped>
 .novel-outline-page {
-  display: grid;
-  grid-template-columns: 400px minmax(0, 1fr);
+  display: flex;
   gap: 16px;
   padding: 16px;
-  min-height: 100%;
+  height: 100%;
   box-sizing: border-box;
-  background:
-    radial-gradient(circle at top left, rgba(247, 201, 72, 0.12), transparent 28%),
-    linear-gradient(180deg, #fffdf8 0%, #f7f8fc 100%);
 }
-
-.left-panel,
-.right-panel {
-  min-width: 0;
-}
-
 .left-panel {
-  display: flex;
-  flex-direction: column;
+  width: 380px;
+  flex-shrink: 0;
+  overflow-y: auto;
 }
-
-.result-card {
-  min-height: calc(100vh - 120px);
+.right-panel {
+  flex: 1;
+  overflow-y: auto;
 }
-
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.mt-12 {
+  margin-top: 12px;
 }
-
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+.mb-12 {
+  margin-bottom: 12px;
 }
-
-.metric-card {
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #fff7e8 0%, #fff 100%);
-  border: 1px solid #f3dfb7;
-}
-
-.metric-label {
+.fs-12 {
   font-size: 12px;
-  color: #8c6d1f;
+  color: #999;
 }
-
-.metric-value {
-  margin-top: 8px;
-  font-size: 28px;
-  line-height: 1;
-  font-weight: 700;
-  color: #3d2b00;
-}
-
+// 恢复任务下拉里每项的双行展示
 .job-option {
-  line-height: 1.45;
+  line-height: 1.4;
   padding: 2px 0;
 }
-
 .job-option-title {
   font-size: 13px;
 }
-
 .job-option-desc {
   font-size: 12px;
   color: #999;
 }
-
-.mb-12 {
-  margin-bottom: 12px;
-}
-
 .action-row {
   margin-top: 12px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
-
-.progress-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.fs-12 {
-  font-size: 12px;
-  color: #8c8c8c;
-}
-
-.error-text {
-  color: #ff4d4f;
-}
-
-.mono {
-  font-family:
-    'SFMono-Regular',
-    'Roboto Mono',
-    Consolas,
-    monospace;
-}
-
-.strong-text {
-  font-weight: 600;
-  color: #2f2a1f;
-}
-
-.multiline,
-.cell-multiline,
-.json-block {
+.outline-text {
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.cell-multiline {
-  line-height: 1.65;
-}
-
-.json-block {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
   margin: 0;
-  padding: 16px;
-  border-radius: 12px;
-  background: #1f2430;
-  color: #e6edf3;
-  max-height: 680px;
-  overflow: auto;
+  max-height: 600px;
+  overflow-y: auto;
+}
+.char-detail {
   font-size: 12px;
+  color: #555;
+  line-height: 1.8;
+  max-width: 60%;
 }
-
-@media (max-width: 1200px) {
-  .novel-outline-page {
-    grid-template-columns: 1fr;
-  }
-
-  .metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+// 人物表格单元格：允许按 formatMultiPoint 的换行自然换行
+.char-table {
+  :deep(.ant-table-cell) {
+    vertical-align: top;
   }
 }
-
-@media (max-width: 768px) {
-  .metrics-grid {
-    grid-template-columns: 1fr;
-  }
+.cell-multiline {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  font-size: 13px;
 }
 </style>
