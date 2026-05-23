@@ -20,6 +20,7 @@ import {
 import { SplitterService } from './splitter.service';
 import { OpenaiService } from 'src/shared/openai/openai.service';
 import { normalize, toStringArray, uniqueStrings } from './outline-merge.utils';
+import { OutlineCompressionService } from './outline-compression.service';
 
 /**
  * 小说大纲生成核心服务
@@ -66,6 +67,7 @@ export class NovelOutlineService {
     private outlineModel: Model<NovelOutlineDocument>,
     private readonly splitter: SplitterService,
     private readonly openaiService: OpenaiService,
+    private readonly outlineCompressionService: OutlineCompressionService,
   ) {
     this.uploadRoot = path.resolve(process.cwd(), 'uploads', 'novel-splits');
   }
@@ -212,6 +214,14 @@ export class NovelOutlineService {
     }
 
     return this.outlineModel.findOne({ novelCode: normalizedNovelCode }).exec();
+  }
+
+  async findCompressedByNovelCode(novelCode: string) {
+    return this.outlineCompressionService.findByNovelCode(novelCode);
+  }
+
+  async buildCompressedByNovelCode(novelCode: string) {
+    return this.outlineCompressionService.buildFromNovelCode(novelCode);
   }
 
   /**
@@ -375,6 +385,15 @@ export class NovelOutlineService {
             lastError: '',
           },
         });
+      }
+
+      try {
+        await this.outlineCompressionService.buildFromNovelCode(novelCode);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `compressed 层生成失败，但原始 outline 已完成: novelCode=${novelCode}, error=${message}`,
+        );
       }
 
       return (await this.jobModel.findOne(jobFilter).exec())!;

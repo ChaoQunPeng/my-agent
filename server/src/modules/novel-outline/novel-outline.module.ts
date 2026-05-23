@@ -4,6 +4,7 @@ import { NovelOutlineController } from './novel-outline.controller';
 import { NovelOutlineService } from './novel-outline.service';
 import { SplitterService } from './splitter.service';
 import { OutlineGeneratorService } from './outline-generator.service';
+import { OutlineCompressionService } from './outline-compression.service';
 import {
   NovelSplitJob,
   NovelSplitJobSchema,
@@ -12,6 +13,10 @@ import {
   NovelOutline,
   NovelOutlineSchema,
 } from './schemas/novel-outline.schema';
+import {
+  NovelOutlineCompressed,
+  NovelOutlineCompressedSchema,
+} from './schemas/novel-outline-compressed.schema';
 import { OpenaiModule } from '../../shared/openai/openai.module';
 
 /**
@@ -23,11 +28,20 @@ import { OpenaiModule } from '../../shared/openai/openai.module';
     MongooseModule.forFeature([
       { name: NovelSplitJob.name, schema: NovelSplitJobSchema },
       { name: NovelOutline.name, schema: NovelOutlineSchema },
+      {
+        name: NovelOutlineCompressed.name,
+        schema: NovelOutlineCompressedSchema,
+      },
     ]),
     OpenaiModule,
   ],
   controllers: [NovelOutlineController],
-  providers: [NovelOutlineService, SplitterService, OutlineGeneratorService],
+  providers: [
+    NovelOutlineService,
+    SplitterService,
+    OutlineGeneratorService,
+    OutlineCompressionService,
+  ],
   exports: [NovelOutlineService],
 })
 export class NovelOutlineModule {}
