@@ -32,10 +32,6 @@ import {
 } from './schemas/novel-events.schema';
 import { SplitterService } from './splitter.service';
 import { OpenaiService } from 'src/shared/openai/openai.service';
-import {
-  StructuredConsolidationService,
-  StructuredStringField,
-} from 'src/shared/openai/structured-consolidation.service';
 import { normalize, toStringArray, uniqueStrings } from './outline-merge.utils';
 
 /**
@@ -92,7 +88,6 @@ export class NovelOutlineService {
     private eventSummaryModel: Model<NovelEventsDocument>,
     private readonly splitter: SplitterService,
     private readonly openaiService: OpenaiService,
-    private readonly structuredConsolidationService: StructuredConsolidationService,
   ) {
     this.uploadRoot = path.resolve(process.cwd(), 'uploads', 'novel-splits');
   }
@@ -441,10 +436,17 @@ export class NovelOutlineService {
       throw new BadRequestException('novelCode 不能为空');
     }
 
+    this.logger.log(
+      `[second-pass] 开始第二轮归纳 novelCode=${normalizedNovelCode}`,
+    );
+
     const latestJob = await this.findSplitJob({ novelCode: normalizedNovelCode });
     if (latestJob && latestJob.status !== 'done') {
       throw new BadRequestException('第一轮提取尚未完成，暂不能进行第二轮归纳');
     }
+    this.logger.log(
+      `[second-pass] 第一轮状态检查完成 novelCode=${normalizedNovelCode}, latestJobStatus=${latestJob?.status ?? 'none'}`,
+    );
 
     const outline = await this.outlineModel
       .findOne({ novelCode: normalizedNovelCode })
@@ -454,8 +456,18 @@ export class NovelOutlineService {
         `未找到小说 ${normalizedNovelCode} 的第一轮提取结果`,
       );
     }
+    this.logger.log(
+      `[second-pass] 第一轮结果已加载 novelCode=${normalizedNovelCode}, characters=${outline.characters?.length || 0}, events=${outline.events?.length || 0}, worldView=${this.formatWorldViewStats(outline.worldView || {})}`,
+    );
 
-    const worldView = await this.consolidateWorldView(outline.worldView || {});
+    this.logger.log(
+      `[second-pass] 进入世界观二次归纳 novelCode=${normalizedNovelCode}`,
+    );
+    const worldView = await this.consolidateWorldView(outline);
+    this.logger.log(
+      `[second-pass] 世界观二次归纳完成 novelCode=${normalizedNovelCode}, worldView=${this.formatWorldViewStats(worldView)}`,
+    );
+
     const characters = (outline.characters || [])
       .map((character) => ({
         name: normalize(character.name),
@@ -476,6 +488,10 @@ export class NovelOutlineService {
         chunkIndex: event.chunkIndex ?? 0,
       }))
       .filter((event) => event.title);
+
+    this.logger.log(
+      `[second-pass] 第二轮写库准备完成 novelCode=${normalizedNovelCode}, characters=${characters.length}, events=${events.length}, worldView=${this.formatWorldViewStats(worldView)}`,
+    );
 
     await Promise.all([
       this.worldViewModel.findOneAndUpdate(
@@ -521,6 +537,10 @@ export class NovelOutlineService {
         },
       ),
     ]);
+
+    this.logger.log(
+      `[second-pass] 第二轮结果写库完成 novelCode=${normalizedNovelCode}, characters=${characters.length}, events=${events.length}, worldView=${this.formatWorldViewStats(worldView)}`,
+    );
 
     return {
       novelCode: normalizedNovelCode,
@@ -939,40 +959,202 @@ export class NovelOutlineService {
   }
 
   private async consolidateWorldView(
-    worldView: OutlineWorldView,
+    outline: Pick<NovelOutline, 'worldView' | 'characters' | 'events'>,
   ): Promise<Record<WorldViewFieldKey, string[]>> {
-    const fields: StructuredStringField<WorldViewFieldKey>[] = [
-      {
-        key: 'worldType',
-        label: '世界类型',
-        instruction:
-          '输出高度概括的类型标签，优先使用简短词语，不要长句，不要重复近义标签。',
-      },
-      {
-        key: 'summary',
-        label: '世界观总结',
-        instruction:
-          '合并互补描述，保留背景、能力体系、地点或时代设定，输出信息密度高的短句。',
-      },
-      {
-        key: 'socialStructure',
-        label: '社会结构',
-        instruction:
-          '合并组织、势力、阶层和制度描述；相同结构反复提到时只保留一条更完整的表述。',
-      },
-      {
-        key: 'coreRules',
-        label: '核心规则',
-        instruction:
-          '重点消解重复规则和反复强化的限制，保留明确、稳定、可复用的规则表达。',
-      },
-    ];
+    const sourceWorldView = this.normalizeWorldViewRecord(outline.worldView || {});
+    const characterClues = this.buildWorldViewCharacterClues(outline.characters || []);
+    const eventClues = this.buildWorldViewEventClues(outline.events || []);
 
-    return this.structuredConsolidationService.consolidateStringListFields({
-      entityName: '小说世界观',
-      fields,
-      rawData: worldView,
+    this.logger.log(
+      `[second-pass][worldView] 归纳输入统计 source=${this.formatWorldViewStats(sourceWorldView)}, characterClues=${characterClues.length}, eventClues=${eventClues.length}`,
+    );
+
+    if (
+      !this.hasWorldViewValues(sourceWorldView) &&
+      !characterClues.length &&
+      !eventClues.length
+    ) {
+      this.logger.log(
+        '[second-pass][worldView] 无可用输入，跳过 LLM 归纳并直接返回空结果',
+      );
+      return sourceWorldView;
+    }
+
+    const system = `
+你是小说第二轮世界观归纳助手，只负责把第一轮结果中与世界设定有关的信息整理成更完整、更稳定的 JSON。
+
+严格规则：
+- 只能基于输入内容整理，禁止补充原文中未明确出现的信息
+- 目标优先是保留信息覆盖率，其次才是去重和概括；不要为了简短而丢失有效设定
+- 对明显重复或近义的内容可以合并；如果多条信息互补，请保留为多条，而不是压成一句空泛总结
+- 要吸收人物身份、组织关系、事件背景里能够反映世界设定的线索
+- summary 重点保留世界背景、时代环境、地点空间、能力体系、技术或魔法设定
+- socialStructure 重点保留组织势力、阶层制度、阵营关系、社会运行结构
+- coreRules 重点保留能力限制、运行机制、约束规则、代价条件
+- worldType 由你根据输入内容自行归纳，输出 1 到 3 个最能概括作品类型的短标签
+- worldType 需要主动合并近义表达，避免输出语义重复或仅差修饰词的多个标签
+- worldType 不要输出带斜杠或并列组合的标签，如“都市奇幻/现代奇幻”
+- worldType 不要输出专有世界名、种族名、组织名、地点名，如“龙族”“龙族世界”“秘密世界”
+- 每个字段必须输出字符串数组；字段名必须完全保持不变
+- 输出必须是合法 JSON，不要输出解释文字
+
+输出格式：
+{
+  "worldView": {
+    "worldType": [],
+    "summary": [],
+    "socialStructure": [],
+    "coreRules": []
+  }
+}
+`;
+
+    const user = `
+归纳目标：小说世界观第二轮整理
+
+第一轮已归并世界观（直接输入，不要丢失其中的有效信息）：
+${JSON.stringify(sourceWorldView, null, 2)}
+
+人物中的世界设定线索（可帮助补充组织、身份、阵营、社会结构）：
+${JSON.stringify(characterClues, null, 2)}
+
+事件中的世界设定线索（可帮助补充背景、地点、势力、规则）：
+${JSON.stringify(eventClues, null, 2)}
+`;
+
+    this.logger.log(
+      `[second-pass][worldView] 准备调用 LLM source=${this.formatWorldViewStats(sourceWorldView)}, characterClues=${characterClues.length}, eventClues=${eventClues.length}, promptChars=${Array.from(user).length}`,
+    );
+    const llmResult = await this.callLLM<Record<string, unknown>>({
+      system,
+      user,
+      maxAttempts: 2,
     });
+    const normalizedFromLlm =
+      this.normalizeWorldResult(llmResult) || ({} as OutlineWorldView);
+    this.logger.log(
+      `[second-pass][worldView] LLM 返回完成 result=${this.formatWorldViewStats(normalizedFromLlm)}`,
+    );
+
+    const mergedWorldView = this.mergeWorldViewCoverage(
+      sourceWorldView,
+      normalizedFromLlm,
+    );
+    this.logger.log(
+      `[second-pass][worldView] 合并保底完成 source=${this.formatWorldViewStats(sourceWorldView)}, llm=${this.formatWorldViewStats(normalizedFromLlm)}, merged=${this.formatWorldViewStats(mergedWorldView)}`,
+    );
+
+    return mergedWorldView;
+  }
+
+  private normalizeWorldViewRecord(
+    worldView: OutlineWorldView,
+  ): Record<WorldViewFieldKey, string[]> {
+    return {
+      worldType: this.normalizeWorldTypeList(toStringArray(worldView.worldType)),
+      summary: uniqueStrings(toStringArray(worldView.summary)),
+      socialStructure: uniqueStrings(toStringArray(worldView.socialStructure)),
+      coreRules: uniqueStrings(toStringArray(worldView.coreRules)),
+    };
+  }
+
+  private normalizeWorldTypeList(values: unknown[]): string[] {
+    return uniqueStrings(
+      values.flatMap((value) => this.splitWorldTypeCandidates(value)),
+    ).slice(0, 6);
+  }
+
+  private splitWorldTypeCandidates(value: unknown): string[] {
+    const text = normalize(value);
+    if (!text) return [];
+
+    return text
+      .split(/[\/／|｜、,，；;]+/)
+      .map((item) => normalize(item))
+      .filter(Boolean);
+  }
+
+  private hasWorldViewValues(
+    worldView: Record<WorldViewFieldKey, string[]>,
+  ): boolean {
+    return Object.values(worldView).some((items) => items.length > 0);
+  }
+
+  private buildWorldViewCharacterClues(
+    characters: Array<{
+      name?: string;
+      identity?: string[];
+      traits?: string[];
+      relations?: string[];
+      goals?: string[];
+    }>,
+  ) {
+    return characters
+      .map((character) => ({
+        name: normalize(character.name),
+        identity: uniqueStrings(character.identity || []).slice(0, 4),
+        traits: uniqueStrings(character.traits || []).slice(0, 4),
+        relations: uniqueStrings(character.relations || []).slice(0, 3),
+        goals: uniqueStrings(character.goals || []).slice(0, 2),
+      }))
+      .filter(
+        (character) =>
+          character.name &&
+          (character.identity.length > 0 ||
+            character.traits.length > 0 ||
+            character.relations.length > 0 ||
+            character.goals.length > 0),
+      )
+      .slice(0, 80);
+  }
+
+  private buildWorldViewEventClues(
+    events: Array<{
+      title?: string;
+      summary?: string[];
+      characters?: string[];
+      chunkIndex?: number;
+    }>,
+  ) {
+    return events
+      .map((event) => ({
+        title: normalize(event.title),
+        summary: uniqueStrings(event.summary || []).slice(0, 3),
+        characters: uniqueStrings(event.characters || []).slice(0, 6),
+        chunkIndex: event.chunkIndex ?? 0,
+      }))
+      .filter((event) => event.title || event.summary.length > 0)
+      .slice(0, 160);
+  }
+
+  private mergeWorldViewCoverage(
+    sourceWorldView: Record<WorldViewFieldKey, string[]>,
+    llmWorldView: OutlineWorldView,
+  ): Record<WorldViewFieldKey, string[]> {
+    const normalizedLlm = this.normalizeWorldViewRecord(llmWorldView || {});
+
+    return {
+      worldType: normalizedLlm.worldType.length
+        ? normalizedLlm.worldType
+        : sourceWorldView.worldType,
+      summary: uniqueStrings([
+        ...normalizedLlm.summary,
+        ...sourceWorldView.summary,
+      ]),
+      socialStructure: uniqueStrings([
+        ...normalizedLlm.socialStructure,
+        ...sourceWorldView.socialStructure,
+      ]),
+      coreRules: uniqueStrings([
+        ...normalizedLlm.coreRules,
+        ...sourceWorldView.coreRules,
+      ]),
+    };
+  }
+
+  private formatWorldViewStats(worldView: Partial<OutlineWorldView>): string {
+    const normalized = this.normalizeWorldViewRecord(worldView);
+    return `worldType=${normalized.worldType.length}, summary=${normalized.summary.length}, socialStructure=${normalized.socialStructure.length}, coreRules=${normalized.coreRules.length}`;
   }
 
   /**
