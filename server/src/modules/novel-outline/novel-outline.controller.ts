@@ -214,4 +214,12 @@ export class NovelOutlineController {
     const result = await this.novelOutlineService.startSecondPass(body.novelCode);
     return ApiResponseDto.success(result, '第二轮归纳完成');
   }
+
+  @Post('get-second-pass')
+  async getSecondPass(@Body() body: NovelCodeDto) {
+    const result = await this.novelOutlineService.findSecondPassByNovelCode(
+      body.novelCode,
+    );
+    return ApiResponseDto.success(result);
+  }
 }

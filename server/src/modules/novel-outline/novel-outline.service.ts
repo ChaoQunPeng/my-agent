@@ -530,6 +530,56 @@ export class NovelOutlineService {
     };
   }
 
+  async findSecondPassByNovelCode(novelCode: string) {
+    const normalizedNovelCode = novelCode?.trim();
+    if (!normalizedNovelCode) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+
+    const [worldView, characters, events] = await Promise.all([
+      this.worldViewModel.findOne({ novelCode: normalizedNovelCode }).lean().exec(),
+      this.characterSummaryModel
+        .findOne({ novelCode: normalizedNovelCode })
+        .lean()
+        .exec(),
+      this.eventSummaryModel.findOne({ novelCode: normalizedNovelCode }).lean().exec(),
+    ]);
+
+    if (!worldView && !characters && !events) {
+      return null;
+    }
+
+    return {
+      novelCode: normalizedNovelCode,
+      worldView: {
+        worldType: uniqueStrings(toStringArray(worldView?.worldType)),
+        summary: uniqueStrings(toStringArray(worldView?.summary)),
+        socialStructure: uniqueStrings(toStringArray(worldView?.socialStructure)),
+        coreRules: uniqueStrings(toStringArray(worldView?.coreRules)),
+      },
+      characters: (characters?.characters || [])
+        .map((character) => ({
+          name: normalize(character.name),
+          aliases: uniqueStrings(character.aliases || []),
+          aliasCandidates: uniqueStrings(character.aliasCandidates || []),
+          identity: uniqueStrings(character.identity || []),
+          personality: uniqueStrings(character.personality || []),
+          goals: uniqueStrings(character.goals || []),
+          traits: uniqueStrings(character.traits || []),
+          relations: uniqueStrings(character.relations || []),
+        }))
+        .filter((character) => character.name),
+      events: (events?.events || [])
+        .map((event) => ({
+          title: normalize(event.title),
+          summary: uniqueStrings(event.summary || []),
+          characters: uniqueStrings(event.characters || []),
+          chunkIndex: event.chunkIndex ?? 0,
+        }))
+        .filter((event) => event.title),
+    };
+  }
+
   private async resolveJob(params: ExtractParams): Promise<NovelSplitJobDocument> {
     const jobId = params.jobId?.trim();
     const novelCode = params.novelCode?.trim();

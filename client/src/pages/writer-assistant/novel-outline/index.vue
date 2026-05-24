@@ -118,6 +118,45 @@
             <a-tab-pane key="conflicts" tab="故事矛盾">
               <pre class="outline-text">{{ formatMultiPoint(outline.storyConflicts) || '（空）' }}</pre>
             </a-tab-pane>
+            <a-tab-pane key="second-world" tab="二次世界观">
+              <a-empty v-if="!secondPassResult" description="尚未进行第二轮归纳" />
+              <pre v-else class="outline-text">{{ formatMultiPoint(secondPassResult.worldSetting) || '（空）' }}</pre>
+            </a-tab-pane>
+            <a-tab-pane key="second-events" tab="二次事件">
+              <a-empty v-if="!secondPassResult" description="尚未进行第二轮归纳" />
+              <pre v-else class="outline-text">{{ formatMultiPoint(secondPassResult.eventsText) || '（空）' }}</pre>
+            </a-tab-pane>
+            <a-tab-pane key="second-characters" :tab="`二次人物 (${secondPassResult?.characters.length || 0})`">
+              <a-empty v-if="!secondPassResult || !secondPassResult.characters.length" description="尚无二次人物结果" />
+              <a-table
+                v-else
+                :columns="characterColumns"
+                :data-source="secondPassResult.characters"
+                :pagination="false"
+                size="small"
+                row-key="name"
+                bordered
+                :scroll="{ x: 1080 }"
+                class="char-table"
+              >
+                <template #bodyCell="{ column, text, record }">
+                  <template v-if="column.dataIndex === 'name' || column.dataIndex === 'identity'">
+                    {{ text || '-' }}
+                  </template>
+                  <template v-else-if="column.dataIndex === 'aliases'">
+                    <a-space wrap v-if="record.aliases && record.aliases.length > 0">
+                      <a-tag v-for="alias in record.aliases" :key="alias" color="blue">{{ alias }}</a-tag>
+                    </a-space>
+                    <span v-else>-</span>
+                  </template>
+                  <template v-else>
+                    <div class="cell-multiline">
+                      {{ formatMultiPoint(text) || '-' }}
+                    </div>
+                  </template>
+                </template>
+              </a-table>
+            </a-tab-pane>
             <a-tab-pane :key="`chars`" :tab="`人物 (${outline.characters.length})`">
               <a-empty v-if="!outline.characters.length" />
               <a-table
@@ -224,12 +263,14 @@ import {
   getOutlineJobStatus,
   abortOutlineJob,
   getNovelOutline,
+  getSecondPassSummary,
   listOutlineJobs,
   getAliasCandidates,
   mergeAlias,
   startSecondPassSummary,
   type NovelOutlineJob,
-  type NovelOutlineResult
+  type NovelOutlineResult,
+  type SecondPassResult
 } from '@/api/novel-outline'
 
 // 表单数据：novelCode + 拆分参数
@@ -247,6 +288,7 @@ const pickedFile = ref<File | null>(null)
 // 当前任务 & 大纲
 const currentJob = ref<NovelOutlineJob | null>(null)
 const outline = ref<NovelOutlineResult | null>(null)
+const secondPassResult = ref<SecondPassResult | null>(null)
 // 右侧查询用 novelCode（和上传 form 的 novelCode 可以不同）
 const queryNovelCode = ref('')
 
@@ -449,6 +491,9 @@ function startPolling() {
       ])
       if (jobRes.data) currentJob.value = jobRes.data
       outline.value = outlineRes.data ?? null
+      if (currentJob.value.status === 'done') {
+        await loadSecondPassResult(currentJob.value.novelCode)
+      }
 
       // 终态则停止轮询
       const s = currentJob.value.status
@@ -516,6 +561,7 @@ async function handleStartSecondPass() {
     const res = await startSecondPassSummary(novelCode)
     const data = res.data
     antMessage.success(`第二轮归纳完成：人物 ${data?.characterCount || 0} 条，事件 ${data?.eventCount || 0} 条`)
+    await loadSecondPassResult(novelCode)
   } catch (e: any) {
     antMessage.error(e?.response?.data?.msg || e?.message || '第二轮归纳失败')
   } finally {
@@ -530,10 +576,25 @@ async function loadOutline() {
   const code = queryNovelCode.value || currentJob.value?.novelCode
   if (!code) return
   try {
-    const res = await getNovelOutline(code)
-    outline.value = res.data ?? null
+    const [outlineRes, secondPassRes] = await Promise.all([
+      getNovelOutline(code),
+      getSecondPassSummary(code)
+    ])
+    outline.value = outlineRes.data ?? null
+    secondPassResult.value = secondPassRes.data ?? null
   } catch (e) {
     // ignore
+  }
+}
+
+async function loadSecondPassResult(novelCode?: string) {
+  const code = novelCode || queryNovelCode.value || currentJob.value?.novelCode
+  if (!code) return
+  try {
+    const res = await getSecondPassSummary(code)
+    secondPassResult.value = res.data ?? null
+  } catch {
+    secondPassResult.value = null
   }
 }
 
