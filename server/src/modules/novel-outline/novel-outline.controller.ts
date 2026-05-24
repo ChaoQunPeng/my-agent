@@ -13,6 +13,7 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Express } from 'express';
@@ -23,6 +24,8 @@ import {
   NovelCodeDto,
   SplitJobQueryDto,
   SplitJobDetailQueryDto,
+  JobIdDto,
+  MergeAliasDto,
 } from './dto/novel-outline.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
@@ -97,12 +100,29 @@ export class NovelOutlineController {
   }
 
   /**
-   * 提取单个 chunk 并增量写入大纲
+   * 启动后台提取任务
    */
   @Post('start-extract')
   async startExtract(@Body() body: StartExtractDto) {
-    const job = await this.novelOutlineService.startExtract(body);
-    return ApiResponseDto.success(job, '提取完成');
+    const job = await this.novelOutlineService.startExtractInBackground(body);
+    return ApiResponseDto.success(job, '任务已启动');
+  }
+
+  /**
+   * 兼容旧版前端：按 jobId 启动生成
+   */
+  @Post('start-generate')
+  async startGenerate(@Body() body: JobIdDto) {
+    const job = await this.novelOutlineService.findSplitJob({ jobId: body.jobId });
+    if (!job) {
+      throw new NotFoundException(`未找到任务 ${body.jobId}`);
+    }
+
+    const result = await this.novelOutlineService.startExtractInBackground({
+      jobId: body.jobId,
+      novelCode: job.novelCode,
+    });
+    return ApiResponseDto.success(result, '任务已启动');
   }
 
   /**
@@ -110,6 +130,17 @@ export class NovelOutlineController {
    */
   @Post('find-by-novel-code')
   async findByNovelCode(@Body() body: NovelCodeDto) {
+    const result = await this.novelOutlineService.findByNovelCode(
+      body.novelCode,
+    );
+    return ApiResponseDto.success(result);
+  }
+
+  /**
+   * 兼容旧版前端：获取大纲
+   */
+  @Post('get-outline')
+  async getOutline(@Body() body: NovelCodeDto) {
     const result = await this.novelOutlineService.findByNovelCode(
       body.novelCode,
     );
@@ -126,11 +157,55 @@ export class NovelOutlineController {
   }
 
   /**
+   * 兼容旧版前端：仅返回任务列表数组
+   */
+  @Post('list-jobs')
+  async listJobs(@Body() body: NovelCodeDto) {
+    const result = await this.novelOutlineService.findSplitJobs({
+      novelCode: body.novelCode,
+      current: 1,
+      pageSize: 100,
+    });
+    return ApiResponseDto.success(result.list);
+  }
+
+  /**
    * 根据 jobId 或 novelCode 获取单个 novel_split_jobs 数据
    */
   @Post('get-split-job')
   async getSplitJob(@Body() body: SplitJobDetailQueryDto) {
     const result = await this.novelOutlineService.findSplitJob(body);
     return ApiResponseDto.success(result);
+  }
+
+  /**
+   * 兼容旧版前端：按 jobId 查询任务状态
+   */
+  @Post('job-status')
+  async getJobStatus(@Body() body: JobIdDto) {
+    const result = await this.novelOutlineService.findSplitJob({
+      jobId: body.jobId,
+    });
+    return ApiResponseDto.success(result);
+  }
+
+  @Post('abort-job')
+  async abortJob(@Body() body: JobIdDto) {
+    const result = await this.novelOutlineService.abortJob(body.jobId);
+    return ApiResponseDto.success(result, '任务已中止');
+  }
+
+  @Post('get-alias-candidates')
+  async getAliasCandidates(@Body() body: NovelCodeDto) {
+    const result = await this.novelOutlineService.getAliasCandidates(
+      body.novelCode,
+    );
+    return ApiResponseDto.success(result);
+  }
+
+  @Post('merge-alias')
+  async mergeAlias(@Body() body: MergeAliasDto) {
+    const result = await this.novelOutlineService.mergeAlias(body);
+    return ApiResponseDto.success(result, '别名合并成功');
   }
 }

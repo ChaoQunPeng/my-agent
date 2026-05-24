@@ -1,8 +1,5 @@
 import request from '@/utils/request'
 
-/**
- * 任务状态
- */
 export type NovelOutlineJobStatus =
   | 'splitting'
   | 'split_done'
@@ -11,10 +8,7 @@ export type NovelOutlineJobStatus =
   | 'failed'
   | 'aborted'
 
-/**
- * 任务信息（与后端 NovelSplitJob 对齐）
- */
-export interface NovelOutlineJob {
+interface RawNovelOutlineJob {
   _id?: string
   jobId: string
   novelCode: string
@@ -25,20 +19,61 @@ export interface NovelOutlineJob {
   chunkDir: string
   sourceFilePath: string
   totalChunks: number
-  splittedChunks: number
-  processedChunks: number
-  processingChunkIndex: number
-  lastCompletedChunkIndex: number
-  lastCompletedChunkFile: string
+  splittedChunks?: number
+  processedChunks?: number
+  processingChunkIndex?: number
+  lastCompletedChunkIndex?: number
+  lastCompletedChunkFile?: string
   status: NovelOutlineJobStatus
   lastError: string
   createdAt?: string
   updatedAt?: string
 }
 
-/**
- * 人物条目
- */
+export interface NovelOutlineJob extends RawNovelOutlineJob {
+  splittedChunks: number
+  processedChunks: number
+  processingChunkIndex: number
+  lastCompletedChunkIndex: number
+  lastCompletedChunkFile: string
+}
+
+interface RawOutlineCharacter {
+  name: string
+  aliases?: string[]
+  aliasCandidates?: string[]
+  identity?: string[]
+  personality?: string[]
+  goals?: string[]
+  traits?: string[]
+  relations?: string[]
+}
+
+interface RawOutlineEvent {
+  title: string
+  summary?: string[]
+  characters?: string[]
+  chunkIndex?: number
+}
+
+interface RawWorldView {
+  worldType?: string[]
+  summary?: string[]
+  socialStructure?: string[]
+  coreRules?: string[]
+}
+
+interface RawNovelOutlineResult {
+  _id?: string
+  novelCode: string
+  lastJobId: string
+  worldView?: RawWorldView
+  characters?: RawOutlineCharacter[]
+  events?: RawOutlineEvent[]
+  createdAt?: string
+  updatedAt?: string
+}
+
 export interface OutlineCharacter {
   name: string
   aliases?: string[]
@@ -50,16 +85,13 @@ export interface OutlineCharacter {
   relations?: string
 }
 
-/**
- * 小说大纲（与后端 NovelOutline 对齐）
- */
 export interface NovelOutlineResult {
   _id?: string
   novelCode: string
   lastJobId: string
   synopsis: string
   worldSetting: string
-  storyConflicts: string // 故事矛盾和冲突点
+  storyConflicts: string
   plotOutline: string
   characters: OutlineCharacter[]
   rawLastResponse: string
@@ -67,10 +99,98 @@ export interface NovelOutlineResult {
   updatedAt?: string
 }
 
-/**
- * 上传 txt 并启动拆分
- * 注意：使用 multipart/form-data
- */
+function normalizeStringList(values?: Array<string | undefined | null>): string[] {
+  return Array.from(
+    new Set(
+      (values || [])
+        .map((value) => (value || '').trim())
+        .filter(Boolean),
+    ),
+  )
+}
+
+function joinLines(values?: Array<string | undefined | null>): string {
+  return normalizeStringList(values).join('\n')
+}
+
+function formatEvent(event: RawOutlineEvent, index: number): string {
+  const body = joinLines(event.summary)
+  return body ? `${index + 1}. ${event.title}\n${body}` : `${index + 1}. ${event.title}`
+}
+
+function normalizeJob(job: RawNovelOutlineJob): NovelOutlineJob {
+  const totalChunks = job.totalChunks || 0
+  const lastCompletedChunkIndex = job.lastCompletedChunkIndex || 0
+  const processingChunkIndex = job.processingChunkIndex || 0
+  const splittedChunks =
+    job.splittedChunks ??
+    (job.status === 'splitting'
+      ? Math.min(processingChunkIndex, totalChunks)
+      : totalChunks)
+  const processedChunks = job.processedChunks ?? lastCompletedChunkIndex
+  const lastCompletedChunkFile =
+    job.lastCompletedChunkFile ||
+    (lastCompletedChunkIndex > 0
+      ? `chunk-${String(lastCompletedChunkIndex).padStart(4, '0')}.txt`
+      : '')
+
+  return {
+    ...job,
+    totalChunks,
+    splittedChunks,
+    processedChunks,
+    processingChunkIndex,
+    lastCompletedChunkIndex,
+    lastCompletedChunkFile,
+  }
+}
+
+function normalizeOutline(outline: RawNovelOutlineResult | null): NovelOutlineResult | null {
+  if (!outline) return null
+
+  const worldView = outline.worldView || {}
+  const events = outline.events || []
+  const characters = (outline.characters || []).map((character) => ({
+    name: character.name,
+    aliases: normalizeStringList(character.aliases),
+    aliasCandidates: normalizeStringList(character.aliasCandidates),
+    identity: joinLines(character.identity),
+    personality: joinLines(character.personality),
+    goals: joinLines(character.goals),
+    traits: joinLines(character.traits),
+    relations: joinLines(character.relations),
+  }))
+
+  const synopsisParts = events.slice(0, 8).map((event, index) => formatEvent(event, index))
+  const worldSettingParts = [
+    ...normalizeStringList(worldView.worldType).map((value) => `世界类型：${value}`),
+    ...normalizeStringList(worldView.summary),
+    ...normalizeStringList(worldView.socialStructure).map(
+      (value) => `社会结构：${value}`,
+    ),
+    ...normalizeStringList(worldView.coreRules).map((value) => `核心规则：${value}`),
+  ]
+  const plotOutlineParts = events.map((event, index) => formatEvent(event, index))
+  const storyConflictParts = normalizeStringList([
+    ...characters.flatMap((character) => [character.goals, character.relations]),
+    ...events.flatMap((event) => event.summary || []),
+  ])
+
+  return {
+    _id: outline._id,
+    novelCode: outline.novelCode,
+    lastJobId: outline.lastJobId,
+    synopsis: synopsisParts.join('\n\n'),
+    worldSetting: worldSettingParts.join('\n'),
+    storyConflicts: storyConflictParts.join('\n'),
+    plotOutline: plotOutlineParts.join('\n\n'),
+    characters,
+    rawLastResponse: '',
+    createdAt: outline.createdAt,
+    updatedAt: outline.updatedAt,
+  }
+}
+
 export function uploadAndSplitNovel(params: {
   novelCode: string
   chunkSize?: number
@@ -81,64 +201,78 @@ export function uploadAndSplitNovel(params: {
   form.append('novelCode', params.novelCode)
   if (params.chunkSize != null)
     form.append('chunkSize', String(params.chunkSize))
-  if (params.overlap != null) form.append('overlap', String(params.overlap))
+  if (params.overlap != null)
+    form.append('overlap', String(params.overlap))
   form.append('file', params.file)
 
-  return request.post<NovelOutlineJob>(
+  return request.post<RawNovelOutlineJob>(
     '/novel-outline/upload-and-split',
     form,
     {
       headers: { 'Content-Type': 'multipart/form-data' },
-      // 大文件需要放宽超时
       timeout: 300000,
     },
-  )
+  ).then((res) => ({
+    ...res,
+    data: res.data ? normalizeJob(res.data) : res.data,
+  }))
 }
 
-/**
- * 启动（或续跑）大纲生成
- */
 export function startGenerateOutline(jobId: string) {
-  return request.post<NovelOutlineJob>('/novel-outline/start-generate', {
+  return request.post<RawNovelOutlineJob>('/novel-outline/start-generate', {
     jobId,
-  })
+  }).then((res) => ({
+    ...res,
+    data: res.data ? normalizeJob(res.data) : res.data,
+  }))
 }
 
-/**
- * 查询任务状态
- */
 export function getOutlineJobStatus(jobId: string) {
-  return request.post<NovelOutlineJob>('/novel-outline/job-status', { jobId })
+  return request.post<RawNovelOutlineJob | null>('/novel-outline/get-split-job', {
+    jobId,
+  }).then((res) => ({
+    ...res,
+    data: res.data ? normalizeJob(res.data) : null,
+  }))
 }
 
-/**
- * 中止任务，后端保留切片和进度以便续跑
- */
 export function abortOutlineJob(jobId: string) {
-  return request.post('/novel-outline/abort-job', { jobId })
+  return request.post<RawNovelOutlineJob>('/novel-outline/abort-job', {
+    jobId,
+  }).then((res) => ({
+    ...res,
+    data: res.data ? normalizeJob(res.data) : res.data,
+  }))
 }
 
-/**
- * 获取大纲结果
- */
 export function getNovelOutline(novelCode: string) {
-  return request.post<NovelOutlineResult | null>('/novel-outline/get-outline', {
-    novelCode,
-  })
+  return request.post<RawNovelOutlineResult | null>(
+    '/novel-outline/find-by-novel-code',
+    {
+      novelCode,
+    },
+  ).then((res) => ({
+    ...res,
+    data: normalizeOutline(res.data ?? null),
+  }))
 }
 
-/**
- * 按 novelCode 查询任务列表
- */
 export function listOutlineJobs(novelCode: string) {
-  return request.post<NovelOutlineJob[]>('/novel-outline/list-jobs', {
+  return request.post<{
+    list: RawNovelOutlineJob[]
+    total: number
+    current: number
+    pageSize: number
+  }>('/novel-outline/get-split-jobs', {
     novelCode,
-  })
+    current: 1,
+    pageSize: 100,
+  }).then((res) => ({
+    ...res,
+    data: (res.data?.list || []).map(normalizeJob),
+  }))
 }
 
-/**
- * 获取待确认的别名候选列表
- */
 export function getAliasCandidates(novelCode: string) {
   return request.post<
     Array<{
@@ -149,9 +283,6 @@ export function getAliasCandidates(novelCode: string) {
   >('/novel-outline/get-alias-candidates', { novelCode })
 }
 
-/**
- * 合并别名（将候选别名确认为正式别名）
- */
 export function mergeAlias(params: {
   novelCode: string
   characterName: string

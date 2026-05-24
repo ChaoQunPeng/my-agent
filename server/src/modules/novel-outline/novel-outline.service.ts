@@ -27,7 +27,8 @@ import { normalize, toStringArray, uniqueStrings } from './outline-merge.utils';
  */
 
 interface ExtractParams {
-  novelCode: string;
+  novelCode?: string;
+  jobId?: string;
 
   signal?: AbortSignal;
 }
@@ -59,6 +60,7 @@ export class NovelOutlineService {
   // 上传根目录（放在 server/uploads/novel-splits 下）
   private readonly uploadRoot: string;
   private readonly logger = new Logger(NovelOutlineService.name);
+  private readonly runningJobs = new Map<string, AbortController>();
   constructor(
     @InjectModel(NovelSplitJob.name)
     private jobModel: Model<NovelSplitJobDocument>,
@@ -115,6 +117,8 @@ export class NovelOutlineService {
       chunkDir,
       sourceFilePath,
       totalChunks: estimated,
+      splittedChunks: 0,
+      processedChunks: 0,
       status: 'splitting',
     });
 
@@ -277,17 +281,162 @@ export class NovelOutlineService {
     throw new BadRequestException('jobId 或 novelCode 不能为空');
   }
 
-  /**
-   * 启动生成任务
-   */
-  async startExtract(params: ExtractParams) {
-    const novelCode = params.novelCode?.trim();
-    const { signal } = params;
-    if (!novelCode) {
-      throw new BadRequestException('novelCode 不能为空');
+  async startExtractInBackground(params: ExtractParams): Promise<NovelSplitJob> {
+    const job = await this.resolveJob(params);
+    if (job.status === 'splitting') {
+      throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
+    }
+    if (job.status === 'done') {
+      return job;
     }
 
-    const job = await this.jobModel
+    const runningController = this.runningJobs.get(job.jobId);
+    if (runningController && !runningController.signal.aborted) {
+      return job;
+    }
+
+    const controller = new AbortController();
+    this.runningJobs.set(job.jobId, controller);
+
+    await this.jobModel.updateOne(
+      { _id: job._id },
+      {
+        $set: {
+          status: 'generating',
+          lastError: '',
+        },
+      },
+    );
+
+    void this.startExtract({
+      jobId: job.jobId,
+      novelCode: job.novelCode,
+      signal: controller.signal,
+    })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`后台提取任务失败 jobId=${job.jobId}: ${message}`);
+      })
+      .finally(() => {
+        const current = this.runningJobs.get(job.jobId);
+        if (current === controller) {
+          this.runningJobs.delete(job.jobId);
+        }
+      });
+
+    return (await this.jobModel.findOne({ jobId: job.jobId }).exec())!;
+  }
+
+  async abortJob(jobId: string): Promise<NovelSplitJob> {
+    const normalizedJobId = jobId?.trim();
+    if (!normalizedJobId) {
+      throw new BadRequestException('jobId 不能为空');
+    }
+
+    const job = await this.jobModel.findOne({ jobId: normalizedJobId }).exec();
+    if (!job) {
+      throw new NotFoundException(`未找到任务 ${normalizedJobId}`);
+    }
+
+    const controller = this.runningJobs.get(normalizedJobId);
+    controller?.abort();
+    this.runningJobs.delete(normalizedJobId);
+
+    await this.jobModel.updateOne(
+      { _id: job._id },
+      {
+        $set: {
+          status: 'aborted',
+          lastError: '任务已中止',
+          processingChunkIndex:
+            job.lastCompletedChunkIndex || job.processingChunkIndex || 0,
+          processedChunks: job.lastCompletedChunkIndex || job.processedChunks || 0,
+        },
+      },
+    );
+
+    return (await this.jobModel.findOne({ jobId: normalizedJobId }).exec())!;
+  }
+
+  async getAliasCandidates(novelCode: string) {
+    const outline = await this.findByNovelCode(novelCode);
+    if (!outline) {
+      return [];
+    }
+
+    return (outline.characters || [])
+      .map((character) => ({
+        characterName: character.name,
+        aliases: uniqueStrings(character.aliases || []),
+        aliasCandidates: uniqueStrings(character.aliasCandidates || []),
+      }))
+      .filter((character) => character.aliasCandidates.length > 0);
+  }
+
+  async mergeAlias(params: {
+    novelCode: string;
+    characterName: string;
+    aliasesToConfirm: string[];
+  }): Promise<NovelOutline> {
+    const novelCode = params.novelCode?.trim();
+    const characterName = normalize(params.characterName);
+    if (!novelCode || !characterName) {
+      throw new BadRequestException('novelCode 和 characterName 不能为空');
+    }
+
+    const outline = await this.outlineModel.findOne({ novelCode }).exec();
+    if (!outline) {
+      throw new NotFoundException(`未找到小说 ${novelCode} 的大纲数据`);
+    }
+
+    const target = (outline.characters || []).find(
+      (character) => normalize(character.name) === characterName,
+    );
+    if (!target) {
+      throw new NotFoundException(`未找到角色 ${params.characterName}`);
+    }
+
+    const aliasesToConfirm = uniqueStrings(params.aliasesToConfirm || []);
+    if (!aliasesToConfirm.length) {
+      throw new BadRequestException('aliasesToConfirm 不能为空');
+    }
+
+    target.aliases = uniqueStrings([...(target.aliases || []), ...aliasesToConfirm]);
+    target.aliasCandidates = uniqueStrings(target.aliasCandidates || []).filter(
+      (alias) => !aliasesToConfirm.includes(alias),
+    );
+
+    await outline.save();
+    return outline;
+  }
+
+  private async resolveJob(params: ExtractParams): Promise<NovelSplitJobDocument> {
+    const jobId = params.jobId?.trim();
+    const novelCode = params.novelCode?.trim();
+
+    let job: NovelSplitJobDocument | null = null;
+    if (jobId) {
+      job = await this.jobModel
+        .findOne({
+          jobId,
+          chunkDir: { $ne: '' },
+          totalChunks: { $gt: 0 },
+        })
+        .exec();
+      if (!job) {
+        throw new NotFoundException(`未找到任务 ${jobId}`);
+      }
+      if (novelCode && job.novelCode !== novelCode) {
+        throw new BadRequestException('jobId 与 novelCode 不匹配');
+      }
+      return job;
+    }
+
+    if (!novelCode) {
+      throw new BadRequestException('jobId 或 novelCode 不能为空');
+    }
+
+    job = await this.jobModel
       .findOne({
         novelCode,
         chunkDir: { $ne: '' },
@@ -298,6 +447,18 @@ export class NovelOutlineService {
     if (!job) {
       throw new NotFoundException(`未找到小说 ${novelCode} 对应的拆分任务`);
     }
+
+    return job;
+  }
+
+  /**
+   * 启动生成任务
+   */
+  async startExtract(params: ExtractParams) {
+    const { signal } = params;
+    const job = await this.resolveJob(params);
+    const novelCode = job.novelCode;
+    const jobId = job.jobId;
     if (job.status === 'splitting') {
       throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
     }
@@ -336,6 +497,7 @@ export class NovelOutlineService {
             status: 'generating',
             processingChunkIndex: chunkIndex,
             totalChunks,
+            processedChunks: Math.max(0, chunkIndex - 1),
             lastError: '',
           },
         });
@@ -348,7 +510,7 @@ export class NovelOutlineService {
         const extractParams: ResolvedExtractParams = {
           ...params,
           novelCode,
-          jobId: job.jobId,
+          jobId,
           chunkText,
           chunkIndex,
           totalChunks,
@@ -360,7 +522,7 @@ export class NovelOutlineService {
 
         await this.mergeChunkResult({
           novelCode,
-          jobId: job.jobId,
+          jobId,
           chunkIndex,
           result,
         });
@@ -372,6 +534,8 @@ export class NovelOutlineService {
             processingChunkIndex:
               nextStatus === 'done' ? totalChunks : chunkIndex + 1,
             lastCompletedChunkIndex: chunkIndex,
+            processedChunks: chunkIndex,
+            lastCompletedChunkFile: `chunk-${String(chunkIndex).padStart(4, '0')}.txt`,
             lastError: '',
           },
         });
@@ -381,10 +545,12 @@ export class NovelOutlineService {
     } catch (err) {
       const e = err as Error;
       const aborted = e?.name === 'AbortError' || signal?.aborted;
+      const latestJob = await this.jobModel.findOne(jobFilter).exec();
       await this.jobModel.updateOne(jobFilter, {
         $set: {
           status: aborted ? 'aborted' : 'failed',
           lastError: aborted ? '任务已中止' : e.message,
+          processedChunks: latestJob?.lastCompletedChunkIndex || 0,
         },
       });
       throw err;

@@ -64,11 +64,20 @@ export class NovelSplitJob {
   @Prop({ default: 0, comment: '预计切片总数' })
   totalChunks!: number;
 
+  @Prop({ default: 0, comment: '已完成拆分的切片数量' })
+  splittedChunks!: number;
+
+  @Prop({ default: 0, comment: '已完成提取的切片数量' })
+  processedChunks!: number;
+
   @Prop({ default: 0, comment: '当前正在处理的切片序号（便于展示运行进度）' })
   processingChunkIndex!: number;
 
   @Prop({ default: 0, comment: '最近一次成功完成的切片序号' })
   lastCompletedChunkIndex!: number;
+
+  @Prop({ default: '', comment: '最近一次成功完成的切片文件名' })
+  lastCompletedChunkFile!: string;
 
   // 任务状态
   @Prop({
