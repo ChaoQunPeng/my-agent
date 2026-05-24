@@ -31,96 +31,42 @@
               </template>
             </a-select>
           </a-form-item>
-          <a-button
-            type="primary"
-            block
-            :disabled="!recoverForm.jobId"
-            :loading="recovering"
-            @click="handleRecover"
-          >
-            恢复此任务
-          </a-button>
+          <a-button type="primary" block :disabled="!recoverForm.jobId" :loading="recovering" @click="handleRecover"> 恢复此任务 </a-button>
         </a-form>
       </a-card>
 
       <a-card title="1. 上传 TXT 并拆分" size="small">
         <a-form layout="vertical" :model="form">
           <a-form-item label="小说编码 novelCode" required>
-            <a-input
-              v-model:value="form.novelCode"
-              placeholder="如 yi_quan_po_tian"
-            />
+            <a-input v-model:value="form.novelCode" placeholder="如 yi_quan_po_tian" />
           </a-form-item>
           <a-form-item label="每块原文总字数（chunkSize）">
-            <a-input-number
-              v-model:value="form.chunkSize"
-              :min="500"
-              :max="20000"
-              :step="500"
-              style="width: 100%"
-            />
+            <a-input-number v-model:value="form.chunkSize" :min="500" :max="20000" :step="500" style="width: 100%" />
           </a-form-item>
           <a-form-item label="前后上下文字数（overlap）">
-            <a-input-number
-              v-model:value="form.overlap"
-              :min="0"
-              :max="2000"
-              :step="50"
-              style="width: 100%"
-            />
+            <a-input-number v-model:value="form.overlap" :min="0" :max="2000" :step="50" style="width: 100%" />
           </a-form-item>
           <a-form-item label="TXT 文件" required>
-            <a-upload
-              :file-list="fileList"
-              :before-upload="onBeforeUpload"
-              :max-count="1"
-              accept=".txt"
-              @remove="onRemoveFile"
-            >
+            <a-upload :file-list="fileList" :before-upload="onBeforeUpload" :max-count="1" accept=".txt" @remove="onRemoveFile">
               <a-button><UploadOutlined />选择 txt 文件</a-button>
             </a-upload>
           </a-form-item>
-          <a-button
-            type="primary"
-            block
-            :loading="uploading"
-            :disabled="!canUpload"
-            @click="handleUpload"
-          >
-            上传并拆分
-          </a-button>
+          <a-button type="primary" block :loading="uploading" :disabled="!canUpload" @click="handleUpload"> 上传并拆分 </a-button>
         </a-form>
       </a-card>
 
       <a-card v-if="currentJob" title="2. 任务进度" size="small" class="mt-12">
         <a-descriptions :column="1" size="small" bordered>
-          <a-descriptions-item label="jobId">{{
-            currentJob.jobId
-          }}</a-descriptions-item>
-          <a-descriptions-item label="原文文件">{{
-            currentJob.sourceFileName
-          }}</a-descriptions-item>
-          <a-descriptions-item label="原文字数">{{
-            currentJob.totalChars
-          }}</a-descriptions-item>
+          <a-descriptions-item label="jobId">{{ currentJob.jobId }}</a-descriptions-item>
+          <a-descriptions-item label="原文文件">{{ currentJob.sourceFileName }}</a-descriptions-item>
+          <a-descriptions-item label="原文字数">{{ currentJob.totalChars }}</a-descriptions-item>
           <a-descriptions-item label="状态">
-            <a-tag :color="statusColor(currentJob.status)">{{
-              statusText(currentJob.status)
-            }}</a-tag>
+            <a-tag :color="statusColor(currentJob.status)">{{ statusText(currentJob.status) }}</a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="拆分进度">
-            {{ currentJob.splittedChunks }} / {{ currentJob.totalChunks }}
-          </a-descriptions-item>
+          <a-descriptions-item label="拆分进度"> {{ currentJob.splittedChunks }} / {{ currentJob.totalChunks }} </a-descriptions-item>
           <a-descriptions-item label="生成进度">
-            <a-progress
-              :percent="genPercent"
-              :status="currentJob.status === 'failed' ? 'exception' : undefined"
-              size="small"
-            />
-            <span class="fs-12"
-              >{{ currentJob.processedChunks }} /
-              {{ currentJob.totalChunks }} 块</span
-            >
+            <a-progress :percent="genPercent" :status="currentJob.status === 'failed' ? 'exception' : undefined" size="small" />
+            <span class="fs-12">{{ currentJob.processedChunks }} / {{ currentJob.totalChunks }} 块</span>
           </a-descriptions-item>
           <a-descriptions-item v-if="currentJob.lastError" label="错误信息">
             <span style="color: #ff4d4f">{{ currentJob.lastError }}</span>
@@ -128,19 +74,10 @@
         </a-descriptions>
 
         <div class="action-row">
-          <a-button
-            type="primary"
-            :loading="generating"
-            :disabled="!canGenerate"
-            @click="handleGenerate"
-          >
-            {{
-              currentJob.processedChunks > 0 ? '继续生成大纲' : '开始生成大纲'
-            }}
+          <a-button type="primary" :loading="generating" :disabled="!canGenerate" @click="handleGenerate">
+            {{ currentJob.processedChunks > 0 ? '继续生成大纲' : '开始生成大纲' }}
           </a-button>
-          <a-button danger :disabled="!canAbort" @click="handleAbort"
-            >中止生成</a-button
-          >
+          <a-button danger :disabled="!canAbort" @click="handleAbort">中止生成</a-button>
           <a-button @click="handleRefresh">刷新</a-button>
         </div>
       </a-card>
@@ -151,12 +88,17 @@
       <a-card title="3. 大纲结果" size="small">
         <template #extra>
           <a-space>
-            <a-input
-              v-model:value="queryNovelCode"
-              placeholder="输入 novelCode"
-              style="width: 200px"
-            />
+            <a-input v-model:value="queryNovelCode" placeholder="输入 novelCode" style="width: 200px" />
             <a-button size="small" @click="loadOutline">查询</a-button>
+            <a-button
+              type="dashed"
+              size="small"
+              :loading="secondPassLoading"
+              :disabled="!canStartSecondPass"
+              @click="handleStartSecondPass"
+            >
+              开始第二轮归纳
+            </a-button>
           </a-space>
         </template>
 
@@ -165,29 +107,18 @@
         <template v-else>
           <a-tabs>
             <a-tab-pane key="synopsis" tab="故事简介">
-              <pre class="outline-text">{{
-                formatMultiPoint(outline.synopsis) || '（空）'
-              }}</pre>
+              <pre class="outline-text">{{ formatMultiPoint(outline.synopsis) || '（空）' }}</pre>
             </a-tab-pane>
             <a-tab-pane key="world" tab="世界观">
-              <pre class="outline-text">{{
-                formatMultiPoint(outline.worldSetting) || '（空）'
-              }}</pre>
+              <pre class="outline-text">{{ formatMultiPoint(outline.worldSetting) || '（空）' }}</pre>
             </a-tab-pane>
             <a-tab-pane key="outline" tab="剧情大纲">
-              <pre class="outline-text">{{
-                formatMultiPoint(outline.plotOutline) || '（空）'
-              }}</pre>
+              <pre class="outline-text">{{ formatMultiPoint(outline.plotOutline) || '（空）' }}</pre>
             </a-tab-pane>
             <a-tab-pane key="conflicts" tab="故事矛盾">
-              <pre class="outline-text">{{
-                formatMultiPoint(outline.storyConflicts) || '（空）'
-              }}</pre>
+              <pre class="outline-text">{{ formatMultiPoint(outline.storyConflicts) || '（空）' }}</pre>
             </a-tab-pane>
-            <a-tab-pane
-              :key="`chars`"
-              :tab="`人物 (${outline.characters.length})`"
-            >
+            <a-tab-pane :key="`chars`" :tab="`人物 (${outline.characters.length})`">
               <a-empty v-if="!outline.characters.length" />
               <a-table
                 v-else
@@ -202,26 +133,13 @@
               >
                 <template #bodyCell="{ column, text, record }">
                   <!-- 姓名 / 身份 保持原文 -->
-                  <template
-                    v-if="
-                      column.dataIndex === 'name' ||
-                      column.dataIndex === 'identity'
-                    "
-                  >
+                  <template v-if="column.dataIndex === 'name' || column.dataIndex === 'identity'">
                     {{ text || '-' }}
                   </template>
                   <!-- 别名列：显示为标签 -->
                   <template v-else-if="column.dataIndex === 'aliases'">
-                    <a-space
-                      wrap
-                      v-if="record.aliases && record.aliases.length > 0"
-                    >
-                      <a-tag
-                        v-for="alias in record.aliases"
-                        :key="alias"
-                        color="blue"
-                        >{{ alias }}</a-tag
-                      >
+                    <a-space wrap v-if="record.aliases && record.aliases.length > 0">
+                      <a-tag v-for="alias in record.aliases" :key="alias" color="blue">{{ alias }}</a-tag>
                     </a-space>
                     <span v-else>-</span>
                   </template>
@@ -236,12 +154,7 @@
             </a-tab-pane>
             <a-tab-pane key="aliases" tab="别名管理">
               <div style="padding: 16px 0">
-                <a-button
-                  type="primary"
-                  size="small"
-                  :loading="loadingAliasCandidates"
-                  @click="loadAliasCandidates"
-                >
+                <a-button type="primary" size="small" :loading="loadingAliasCandidates" @click="loadAliasCandidates">
                   刷新候选列表
                 </a-button>
 
@@ -259,17 +172,9 @@
                       :key="index"
                       :header="`${item.characterName} (已有${item.aliases.length}个别名, ${item.aliasCandidates.length}个候选)`"
                     >
-                      <div
-                        v-if="item.aliases.length > 0"
-                        style="margin-bottom: 12px"
-                      >
+                      <div v-if="item.aliases.length > 0" style="margin-bottom: 12px">
                         <strong>已确认别名：</strong>
-                        <a-tag
-                          v-for="alias in item.aliases"
-                          :key="alias"
-                          color="blue"
-                          >{{ alias }}</a-tag
-                        >
+                        <a-tag v-for="alias in item.aliases" :key="alias" color="blue">{{ alias }}</a-tag>
                       </div>
 
                       <div v-if="item.aliasCandidates.length > 0">
@@ -279,11 +184,7 @@
                             v-model:value="selectedAliases[item.characterName]"
                             style="display: flex; flex-wrap: wrap; gap: 8px"
                           >
-                            <a-checkbox
-                              v-for="candidate in item.aliasCandidates"
-                              :key="candidate"
-                              :value="candidate"
-                            >
+                            <a-checkbox v-for="candidate in item.aliasCandidates" :key="candidate" :value="candidate">
                               {{ candidate }}
                             </a-checkbox>
                           </a-checkbox-group>
@@ -293,10 +194,7 @@
                           <a-button
                             type="primary"
                             size="small"
-                            :disabled="
-                              !selectedAliases[item.characterName] ||
-                              selectedAliases[item.characterName].length === 0
-                            "
+                            :disabled="!selectedAliases[item.characterName] || selectedAliases[item.characterName].length === 0"
                             @click="confirmMergeAliases(item.characterName)"
                           >
                             合并选中别名
@@ -329,15 +227,16 @@ import {
   listOutlineJobs,
   getAliasCandidates,
   mergeAlias,
+  startSecondPassSummary,
   type NovelOutlineJob,
-  type NovelOutlineResult,
+  type NovelOutlineResult
 } from '@/api/novel-outline'
 
 // 表单数据：novelCode + 拆分参数
 const form = reactive({
   novelCode: '',
   chunkSize: 15000, // 默认每块最多15000字原文，包含前后上下文
-  overlap: 300, // 每块前后各保留300字上下文
+  overlap: 300 // 每块前后各保留300字上下文
 })
 
 // Upload 组件文件列表
@@ -353,25 +252,22 @@ const queryNovelCode = ref('')
 
 const uploading = ref(false)
 const generating = ref(false)
+const secondPassLoading = ref(false)
 
 // 恢复任务相关状态：用户输入 novelCode，查询历史 job 列表，选中后恢复为 currentJob
 const recoverForm = reactive({
   novelCode: '',
-  jobId: '',
+  jobId: ''
 })
 const listingJobs = ref(false)
 const recovering = ref(false)
 // 下拉可选项（来自 listOutlineJobs 的返回）
-const jobOptions = ref<Array<{ value: string; label: string; desc: string }>>(
-  [],
-)
+const jobOptions = ref<Array<{ value: string; label: string; desc: string }>>([])
 
 // 轮询定时器
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
-const canUpload = computed(
-  () => !!form.novelCode && !!pickedFile.value && !uploading.value,
-)
+const canUpload = computed(() => !!form.novelCode && !!pickedFile.value && !uploading.value)
 // 允许续跑的状态：
 // - split_done / failed / aborted：常规可续跑
 // - generating：后端重启后残留的"假在跑"任务，允许强制再次拉起（后端有二次校验）
@@ -382,20 +278,19 @@ const canGenerate = computed(
       currentJob.value.status === 'failed' ||
       currentJob.value.status === 'aborted' ||
       currentJob.value.status === 'generating') &&
-    currentJob.value.processedChunks < currentJob.value.totalChunks,
+    currentJob.value.processedChunks < currentJob.value.totalChunks
 )
-const canAbort = computed(
-  () =>
-    !!currentJob.value &&
-    (currentJob.value.status === 'splitting' ||
-      currentJob.value.status === 'generating'),
-)
+const canAbort = computed(() => !!currentJob.value && (currentJob.value.status === 'splitting' || currentJob.value.status === 'generating'))
+const canStartSecondPass = computed(() => {
+  if (currentJob.value) {
+    return currentJob.value.status === 'done' && !secondPassLoading.value
+  }
+  return !!outline.value?.novelCode && !secondPassLoading.value
+})
 
 const genPercent = computed(() => {
   if (!currentJob.value || !currentJob.value.totalChunks) return 0
-  return Math.floor(
-    (currentJob.value.processedChunks / currentJob.value.totalChunks) * 100,
-  )
+  return Math.floor((currentJob.value.processedChunks / currentJob.value.totalChunks) * 100)
 })
 
 /**
@@ -431,14 +326,14 @@ const characterColumns = [
     dataIndex: 'name',
     key: 'name',
     width: 100,
-    fixed: 'left' as const,
+    fixed: 'left' as const
   },
   { title: '别名', dataIndex: 'aliases', key: 'aliases', width: 150 },
   { title: '身份', dataIndex: 'identity', key: 'identity', width: 140 },
   { title: '性格', dataIndex: 'personality', key: 'personality', width: 200 },
   { title: '目标', dataIndex: 'goals', key: 'goals', width: 200 },
   { title: '特征', dataIndex: 'traits', key: 'traits', width: 200 },
-  { title: '关系', dataIndex: 'relations', key: 'relations', width: 240 },
+  { title: '关系', dataIndex: 'relations', key: 'relations', width: 240 }
 ]
 
 /**
@@ -452,7 +347,7 @@ function statusColor(s: NovelOutlineJob['status']) {
       generating: 'processing',
       done: 'success',
       failed: 'error',
-      aborted: 'default',
+      aborted: 'default'
     }[s] || 'default'
   )
 }
@@ -464,7 +359,7 @@ function statusText(s: NovelOutlineJob['status']) {
       generating: '生成中',
       done: '已完成',
       failed: '失败',
-      aborted: '已中止',
+      aborted: '已中止'
     }[s] || s
   )
 }
@@ -482,8 +377,8 @@ function onBeforeUpload(file: File) {
     {
       uid: String(file.lastModified),
       name: file.name,
-      status: 'done',
-    } as UploadFile,
+      status: 'done'
+    } as UploadFile
   ]
   return false
 }
@@ -504,7 +399,7 @@ async function handleUpload() {
       novelCode: form.novelCode,
       chunkSize: form.chunkSize,
       overlap: form.overlap,
-      file: pickedFile.value,
+      file: pickedFile.value
     })
     // axios 拦截器已返回后端的 { code, msg, data }，非 200 会走 catch
     if (res.data) {
@@ -550,7 +445,7 @@ function startPolling() {
     try {
       const [jobRes, outlineRes] = await Promise.all([
         getOutlineJobStatus(currentJob.value.jobId),
-        getNovelOutline(currentJob.value.novelCode),
+        getNovelOutline(currentJob.value.novelCode)
       ])
       if (jobRes.data) currentJob.value = jobRes.data
       outline.value = outlineRes.data ?? null
@@ -560,10 +455,7 @@ function startPolling() {
       if (s === 'done' || s === 'failed' || s === 'aborted') {
         stopPolling()
         if (s === 'done') antMessage.success('大纲生成完成')
-        if (s === 'failed')
-          antMessage.error(
-            '生成失败：' + (currentJob.value.lastError || '未知错误'),
-          )
+        if (s === 'failed') antMessage.error('生成失败：' + (currentJob.value.lastError || '未知错误'))
       }
     } catch (e) {
       // 轮询错误不打断，下一轮继续
@@ -612,6 +504,25 @@ async function handleRefresh() {
   await loadOutline()
 }
 
+async function handleStartSecondPass() {
+  const novelCode = currentJob.value?.novelCode || outline.value?.novelCode || queryNovelCode.value
+  if (!novelCode) {
+    antMessage.warning('请先完成第一轮提取并加载对应小说')
+    return
+  }
+
+  secondPassLoading.value = true
+  try {
+    const res = await startSecondPassSummary(novelCode)
+    const data = res.data
+    antMessage.success(`第二轮归纳完成：人物 ${data?.characterCount || 0} 条，事件 ${data?.eventCount || 0} 条`)
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '第二轮归纳失败')
+  } finally {
+    secondPassLoading.value = false
+  }
+}
+
 /**
  * 加载大纲（右侧查询）
  */
@@ -629,9 +540,7 @@ async function loadOutline() {
 /**
  * 别名管理相关状态
  */
-const aliasCandidates = ref<
-  Array<{ characterName: string; aliases: string[]; aliasCandidates: string[] }>
->([])
+const aliasCandidates = ref<Array<{ characterName: string; aliases: string[]; aliasCandidates: string[] }>>([])
 const loadingAliasCandidates = ref(false)
 const selectedAliases = ref<Record<string, string[]>>({}) // 记录每个人物选中的候选别名
 const activeAliasCollapse = ref<number | undefined>(undefined) // 当前展开的折叠面板
@@ -672,7 +581,7 @@ async function confirmMergeAliases(characterName: string) {
     await mergeAlias({
       novelCode: code,
       characterName,
-      aliasesToConfirm: toConfirm,
+      aliasesToConfirm: toConfirm
     })
     antMessage.success('别名合并成功')
     // 重新加载大纲和别名候选
@@ -696,12 +605,12 @@ async function handleListJobs() {
   try {
     const res = await listOutlineJobs(code)
     const jobs = res.data || []
-    jobOptions.value = jobs.map((j) => ({
+    jobOptions.value = jobs.map(j => ({
       value: j.jobId,
       // 下拉关闭时显示的紧凑文案
       label: `${j.jobId}  [${j.status}]  ${j.processedChunks}/${j.totalChunks}`,
       // 下拉展开时副标题，便于区分同一 novelCode 下的多次上传
-      desc: `原文：${j.sourceFileName}  · 创建：${formatTime(j.createdAt)}`,
+      desc: `原文：${j.sourceFileName}  · 创建：${formatTime(j.createdAt)}`
     }))
     recoverForm.jobId = ''
     if (!jobs.length) antMessage.info('该 novelCode 没有历史任务')
@@ -733,9 +642,7 @@ async function handleRecover() {
     // 若任务仍被标记为生成中（可能是后端重启后残留），打开轮询让 UI 感知最新状态
     if (res.data.status === 'generating') {
       startPolling()
-      antMessage.warning(
-        '任务状态仍为 generating，若确认后端已停止，请点击"继续生成大纲"强制续跑',
-      )
+      antMessage.warning('任务状态仍为 generating，若确认后端已停止，请点击"继续生成大纲"强制续跑')
     } else {
       antMessage.success('任务已恢复')
     }
@@ -760,9 +667,9 @@ function formatTime(t?: string): string {
 // 切换 novelCode 时自动清掉旧大纲
 watch(
   () => form.novelCode,
-  (v) => {
+  v => {
     if (v && !queryNovelCode.value) queryNovelCode.value = v
-  },
+  }
 )
 
 onBeforeUnmount(() => {

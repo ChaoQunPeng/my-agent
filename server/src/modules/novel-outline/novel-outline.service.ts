@@ -15,10 +15,27 @@ import {
 } from './schemas/novel-split-job.schema';
 import {
   NovelOutline,
+  OutlineWorldView,
   NovelOutlineDocument,
 } from './schemas/novel-outline.schema';
+import {
+  NovelWorldView,
+  NovelWorldViewDocument,
+} from './schemas/novel-world-view.schema';
+import {
+  NovelCharacters,
+  NovelCharactersDocument,
+} from './schemas/novel-characters.schema';
+import {
+  NovelEvents,
+  NovelEventsDocument,
+} from './schemas/novel-events.schema';
 import { SplitterService } from './splitter.service';
 import { OpenaiService } from 'src/shared/openai/openai.service';
+import {
+  StructuredConsolidationService,
+  StructuredStringField,
+} from 'src/shared/openai/structured-consolidation.service';
 import { normalize, toStringArray, uniqueStrings } from './outline-merge.utils';
 
 /**
@@ -54,6 +71,7 @@ type ResolvedExtractParams = ExtractParams & {
 };
 
 type RawWorldView = Record<string, unknown> | string | undefined;
+type WorldViewFieldKey = Extract<keyof OutlineWorldView, string>;
 
 @Injectable()
 export class NovelOutlineService {
@@ -66,8 +84,15 @@ export class NovelOutlineService {
     private jobModel: Model<NovelSplitJobDocument>,
     @InjectModel(NovelOutline.name)
     private outlineModel: Model<NovelOutlineDocument>,
+    @InjectModel(NovelWorldView.name)
+    private worldViewModel: Model<NovelWorldViewDocument>,
+    @InjectModel(NovelCharacters.name)
+    private characterSummaryModel: Model<NovelCharactersDocument>,
+    @InjectModel(NovelEvents.name)
+    private eventSummaryModel: Model<NovelEventsDocument>,
     private readonly splitter: SplitterService,
     private readonly openaiService: OpenaiService,
+    private readonly structuredConsolidationService: StructuredConsolidationService,
   ) {
     this.uploadRoot = path.resolve(process.cwd(), 'uploads', 'novel-splits');
   }
@@ -408,6 +433,101 @@ export class NovelOutlineService {
 
     await outline.save();
     return outline;
+  }
+
+  async startSecondPass(novelCode: string) {
+    const normalizedNovelCode = novelCode?.trim();
+    if (!normalizedNovelCode) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+
+    const latestJob = await this.findSplitJob({ novelCode: normalizedNovelCode });
+    if (latestJob && latestJob.status !== 'done') {
+      throw new BadRequestException('第一轮提取尚未完成，暂不能进行第二轮归纳');
+    }
+
+    const outline = await this.outlineModel
+      .findOne({ novelCode: normalizedNovelCode })
+      .exec();
+    if (!outline) {
+      throw new NotFoundException(
+        `未找到小说 ${normalizedNovelCode} 的第一轮提取结果`,
+      );
+    }
+
+    const worldView = await this.consolidateWorldView(outline.worldView || {});
+    const characters = (outline.characters || [])
+      .map((character) => ({
+        name: normalize(character.name),
+        aliases: uniqueStrings(character.aliases || []),
+        aliasCandidates: uniqueStrings(character.aliasCandidates || []),
+        identity: uniqueStrings(character.identity || []),
+        personality: uniqueStrings(character.personality || []),
+        goals: uniqueStrings(character.goals || []),
+        traits: uniqueStrings(character.traits || []),
+        relations: uniqueStrings(character.relations || []),
+      }))
+      .filter((character) => character.name);
+    const events = (outline.events || [])
+      .map((event) => ({
+        title: normalize(event.title),
+        summary: uniqueStrings(event.summary || []),
+        characters: uniqueStrings(event.characters || []),
+        chunkIndex: event.chunkIndex ?? 0,
+      }))
+      .filter((event) => event.title);
+
+    await Promise.all([
+      this.worldViewModel.findOneAndUpdate(
+        { novelCode: normalizedNovelCode },
+        {
+          $set: {
+            novelCode: normalizedNovelCode,
+            ...worldView,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        },
+      ),
+      this.characterSummaryModel.findOneAndUpdate(
+        { novelCode: normalizedNovelCode },
+        {
+          $set: {
+            novelCode: normalizedNovelCode,
+            characters,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        },
+      ),
+      this.eventSummaryModel.findOneAndUpdate(
+        { novelCode: normalizedNovelCode },
+        {
+          $set: {
+            novelCode: normalizedNovelCode,
+            events,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        },
+      ),
+    ]);
+
+    return {
+      novelCode: normalizedNovelCode,
+      worldView,
+      characterCount: characters.length,
+      eventCount: events.length,
+    };
   }
 
   private async resolveJob(params: ExtractParams): Promise<NovelSplitJobDocument> {
@@ -766,6 +886,43 @@ export class NovelOutlineService {
     ].some((key) => key in root);
 
     return hasFlatWorldFields ? root : undefined;
+  }
+
+  private async consolidateWorldView(
+    worldView: OutlineWorldView,
+  ): Promise<Record<WorldViewFieldKey, string[]>> {
+    const fields: StructuredStringField<WorldViewFieldKey>[] = [
+      {
+        key: 'worldType',
+        label: '世界类型',
+        instruction:
+          '输出高度概括的类型标签，优先使用简短词语，不要长句，不要重复近义标签。',
+      },
+      {
+        key: 'summary',
+        label: '世界观总结',
+        instruction:
+          '合并互补描述，保留背景、能力体系、地点或时代设定，输出信息密度高的短句。',
+      },
+      {
+        key: 'socialStructure',
+        label: '社会结构',
+        instruction:
+          '合并组织、势力、阶层和制度描述；相同结构反复提到时只保留一条更完整的表述。',
+      },
+      {
+        key: 'coreRules',
+        label: '核心规则',
+        instruction:
+          '重点消解重复规则和反复强化的限制，保留明确、稳定、可复用的规则表达。',
+      },
+    ];
+
+    return this.structuredConsolidationService.consolidateStringListFields({
+      entityName: '小说世界观',
+      fields,
+      rawData: worldView,
+    });
   }
 
   /**

@@ -290,3 +290,19 @@ export function mergeAlias(params: {
 }) {
   return request.post('/novel-outline/merge-alias', params)
 }
+
+export function startSecondPassSummary(novelCode: string) {
+  return request.post<{
+    novelCode: string
+    worldView: {
+      worldType: string[]
+      summary: string[]
+      socialStructure: string[]
+      coreRules: string[]
+    }
+    characterCount: number
+    eventCount: number
+  }>('/novel-outline/start-second-pass', {
+    novelCode,
+  })
+}
