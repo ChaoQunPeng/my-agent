@@ -24,6 +24,8 @@ import {
   SplitJobQueryDto,
   JobIdDto,
   MergeAliasDto,
+  SearchChunkMetaDto,
+  AnswerByMetaDto,
 } from './dto/novel-outline.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
@@ -76,7 +78,7 @@ export class NovelOutlineController {
       sourceFileName: originalName,
       fileBuffer: file.buffer,
     });
-    return ApiResponseDto.success(job, '拆分完成');
+    return ApiResponseDto.success(job, '导入完成');
   }
 
   /**
@@ -160,5 +162,26 @@ export class NovelOutlineController {
   async mergeAlias(@Body() body: MergeAliasDto) {
     const result = await this.novelOutlineService.mergeAlias(body);
     return ApiResponseDto.success(result, '别名合并成功');
+  }
+
+  @Post('search-meta')
+  async searchMeta(@Body() body: SearchChunkMetaDto) {
+    const result = await this.novelOutlineService.searchChunkMeta({
+      novelCode: body.novelCode,
+      query: body.query,
+      topN: body.topN,
+      includeChunks: body.includeChunks,
+    });
+    return ApiResponseDto.success(result);
+  }
+
+  @Post('answer-by-meta')
+  async answerByMeta(@Body() body: AnswerByMetaDto) {
+    const result = await this.novelOutlineService.answerQuestionByMeta({
+      novelCode: body.novelCode,
+      question: body.question,
+      topN: body.topN,
+    });
+    return ApiResponseDto.success(result);
   }
 }

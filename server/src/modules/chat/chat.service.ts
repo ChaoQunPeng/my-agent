@@ -8,6 +8,7 @@ import { CharacterService } from '../character/character.service';
 import { SessionService } from '../session/session.service';
 import { FileReaderService } from '../../shared/file-reader/file-reader.service';
 import { buildNpcPrompt } from 'src/common/prompts/character';
+import { NovelOutlineService } from '../novel-outline/novel-outline.service';
 
 export interface Session {
   id: string;
@@ -31,6 +32,7 @@ export class ChatService {
     private readonly characterService: CharacterService,
     private readonly sessionService: SessionService,
     private readonly fileReaderService: FileReaderService,
+    private readonly novelOutlineService: NovelOutlineService,
   ) {}
 
   /**
@@ -56,7 +58,13 @@ export class ChatService {
     }
 
     // TODO: 未来可以扩展小说类型的处理逻辑
-    // if (type === 'novel' && resourceId) { ... }
+    if (type === 'novel' && resourceId) {
+      systemPrompt = [
+        '你是小说写作与设定助手。',
+        '回答小说设定问题时，应优先依据系统提供的小说资料。',
+        '如果资料不足，需要明确说明，不要编造。',
+      ].join('\n');
+    }
 
     return systemPrompt;
   }
@@ -79,7 +87,30 @@ export class ChatService {
 
     // 构建系统提示词
     const systemPrompt = await this.buildDynamicSystemPrompt(type, resourceId);
-    let messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+    const systemMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+      [];
+    if (systemPrompt) {
+      systemMessages.push({ role: 'system', content: systemPrompt });
+    }
+
+    if (type === 'novel' && resourceId) {
+      try {
+        const context = await this.novelOutlineService.buildNovelQuestionContext(
+          {
+            novelCode: resourceId,
+            question: cleanMessage,
+          },
+        );
+        if (context.systemPrompt) {
+          systemMessages.push({
+            role: 'system',
+            content: context.systemPrompt,
+          });
+        }
+      } catch (error) {
+        console.error('构建小说检索上下文失败:', error);
+      }
+    }
 
     // 获取历史消息
     const customHistory = sessionId
@@ -87,8 +118,8 @@ export class ChatService {
       : [];
 
     // 组装消息列表
-    messages = [
-      { role: 'system', content: systemPrompt },
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      ...systemMessages,
       ...customHistory,
       { role: 'user', content: cleanMessage },
     ];

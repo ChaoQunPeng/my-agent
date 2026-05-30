@@ -39,8 +39,10 @@ export default [
         component: () => import('~/pages/dialog/index.vue'),
         meta: {
           title: '一拳破天',
+          sessionType: 'novel',
           sessionCategory: 'writing',
-          novelCode: 'yi_quan_po_tian'
+          novelCode: 'yi_quan_po_tian',
+          resourceId: 'yi_quan_po_tian'
         }
       },
       // 小说大纲生成：上传 txt → 拆分 → 调用大模型增量生成大纲

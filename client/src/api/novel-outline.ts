@@ -2,6 +2,7 @@ import request from '@/utils/request'
 
 export type NovelOutlineJobStatus =
   | 'splitting'
+  | 'meta_generating'
   | 'split_done'
   | 'generating'
   | 'done'
@@ -17,9 +18,11 @@ interface RawNovelOutlineJob {
   chunkSize: number
   overlap: number
   chunkDir: string
+  metaDir?: string
   sourceFilePath: string
   totalChunks: number
   splittedChunks?: number
+  metaGeneratedChunks?: number
   processedChunks?: number
   processingChunkIndex?: number
   lastCompletedChunkIndex?: number
@@ -32,6 +35,7 @@ interface RawNovelOutlineJob {
 
 export interface NovelOutlineJob extends RawNovelOutlineJob {
   splittedChunks: number
+  metaGeneratedChunks: number
   processedChunks: number
   processingChunkIndex: number
   lastCompletedChunkIndex: number
@@ -128,6 +132,7 @@ function normalizeJob(job: RawNovelOutlineJob): NovelOutlineJob {
       ? Math.min(processingChunkIndex, totalChunks)
       : totalChunks)
   const processedChunks = job.processedChunks ?? lastCompletedChunkIndex
+  const metaGeneratedChunks = job.metaGeneratedChunks ?? 0
   const lastCompletedChunkFile =
     job.lastCompletedChunkFile ||
     (lastCompletedChunkIndex > 0
@@ -138,6 +143,7 @@ function normalizeJob(job: RawNovelOutlineJob): NovelOutlineJob {
     ...job,
     totalChunks,
     splittedChunks,
+    metaGeneratedChunks,
     processedChunks,
     processingChunkIndex,
     lastCompletedChunkIndex,

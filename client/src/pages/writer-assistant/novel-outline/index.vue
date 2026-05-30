@@ -326,6 +326,7 @@ function statusColor(s: NovelOutlineJob['status']) {
   return (
     {
       splitting: 'processing',
+      meta_generating: 'processing',
       split_done: 'blue',
       generating: 'processing',
       done: 'success',
@@ -338,7 +339,8 @@ function statusText(s: NovelOutlineJob['status']) {
   return (
     {
       splitting: '拆分中',
-      split_done: '拆分完成',
+      meta_generating: 'Meta生成中',
+      split_done: '导入完成',
       generating: '生成中',
       done: '已完成',
       failed: '失败',

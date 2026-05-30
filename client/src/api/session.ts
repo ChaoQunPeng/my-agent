@@ -32,11 +32,14 @@ export interface Message {
  * @param type 可选的资源类型筛选条件（'character' | 'novel'）
  * @param resourceId 可选的资源ID筛选条件
  */
-export function getSessions(type?: string) {
+export function getSessions(type?: string, resourceId?: string) {
   const params: any = {}
 
   if (type) {
     params.type = type
+  }
+  if (resourceId) {
+    params.resourceId = resourceId
   }
   return request.post<Session[]>('/sessions/list', params)
 }

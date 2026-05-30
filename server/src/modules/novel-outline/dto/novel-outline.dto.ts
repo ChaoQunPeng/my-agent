@@ -15,6 +15,7 @@ import {
   IsArray,
   ArrayNotEmpty,
   IsIn,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -85,9 +86,52 @@ export class SplitJobQueryDto {
   @IsOptional()
   jobId?: string;
 
-  @IsIn(['splitting', 'split_done', 'generating', 'done', 'failed', 'aborted'])
+  @IsIn([
+    'splitting',
+    'meta_generating',
+    'split_done',
+    'generating',
+    'done',
+    'failed',
+    'aborted',
+  ])
   @IsOptional()
   status?: string;
+}
+
+export class SearchChunkMetaDto {
+  @IsString()
+  novelCode!: string;
+
+  @IsString()
+  query!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  @IsOptional()
+  topN?: number;
+
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
+  includeChunks?: boolean;
+}
+
+export class AnswerByMetaDto {
+  @IsString()
+  novelCode!: string;
+
+  @IsString()
+  question!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  @IsOptional()
+  topN?: number;
 }
 
 /**

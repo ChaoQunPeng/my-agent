@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as fs from 'fs/promises';
@@ -48,12 +49,36 @@ type ResolvedExtractParams = ExtractParams & {
 
 type RawWorldView = Record<string, unknown> | string | undefined;
 
+export interface ChunkMeta {
+  id: string;
+  summary: string;
+  keywords: string[];
+}
+
+interface SearchChunkMetaParams {
+  novelCode: string;
+  query: string;
+  topN?: number;
+  includeChunks?: boolean;
+}
+
+export interface SearchChunkMetaHit {
+  id: string;
+  score: number;
+  summary: string;
+  keywords: string[];
+  metaFilePath: string;
+  chunkFilePath: string;
+  chunkText?: string;
+}
+
 @Injectable()
 export class NovelOutlineService {
   // 上传根目录（放在 server/uploads/novel-splits 下）
   private readonly uploadRoot: string;
   private readonly logger = new Logger(NovelOutlineService.name);
   private readonly runningJobs = new Map<string, AbortController>();
+  private readonly chunkMetaMaxAttempts: number;
   constructor(
     @InjectModel(NovelSplitJob.name)
     private jobModel: Model<NovelSplitJobDocument>,
@@ -61,8 +86,14 @@ export class NovelOutlineService {
     private outlineModel: Model<NovelOutlineDocument>,
     private readonly splitter: SplitterService,
     private readonly openaiService: OpenaiService,
+    private readonly configService: ConfigService,
   ) {
     this.uploadRoot = path.resolve(process.cwd(), 'uploads', 'novel-splits');
+    this.chunkMetaMaxAttempts = Math.max(
+      1,
+      Number(this.configService.get<string>('NOVEL_CHUNK_META_MAX_ATTEMPTS')) ||
+        3,
+    );
   }
 
   /**
@@ -83,15 +114,20 @@ export class NovelOutlineService {
       (novelCode || '').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) ||
       'unknown';
     const jobId = `novel_${safeNovelCode}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const chunkDir = path.join(this.uploadRoot, safeNovelCode);
+    const novelDir = path.join(this.uploadRoot, safeNovelCode);
+    const chunkDir = path.join(novelDir, 'chunks');
+    const metaDir = path.join(novelDir, 'meta');
+    await this.safeRemoveDir(chunkDir);
+    await this.safeRemoveDir(metaDir);
     await fs.mkdir(chunkDir, { recursive: true });
+    await fs.mkdir(metaDir, { recursive: true });
 
     const { text: sourceText, encoding: detectedEncoding } =
       this.decodeNovelBuffer(fileBuffer);
     console.log(
       `[novel-outline] upload-and-split: 文件解码完成 novelCode=${novelCode}, encoding=${detectedEncoding}`,
     );
-    const sourceFilePath = path.join(chunkDir, '__source__.txt');
+    const sourceFilePath = path.join(novelDir, '__source__.txt');
     await fs.writeFile(sourceFilePath, sourceText, 'utf-8');
 
     const totalChars = Array.from(sourceText).length;
@@ -108,9 +144,11 @@ export class NovelOutlineService {
       chunkSize,
       overlap,
       chunkDir,
+      metaDir,
       sourceFilePath,
       totalChunks: estimated,
       splittedChunks: 0,
+      metaGeneratedChunks: 0,
       processedChunks: 0,
       status: 'splitting',
     });
@@ -136,16 +174,33 @@ export class NovelOutlineService {
           $set: {
             totalChunks: actualTotal,
             splittedChunks: actualTotal,
+            status: 'meta_generating',
+          },
+        },
+      );
+      await this.generateChunkMetas(jobId, {
+        chunkDir,
+        metaDir,
+        novelCode,
+        totalChunks: actualTotal,
+      });
+      await this.jobModel.updateOne(
+        { jobId },
+        {
+          $set: {
+            totalChunks: actualTotal,
+            splittedChunks: actualTotal,
+            metaGeneratedChunks: actualTotal,
             status: 'split_done',
+            lastError: '',
           },
         },
       );
       console.log(
-        `[novel-outline] split: 拆分完成 jobId=${jobId}, totalChunks=${actualTotal}`,
+        `[novel-outline] split/meta: 导入完成 jobId=${jobId}, totalChunks=${actualTotal}`,
       );
       return (await this.jobModel.findOne({ jobId }).exec())!;
     } catch (err) {
-      await this.safeRemoveDir(chunkDir);
       await this.jobModel.updateOne(
         { jobId },
         { $set: { status: 'failed', lastError: (err as Error).message } },
@@ -197,6 +252,130 @@ export class NovelOutlineService {
         };
       }
     }
+  }
+
+  async searchChunkMeta(params: SearchChunkMetaParams) {
+    const novelCode = params.novelCode?.trim();
+    const query = params.query?.trim();
+    const topN = Math.min(20, Math.max(1, Number(params.topN) || 5));
+    if (!novelCode) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+    if (!query) {
+      throw new BadRequestException('query 不能为空');
+    }
+
+    const queryWords = this.tokenizeQuery(query);
+    const hits = await this.loadAndScoreChunkMetas({
+      novelCode,
+      queryWords,
+      topN,
+      includeChunks: params.includeChunks,
+    });
+
+    return {
+      novelCode,
+      query,
+      queryWords,
+      total: hits.length,
+      hits,
+    };
+  }
+
+  async answerQuestionByMeta(params: {
+    novelCode: string;
+    question: string;
+    topN?: number;
+  }) {
+    const question = params.question?.trim();
+    if (!question) {
+      throw new BadRequestException('question 不能为空');
+    }
+
+    const retrieval = await this.searchChunkMeta({
+      novelCode: params.novelCode,
+      query: question,
+      topN: params.topN,
+      includeChunks: true,
+    });
+
+    const prompt = this.buildNovelQaContextPrompt(
+      retrieval.hits.map((hit, index) => ({
+        index: index + 1,
+        id: hit.id,
+        summary: hit.summary,
+        keywords: hit.keywords,
+        chunkText: hit.chunkText || '',
+      })),
+    );
+
+    const completion = await this.openaiService.client.chat.completions.create({
+      model: this.openaiService.model,
+      messages: [
+        {
+          role: 'system',
+          content: [
+            '你是小说百科助手。',
+            '你只能依据提供的资料回答，不允许编造。',
+            '如果资料不足，必须明确说明“根据当前提供的资料，暂时无法确定”。',
+            '回答风格使用简洁、准确的百科风格。',
+          ].join('\n'),
+        },
+        {
+          role: 'system',
+          content: prompt,
+        },
+        {
+          role: 'user',
+          content: question,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+
+    const answer = completion.choices?.[0]?.message?.content?.trim() ?? '';
+    return {
+      novelCode: params.novelCode,
+      question,
+      queryWords: retrieval.queryWords,
+      hits: retrieval.hits,
+      answer,
+    };
+  }
+
+  async buildNovelQuestionContext(params: {
+    novelCode: string;
+    question: string;
+    topN?: number;
+  }) {
+    const retrieval = await this.searchChunkMeta({
+      novelCode: params.novelCode,
+      query: params.question,
+      topN: params.topN,
+      includeChunks: true,
+    });
+
+    return {
+      queryWords: retrieval.queryWords,
+      hits: retrieval.hits,
+      systemPrompt: [
+        '你是小说百科助手。',
+        '你只能依据系统提供的检索资料和对话历史回答，不允许编造。',
+        '如果资料不足，必须明确说明“根据当前提供的资料，暂时无法确定”。',
+        '回答风格使用百科式说明，先给定义或结论，再补充依据。',
+        '',
+        this.buildNovelQaContextPrompt(
+          retrieval.hits.map((hit, index) => ({
+            index: index + 1,
+            id: hit.id,
+            summary: hit.summary,
+            keywords: hit.keywords,
+            chunkText: hit.chunkText || '',
+          })),
+        ),
+      ].join('\n'),
+    };
   }
 
   /**
@@ -266,8 +445,8 @@ export class NovelOutlineService {
 
   async startExtractInBackground(jobId: string): Promise<NovelSplitJob> {
     const job = await this.resolveJob(jobId);
-    if (job.status === 'splitting') {
-      throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
+    if (job.status === 'splitting' || job.status === 'meta_generating') {
+      throw new BadRequestException('任务仍在导入处理中，暂不能开始提取');
     }
     if (job.status === 'done') {
       return job;
@@ -417,8 +596,8 @@ export class NovelOutlineService {
     const job = await this.resolveJob(params.jobId);
     const novelCode = job.novelCode;
     const jobId = job.jobId;
-    if (job.status === 'splitting') {
-      throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
+    if (job.status === 'splitting' || job.status === 'meta_generating') {
+      throw new BadRequestException('任务仍在导入处理中，暂不能开始提取');
     }
 
     if (job.status === 'done') {
@@ -733,16 +912,300 @@ export class NovelOutlineService {
     job: NovelSplitJobDocument,
     chunkIndex: number,
   ): Promise<string> {
-    const chunkFilePath = path.join(
-      job.chunkDir,
-      `chunk-${String(chunkIndex).padStart(4, '0')}.txt`,
-    );
+    const chunkId = String(chunkIndex).padStart(4, '0');
+    const chunkFilePath = await this.resolveChunkFilePath(job.chunkDir, chunkId);
 
     try {
       return await fs.readFile(chunkFilePath, 'utf-8');
     } catch {
       throw new NotFoundException(`切片文件不存在：${chunkFilePath}`);
     }
+  }
+
+  private async generateChunkMetas(
+    jobId: string,
+    params: {
+      chunkDir: string;
+      metaDir: string;
+      novelCode: string;
+      totalChunks: number;
+    },
+  ): Promise<void> {
+    const { chunkDir, metaDir, novelCode, totalChunks } = params;
+    await fs.mkdir(metaDir, { recursive: true });
+
+    for (let chunkIndex = 1; chunkIndex <= totalChunks; chunkIndex += 1) {
+      const id = String(chunkIndex).padStart(4, '0');
+      const chunkFilePath = await this.resolveChunkFilePath(chunkDir, id);
+      const chunkText = await fs.readFile(chunkFilePath, 'utf-8');
+      const meta = await this.generateSingleChunkMeta({
+        id,
+        chunkIndex,
+        totalChunks,
+        novelCode,
+        chunkText,
+      });
+      const metaFilePath = path.join(
+        metaDir,
+        `${path.parse(chunkFilePath).name}.json`,
+      );
+      await fs.writeFile(
+        metaFilePath,
+        JSON.stringify(meta, null, 2),
+        'utf-8',
+      );
+
+      await this.jobModel.updateOne(
+        { jobId },
+        {
+          $set: {
+            status: 'meta_generating',
+            metaGeneratedChunks: chunkIndex,
+            lastError: '',
+          },
+        },
+      );
+    }
+  }
+
+  private async generateSingleChunkMeta(params: {
+    id: string;
+    chunkIndex: number;
+    totalChunks: number;
+    novelCode: string;
+    chunkText: string;
+  }): Promise<ChunkMeta> {
+    const system = [
+      '你是小说 Chunk Metadata 生成器。',
+      '你的任务是基于一个 chunk 生成可检索的 meta.json。',
+      '必须遵守：前文参考和后文参考只用于理解上下文，不允许重复提取。',
+      '只能从【本段正文】提取当前 chunk 新增的信息。',
+      'summary 必须使用第三人称，50 到 150 字，保留核心剧情与设定，适合后续搜索。',
+      'keywords 必须返回 5 到 20 个关键词，优先提取人物、地点、组织、世界观设定、能力、境界、特殊名词、关键道具、事件名称。',
+      '禁止输出 markdown、解释文字或额外说明。',
+      '必须返回合法 JSON，格式严格如下：{"summary":"","keywords":[]}',
+    ].join('\n');
+
+    const user = [
+      `小说编号：${params.novelCode}`,
+      `当前 chunk：${params.chunkIndex}/${params.totalChunks}`,
+      `chunkId：${params.id}`,
+      '',
+      '请分析以下 chunk：',
+      params.chunkText,
+    ].join('\n');
+
+    const response = await this.callLLM<{
+      summary?: unknown;
+      keywords?: unknown;
+    }>({
+      system,
+      user,
+      maxAttempts: this.chunkMetaMaxAttempts,
+    });
+
+    const summary = this.truncateByChars(
+      normalize(String(response.summary ?? '')),
+      150,
+    );
+    const keywords = uniqueStrings(
+      Array.isArray(response.keywords) ? response.keywords : [],
+    ).slice(0, 20);
+
+    if (!summary || Array.from(summary).length < 30) {
+      throw new Error(`chunk ${params.id} 的 meta summary 为空`);
+    }
+    if (keywords.length < 5) {
+      throw new Error(`chunk ${params.id} 的 meta keywords 为空`);
+    }
+
+    return {
+      id: params.id,
+      summary,
+      keywords,
+    };
+  }
+
+  private async loadAndScoreChunkMetas(params: {
+    novelCode: string;
+    queryWords: string[];
+    topN: number;
+    includeChunks?: boolean;
+  }): Promise<SearchChunkMetaHit[]> {
+    const { metaDir, chunkDir } = this.resolveNovelDirs(params.novelCode);
+    let fileNames: string[] = [];
+    try {
+      fileNames = (await fs.readdir(metaDir))
+        .filter((fileName) => fileName.endsWith('.json'))
+        .sort((a, b) => a.localeCompare(b, 'en'));
+    } catch {
+      throw new NotFoundException(`未找到小说 ${params.novelCode} 的 meta 目录`);
+    }
+
+    const hits: SearchChunkMetaHit[] = [];
+    for (const fileName of fileNames) {
+      const metaFilePath = path.join(metaDir, fileName);
+      const raw = await fs.readFile(metaFilePath, 'utf-8');
+      const parsed = JSON.parse(raw) as Partial<ChunkMeta>;
+      const id = normalize(String(parsed.id ?? this.extractChunkId(fileName)));
+      const summary = normalize(String(parsed.summary ?? ''));
+      const keywords = uniqueStrings(
+        Array.isArray(parsed.keywords) ? parsed.keywords : [],
+      );
+      const score = this.calcMetaScore(
+        { id, summary, keywords },
+        params.queryWords,
+      );
+
+      if (score <= 0) {
+        continue;
+      }
+
+      const chunkFilePath = await this.resolveChunkFilePath(chunkDir, id);
+      hits.push({
+        id,
+        score,
+        summary,
+        keywords,
+        metaFilePath,
+        chunkFilePath,
+      });
+    }
+
+    hits.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id, 'en'));
+    const topHits = hits.slice(0, params.topN);
+    if (params.includeChunks) {
+      await Promise.all(
+        topHits.map(async (hit) => {
+          hit.chunkText = await fs.readFile(hit.chunkFilePath, 'utf-8');
+        }),
+      );
+    }
+    return topHits;
+  }
+
+  private calcMetaScore(meta: ChunkMeta, queryWords: string[]): number {
+    let score = 0;
+    const summary = meta.summary.toLowerCase();
+    const keywords = meta.keywords.map((keyword) => keyword.toLowerCase());
+
+    for (const rawWord of queryWords) {
+      const word = rawWord.toLowerCase();
+      if (!word) continue;
+      if (summary.includes(word)) {
+        score += 10;
+      }
+      if (keywords.some((keyword) => keyword.includes(word))) {
+        score += 20;
+      }
+    }
+
+    return score;
+  }
+
+  private tokenizeQuery(query: string): string[] {
+    const cleaned = query
+      .trim()
+      .replace(/[？?！!。，、；：,.]/g, ' ')
+      .replace(
+        /(什么是|是什么|为什么会|为什么|怎么会|怎么样|如何|哪里|哪儿|哪个|是谁|是什么地方|是什么东西)/g,
+        ' ',
+      )
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const tokens = new Set<string>();
+    const segments = cleaned.match(/[\u4e00-\u9fa5A-Za-z0-9_]+/g) || [];
+    for (const segment of segments) {
+      const normalizedSegment = normalize(segment);
+      if (normalizedSegment.length >= 2) {
+        tokens.add(normalizedSegment);
+      }
+
+      const chars = Array.from(normalizedSegment);
+      for (let size = 2; size <= 4; size += 1) {
+        if (chars.length < size) continue;
+        for (let i = 0; i <= chars.length - size; i += 1) {
+          const word = chars.slice(i, i + size).join('');
+          if (word.length >= 2) {
+            tokens.add(word);
+          }
+        }
+      }
+    }
+
+    return Array.from(tokens);
+  }
+
+  private buildNovelQaContextPrompt(
+    chunks: Array<{
+      index: number;
+      id: string;
+      summary: string;
+      keywords: string[];
+      chunkText: string;
+    }>,
+  ): string {
+    return [
+      '以下是与问题相关的小说检索资料，请仅基于这些资料回答：',
+      ...chunks.map((chunk) =>
+        [
+          `资料${chunk.index}｜Chunk ${chunk.id}`,
+          `摘要：${chunk.summary}`,
+          `关键词：${chunk.keywords.join('、')}`,
+          '原文：',
+          chunk.chunkText,
+        ].join('\n'),
+      ),
+    ].join('\n\n');
+  }
+
+  private resolveNovelDirs(novelCode: string) {
+    const safeNovelCode = this.toSafeNovelCode(novelCode);
+    const novelDir = path.join(this.uploadRoot, safeNovelCode);
+    return {
+      novelDir,
+      chunkDir: path.join(novelDir, 'chunks'),
+      metaDir: path.join(novelDir, 'meta'),
+    };
+  }
+
+  private toSafeNovelCode(novelCode: string): string {
+    return (
+      (novelCode || '').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) ||
+      'unknown'
+    );
+  }
+
+  private extractChunkId(fileName: string): string {
+    const matched = path.parse(fileName).name.match(/(\d{4,})$/);
+    return matched?.[1] || path.parse(fileName).name;
+  }
+
+  private truncateByChars(text: string, maxChars: number): string {
+    const chars = Array.from(text);
+    return chars.length <= maxChars ? text : chars.slice(0, maxChars).join('');
+  }
+
+  private async resolveChunkFilePath(
+    chunkDir: string,
+    chunkId: string,
+  ): Promise<string> {
+    const candidates = [
+      path.join(chunkDir, `${chunkId}.txt`),
+      path.join(chunkDir, `chunk-${chunkId}.txt`),
+    ];
+
+    for (const filePath of candidates) {
+      try {
+        await fs.access(filePath);
+        return filePath;
+      } catch {
+        continue;
+      }
+    }
+
+    return candidates[1];
   }
 
   /**

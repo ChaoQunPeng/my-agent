@@ -28,7 +28,7 @@
         :api-func="chatStreamApi"
         :api-params="{
           type: currentSessionType,
-          resourceId: currentCharacterId
+          resourceId: currentResourceId
         }"
       />
     </div>
@@ -44,7 +44,11 @@
       />
 
       <!-- 写作助手（仅在type为novel时显示） -->
-      <WritingAssistant v-if="currentSessionType == 'novel' && currentSessionId" :session-id="currentSessionId" />
+      <WritingAssistant
+        v-if="currentSessionType == 'novel' && currentSessionId"
+        :session-id="currentSessionId"
+        :novel-code="currentNovelCode"
+      />
     </div>
 
     <!-- 编辑会话对话框 -->
@@ -92,6 +96,16 @@ const currentSessionType = computed(() => {
   return route.meta?.sessionType as string
 })
 
+const currentNovelCode = computed(() => {
+  return (route.meta?.resourceId || route.meta?.novelCode || '') as string
+})
+
+const currentResourceId = computed(() => {
+  if (currentSessionType.value === 'character')
+    return currentCharacterId.value
+  return currentNovelCode.value
+})
+
 // 当前会话绑定的角色ID（用于聊天API调用）
 const currentCharacterId = ref<string>('')
 
@@ -126,7 +140,7 @@ onUnmounted(() => {
 const fetchSessions = async () => {
   try {
     // 根据新的schema，使用category、type、resourceId作为筛选条件
-    const res = await getSessions(currentSessionType.value)
+    const res = await getSessions(currentSessionType.value, currentNovelCode.value || undefined)
     sessions.value = res.data || []
   } catch (error: any) {
     antMessage.error('获取会话列表失败')
@@ -138,7 +152,8 @@ const handleCreateSession = async () => {
   try {
     // 根据新的schema，使用type和resourceId代替novelCode
     const res = await createSession({
-      type: currentSessionType.value
+      type: currentSessionType.value,
+      resourceId: currentNovelCode.value || undefined
     })
     const newSession = res.data
 
