@@ -1,88 +1,91 @@
 <template>
   <div class="novel-outline-page">
-    <!-- 左侧：上传 + 任务控制 -->
+    <!-- 左侧：任务操作 -->
     <div class="left-panel">
-      <!-- 恢复任务：在后端重启 / 页面刷新后，通过 jobId 重新挂上某个历史任务 -->
-      <a-card title="0. 恢复任务" size="small" class="mb-12">
-        <a-form layout="vertical">
-          <a-form-item label="小说编码 novelCode">
-            <a-input-search
-              v-model:value="recoverForm.novelCode"
-              placeholder="输入 novelCode 查询历史任务"
-              enter-button="列出任务"
-              :loading="listingJobs"
-              @search="handleListJobs"
-            />
-          </a-form-item>
-          <a-form-item label="选择历史任务 jobId">
-            <a-select
-              v-model:value="recoverForm.jobId"
-              placeholder="先点上方'列出任务'"
-              :options="jobOptions"
-              :disabled="!jobOptions.length"
-              style="width: 100%"
-              option-label-prop="label"
-            >
-              <template #option="{ label, desc }">
-                <div class="job-option">
-                  <div class="job-option-title">{{ label }}</div>
-                  <div class="job-option-desc">{{ desc }}</div>
-                </div>
-              </template>
-            </a-select>
-          </a-form-item>
-          <a-button type="primary" block :disabled="!recoverForm.jobId" :loading="recovering" @click="handleRecover"> 恢复此任务 </a-button>
-        </a-form>
-      </a-card>
+      <a-card size="small" class="left-panel-card">
+        <a-tabs v-model:activeKey="activeLeftTab" class="left-panel-tabs">
+          <a-tab-pane key="recover" tab="恢复任务">
+            <a-form layout="vertical">
+              <a-form-item label="小说编码 novelCode">
+                <a-input-search
+                  v-model:value="recoverForm.novelCode"
+                  placeholder="输入 novelCode 查询历史任务"
+                  enter-button="列出任务"
+                  :loading="listingJobs"
+                  @search="handleListJobs"
+                />
+              </a-form-item>
+              <a-form-item label="选择历史任务 jobId">
+                <a-select
+                  v-model:value="recoverForm.jobId"
+                  placeholder="先点上方'列出任务'"
+                  :options="jobOptions"
+                  :disabled="!jobOptions.length"
+                  style="width: 100%"
+                  option-label-prop="label"
+                >
+                  <template #option="{ label, desc }">
+                    <div class="job-option">
+                      <div class="job-option-title">{{ label }}</div>
+                      <div class="job-option-desc">{{ desc }}</div>
+                    </div>
+                  </template>
+                </a-select>
+              </a-form-item>
+              <a-button type="primary" block :disabled="!recoverForm.jobId" :loading="recovering" @click="handleRecover"> 恢复此任务 </a-button>
+            </a-form>
+          </a-tab-pane>
 
-      <a-card title="1. 上传 TXT 并拆分" size="small">
-        <a-form layout="vertical" :model="form">
-          <a-form-item label="小说编码 novelCode" required>
-            <a-input v-model:value="form.novelCode" placeholder="如 yi_quan_po_tian" />
-          </a-form-item>
-          <a-form-item label="每块原文总字数（chunkSize）">
-            <a-input-number v-model:value="form.chunkSize" :min="500" :max="20000" :step="500" style="width: 100%" />
-          </a-form-item>
-          <a-form-item label="前后上下文字数（overlap）">
-            <a-input-number v-model:value="form.overlap" :min="0" :max="2000" :step="50" style="width: 100%" />
-          </a-form-item>
-          <a-form-item label="TXT 文件" required>
-            <a-upload :file-list="fileList" :before-upload="onBeforeUpload" :max-count="1" accept=".txt" @remove="onRemoveFile">
-              <a-button><UploadOutlined />选择 txt 文件</a-button>
-            </a-upload>
-          </a-form-item>
-          <a-button type="primary" block :loading="uploading" :disabled="!canUpload" @click="handleUpload"> 上传并拆分 </a-button>
-        </a-form>
-      </a-card>
+          <a-tab-pane key="upload" tab="上传 TXT 并拆分">
+            <a-form layout="vertical" :model="form">
+              <a-form-item label="小说编码 novelCode" required>
+                <a-input v-model:value="form.novelCode" placeholder="如 yi_quan_po_tian" />
+              </a-form-item>
+              <a-form-item label="每块原文总字数（chunkSize）">
+                <a-input-number v-model:value="form.chunkSize" :min="500" :max="20000" :step="500" style="width: 100%" />
+              </a-form-item>
+              <a-form-item label="前后上下文字数（overlap）">
+                <a-input-number v-model:value="form.overlap" :min="0" :max="2000" :step="50" style="width: 100%" />
+              </a-form-item>
+              <a-form-item label="TXT 文件" required>
+                <a-upload :file-list="fileList" :before-upload="onBeforeUpload" :max-count="1" accept=".txt" @remove="onRemoveFile">
+                  <a-button><UploadOutlined />选择 txt 文件</a-button>
+                </a-upload>
+              </a-form-item>
+              <a-button type="primary" block :loading="uploading" :disabled="!canUpload" @click="handleUpload"> 上传并拆分 </a-button>
+            </a-form>
+          </a-tab-pane>
 
-      <a-card v-if="currentJob" title="2. 任务进度" size="small" class="mt-12">
-        <a-descriptions :column="1" size="small" bordered>
-          <a-descriptions-item label="jobId">{{ currentJob.jobId }}</a-descriptions-item>
-          <a-descriptions-item label="原文文件">{{ currentJob.sourceFileName }}</a-descriptions-item>
-          <a-descriptions-item label="原文字数">{{ currentJob.totalChars }}</a-descriptions-item>
-          <a-descriptions-item label="状态">
-            <a-tag :color="statusColor(currentJob.status)">{{ statusText(currentJob.status) }}</a-tag>
-          </a-descriptions-item>
-          <a-descriptions-item label="拆分进度"> {{ currentJob.splittedChunks }} / {{ currentJob.totalChunks }} </a-descriptions-item>
-          <a-descriptions-item label="生成进度">
-            <a-progress :percent="genPercent" :status="currentJob.status === 'failed' ? 'exception' : undefined" size="small" />
-            <span class="fs-12">{{ currentJob.processedChunks }} / {{ currentJob.totalChunks }} 块</span>
-          </a-descriptions-item>
-          <a-descriptions-item v-if="currentJob.lastError" label="错误信息">
-            <span style="color: #ff4d4f">{{ currentJob.lastError }}</span>
-          </a-descriptions-item>
-        </a-descriptions>
+          <a-tab-pane v-if="showTaskProgressTab" key="progress" tab="任务进度">
+            <a-descriptions v-if="currentJob" :column="1" size="small" bordered>
+              <a-descriptions-item label="jobId">{{ currentJob.jobId }}</a-descriptions-item>
+              <a-descriptions-item label="原文文件">{{ currentJob.sourceFileName }}</a-descriptions-item>
+              <a-descriptions-item label="原文字数">{{ currentJob.totalChars }}</a-descriptions-item>
+              <a-descriptions-item label="状态">
+                <a-tag :color="statusColor(currentJob.status)">{{ statusText(currentJob.status) }}</a-tag>
+              </a-descriptions-item>
+              <a-descriptions-item label="拆分进度"> {{ currentJob.splittedChunks }} / {{ currentJob.totalChunks }} </a-descriptions-item>
+              <a-descriptions-item label="生成进度">
+                <a-progress :percent="genPercent" :status="currentJob.status === 'failed' ? 'exception' : undefined" size="small" />
+                <span class="fs-12">{{ currentJob.processedChunks }} / {{ currentJob.totalChunks }} 块</span>
+              </a-descriptions-item>
+              <a-descriptions-item v-if="currentJob.lastError" label="错误信息">
+                <span style="color: #ff4d4f">{{ currentJob.lastError }}</span>
+              </a-descriptions-item>
+            </a-descriptions>
 
-        <div class="action-row">
-          <a-button type="primary" :loading="generating" :disabled="!canGenerate" @click="handleGenerate">
-            {{ currentJob.processedChunks > 0 ? '继续生成大纲' : '开始生成大纲' }}
-          </a-button>
-          <a-button :loading="rebuildingIndex" :disabled="!canRebuildIndex" @click="handleRebuildIndex">
-            重建索引
-          </a-button>
-          <a-button danger :disabled="!canAbort" @click="handleAbort">中止生成</a-button>
-          <a-button @click="handleRefresh">刷新</a-button>
-        </div>
+            <div class="action-row">
+              <a-button type="primary" :loading="generating" :disabled="!canGenerate" @click="handleGenerate">
+                {{ currentJob?.processedChunks ? '继续生成大纲' : '开始生成大纲' }}
+              </a-button>
+              <a-button :loading="rebuildingIndex" :disabled="!canRebuildIndex" @click="handleRebuildIndex">
+                重建索引
+              </a-button>
+              <a-button danger :disabled="!canAbort" @click="handleAbort">中止生成</a-button>
+              <a-button @click="handleRefresh">刷新</a-button>
+            </div>
+          </a-tab-pane>
+        </a-tabs>
       </a-card>
     </div>
 
@@ -241,6 +244,8 @@ const pickedFile = ref<File | null>(null)
 // 当前任务 & 大纲
 const currentJob = ref<NovelOutlineJob | null>(null)
 const outline = ref<NovelOutlineResult | null>(null)
+const activeLeftTab = ref('upload')
+const showTaskProgressTab = computed(() => !!currentJob.value)
 // 右侧查询用 novelCode（和上传 form 的 novelCode 可以不同）
 const queryNovelCode = ref('')
 
@@ -401,6 +406,7 @@ async function handleUpload() {
     // axios 拦截器已返回后端的 { code, msg, data }，非 200 会走 catch
     if (res.data) {
       currentJob.value = res.data
+      activeLeftTab.value = 'progress'
       queryNovelCode.value = res.data.novelCode
       antMessage.success(`拆分与索引完成，共 ${res.data.totalChunks} 块`)
       // 拆分完了就预加载一下已有大纲（可能是之前生成的）
@@ -423,6 +429,7 @@ async function handleGenerate() {
     const res = await startGenerateOutline(currentJob.value.jobId)
     if (res.data) {
       currentJob.value = res.data
+      activeLeftTab.value = 'progress'
       startPolling()
     }
   } catch (e: any) {
@@ -632,6 +639,7 @@ async function handleRecover() {
       return
     }
     currentJob.value = res.data
+    activeLeftTab.value = 'progress'
     queryNovelCode.value = res.data.novelCode
     // 同步到上传表单的 novelCode，便于后续继续生成 / 中止按钮的语义统一
     form.novelCode = res.data.novelCode
@@ -669,6 +677,12 @@ watch(
   }
 )
 
+watch(showTaskProgressTab, visible => {
+  if (!visible && activeLeftTab.value === 'progress') {
+    activeLeftTab.value = 'upload'
+  }
+})
+
 onBeforeUnmount(() => {
   stopPolling()
 })
@@ -687,15 +701,22 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   overflow-y: auto;
 }
+.left-panel-card {
+  height: 100%;
+}
+.left-panel-tabs {
+  height: 100%;
+}
+.left-panel-tabs :deep(.ant-tabs-content-holder) {
+  overflow-y: auto;
+}
+.left-panel-tabs :deep(.ant-tabs-content),
+.left-panel-tabs :deep(.ant-tabs-tabpane) {
+  height: 100%;
+}
 .right-panel {
   flex: 1;
   overflow-y: auto;
-}
-.mt-12 {
-  margin-top: 12px;
-}
-.mb-12 {
-  margin-bottom: 12px;
 }
 .fs-12 {
   font-size: 12px;
