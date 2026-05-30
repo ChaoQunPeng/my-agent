@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import type { VNodeChild } from 'vue'
-import { isFunction } from '@v-c/utils'
 import { useLayoutState } from '~/layouts/basic-layout/context'
 import { useLayoutMenuInject } from './context.ts'
 
@@ -16,8 +14,7 @@ const slots = defineSlots<{
   footer?: (props: any) => any
 }>()
 
-const { layoutMenu: layoutMenuStore, appStore } = useLayoutMenuInject()
-const { layoutSetting } = (storeToRefs as any)(appStore)
+const { layoutMenu: layoutMenuStore } = useLayoutMenuInject()
 const { menuDataMap } = (storeToRefs as any)(layoutMenuStore)
 const route = useRoute()
 function getCurrentItem() {
@@ -52,11 +49,6 @@ const contentCls = computed(() => {
 
   return cls
 })
-function renderTitle(title: VNodeChild | (() => VNodeChild)) {
-  if (isFunction(title)) return title()
-
-  return title
-}
 </script>
 
 <template>

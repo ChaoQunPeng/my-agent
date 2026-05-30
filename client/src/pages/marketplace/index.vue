@@ -70,7 +70,6 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue';
 import { SearchOutlined } from '@ant-design/icons-vue';
-const selectTags = reactive([true, false, false, false]);
 
 const list = [
   {
@@ -395,40 +394,14 @@ const list = [
   }
 ];
 
-// 标签数据
-const tags = ref([
-  { label: '全部', value: '' },
-  { label: '类别1', value: 'cat1' },
-  { label: '类别2', value: 'cat2' },
-  { label: '类别3', value: 'cat3' }
-]);
-
 // 搜索和筛选相关的响应式数据
 const searchText = ref('');
-const selectedTag = ref('');
 const currentPage = ref(1);
 const pageSize = ref(8);
-
-// 标签选择处理函数
-const selectTag = (index: number) => {
-  for (let index = 0; index < selectTags.length; index++) {
-    selectTags[index] = false;
-  }
-
-  selectTags[index] = true;
-  // 重置到第一页
-  currentPage.value = 1;
-};
 
 // 计算过滤后的列表
 const filteredList = computed(() => {
   return list.filter(item => {
-    // 标签筛选
-    if (selectedTag.value && selectedTag.value !== '') {
-      // 这里应该根据实际的标签数据进行筛选
-      // 目前只是一个示例
-    }
-
     // 搜索文本筛选
     if (searchText.value) {
       return (
@@ -447,12 +420,6 @@ const paginatedList = computed(() => {
   const end = start + pageSize.value;
   return filteredList.value.slice(start, end);
 });
-
-// 搜索处理函数
-const onSearch = () => {
-  // 重置到第一页
-  currentPage.value = 1;
-};
 
 // 分页改变处理函数
 const onPageChange = (page: number) => {

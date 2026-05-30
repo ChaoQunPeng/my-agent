@@ -16,7 +16,6 @@ import GlobalLayoutFooter from '~/layouts/components/global-footer/index.vue';
 import { getQueryParam } from '~/utils/tools';
 
 const message = useMessage();
-const notification = useNotification();
 const appStore = useAppStore();
 const { layoutSetting } = storeToRefs(appStore);
 const router = useRouter();

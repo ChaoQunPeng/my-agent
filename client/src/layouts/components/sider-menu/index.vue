@@ -66,7 +66,7 @@ import type { CSSProperties } from 'vue'
 // import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue';
 import { useLayoutState } from '../../basic-layout/context'
 import Menu from '../menu/index.vue'
-import { RobotOutlined, DatabaseOutlined, TeamOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { RobotOutlined, SettingOutlined } from '@ant-design/icons-vue'
 const router = useRouter()
 
 const { currentRoute } = useCurrentRoute()

@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { pick } from '@v-c/utils';
-import { animationNameList } from '~@/config/default-setting';
 import BasicLayout from './basic-layout/index.vue';
 import RouteView from './components/route-view.vue';
-import SettingDrawer from './components/setting-drawer/index.vue';
 import MultiTab from './multi-tab/index.vue';
 
 defineOptions({
@@ -13,10 +11,9 @@ const appStore = useAppStore();
 const { layoutSetting } = storeToRefs(appStore);
 const userStore = useUserStore();
 const layoutMenu = useLayoutMenu();
-const { t } = useI18nLocale();
 const { selectedKeys, openKeys } = storeToRefs(layoutMenu);
 const { isMobile, isPad } = useQueryBreakpoints();
-watch(isPad, val => {
+watch(() => isPad.value, val => {
   if (val) appStore.toggleCollapsed(true);
   else appStore.toggleCollapsed(false);
 });

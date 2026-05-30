@@ -8,20 +8,9 @@ export const breakpointsEnum = {
 
 export function useQueryBreakpoints() {
   const breakpoints = reactive(useBreakpoints(breakpointsEnum));
-
-  // // 手机端
-  // const isMobile = breakpoints.smaller('sm');
-  // // pad端
-  // const isPad = breakpoints.between('sm', 'md');
-  // // pc端
-  // const isDesktop = breakpoints.greater('md');
-
-  // 手机端
-  const isMobile = false;
-  // pad端
-  const isPad = false;
-  // pc端
-  const isDesktop = true;
+  const isMobile = breakpoints.smaller('sm');
+  const isPad = breakpoints.between('sm', 'md');
+  const isDesktop = breakpoints.greater('md');
 
   return {
     breakpoints,

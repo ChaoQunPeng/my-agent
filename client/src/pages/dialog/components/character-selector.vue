@@ -184,7 +184,7 @@
           <a-col :span="10">
             <a-form-item label="行为图谱">
               <div class="behavior-input">
-                <div v-for="(desc, index) in editForm.behaviorAtlas || []" :key="index" class="behavior-item-input">
+                <div v-for="(_, index) in editForm.behaviorAtlas || []" :key="index" class="behavior-item-input">
                   <a-input v-model:value="editForm.behaviorAtlas![index]" placeholder="描述解决问题的逻辑、应对压力的反应" />
                   <a-button type="text" danger @click="removeBehaviorDescription(index)">
                     <DeleteOutlined />
@@ -205,7 +205,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
-import dayjs, { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import { message as antMessage, Modal } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import {

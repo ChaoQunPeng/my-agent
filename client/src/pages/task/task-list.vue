@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MenuProps, PaginationProps, TableProps, FormProps, ModalProps } from 'ant-design-vue';
+import type { MenuProps, PaginationProps, ModalProps } from 'ant-design-vue';
 import type { TaskModel, CreateTaskParams, UpdateTaskParams } from '~@/api/task';
 import {
   PlusOutlined,
@@ -142,7 +142,6 @@ const visibleColumns = computed(() => {
   return columns.value.filter(item => item.dataIndex !== 'action');
 });
 
-const openColumnConfig = ref(false);
 const columnConfig = ref<string[]>([]);
 
 // 标签输入

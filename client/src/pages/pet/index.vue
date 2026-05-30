@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 
 // 状态定义
 const userInput = ref('')
@@ -78,7 +78,7 @@ interface Message {
 const messages = ref<Message[]>([{ role: 'assistant', content: '喵~ 你好呀！我是你的AI宠物小伙伴，今天想和我玩什么呀？' }])
 
 // 模拟API调用（请替换为真实的DeepSeek API）
-const callDeepSeekAPI = async (userMessage: string): Promise<string> => {
+const callDeepSeekAPI = async (): Promise<string> => {
   // TODO: 请替换为您的实际API调用
   // 示例：使用fetch调用DeepSeek API
   /*
@@ -132,7 +132,7 @@ const sendMessage = async () => {
     // 显示思考气泡
     showThoughtBubble('思考中...')
 
-    const reply = await callDeepSeekAPI(userMsg)
+    const reply = await callDeepSeekAPI()
 
     hideThoughtBubble()
     messages.value.push({ role: 'assistant', content: reply })

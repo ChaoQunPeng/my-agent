@@ -162,9 +162,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { message as antMessage } from 'ant-design-vue'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
-import { getNovelConfigByCode, createOrUpdateNovelConfig, type NovelConfig, type Character } from '@/api/novel-context'
-import { getSessionDetail } from '@/api/session'
+import { getNovelConfigByCode, createOrUpdateNovelConfig, type NovelConfig } from '@/api/novel-context'
 
 const props = defineProps<{
   sessionId: string
@@ -314,38 +312,6 @@ const handleSaveArrayField = async (field: 'avoidPlots' | 'forbiddenWords') => {
   }
 }
 
-// 添加角色
-const addCharacter = () => {
-  if (!formData.value.charactersList) {
-    formData.value.charactersList = []
-  }
-  formData.value.charactersList.push({
-    name: '',
-    identity: '',
-    personality: '',
-    goals: '',
-    traits: ''
-  })
-}
-
-// 删除角色
-const removeCharacter = (index: number) => {
-  if (formData.value.charactersList) {
-    formData.value.charactersList.splice(index, 1)
-  }
-}
-
-// 保存角色
-const handleSaveCharacters = async () => {
-  try {
-    await createOrUpdateNovelConfig(formData.value)
-    antMessage.success('保存成功')
-  } catch (error) {
-    console.error('保存失败:', error)
-    antMessage.error('保存失败')
-  }
-}
-
 // 保存全部字段
 const handleSaveAll = async () => {
   // 验证 novelCode
@@ -389,7 +355,7 @@ const generateFullChapter = async () => {
     // 提取所有用户提示和 AI 回复，组织成连贯的章节
     const chapterParts: string[] = []
 
-    sessionMessages.value.forEach((msg, index) => {
+    sessionMessages.value.forEach(msg => {
       if (msg.role === 'assistant' && msg.content.trim()) {
         // 清理 AI 回复中的标记性文字
         let content = msg.content
@@ -429,7 +395,7 @@ const generateFullChapter = async () => {
 // 监听 sessionId 和 novelCode 变化
 watch(
   [() => props.sessionId, () => props.novelCode],
-  ([newSessionId, newNovelCode]) => {
+  ([, newNovelCode]) => {
     formData.value.novelCode = newNovelCode || ''
     loadConfig()
   },

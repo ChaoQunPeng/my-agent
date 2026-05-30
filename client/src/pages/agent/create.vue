@@ -108,8 +108,4 @@ const handleSubmit = async () => {
 const handleReset = () => {
   formRef.value?.resetFields();
 };
-
-const goBack = () => {
-  router.go(-1);
-};
 </script>

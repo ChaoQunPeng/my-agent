@@ -142,7 +142,7 @@ type FxMode = 'grain' | 'scanline' | 'crt'
 /**
  * 主题配置
  */
-const THEME: ThemeMode = 'horror'
+const THEME = 'horror' as ThemeMode
 
 /**
  * FX 氛围效果
