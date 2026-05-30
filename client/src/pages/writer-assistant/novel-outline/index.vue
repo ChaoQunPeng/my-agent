@@ -77,6 +77,9 @@
           <a-button type="primary" :loading="generating" :disabled="!canGenerate" @click="handleGenerate">
             {{ currentJob.processedChunks > 0 ? '继续生成大纲' : '开始生成大纲' }}
           </a-button>
+          <a-button :loading="rebuildingIndex" :disabled="!canRebuildIndex" @click="handleRebuildIndex">
+            重建索引
+          </a-button>
           <a-button danger :disabled="!canAbort" @click="handleAbort">中止生成</a-button>
           <a-button @click="handleRefresh">刷新</a-button>
         </div>
@@ -215,6 +218,7 @@ import {
   getOutlineJobStatus,
   abortOutlineJob,
   getNovelOutline,
+  rebuildNovelMetaIndex,
   listOutlineJobs,
   getAliasCandidates,
   mergeAlias,
@@ -242,6 +246,7 @@ const queryNovelCode = ref('')
 
 const uploading = ref(false)
 const generating = ref(false)
+const rebuildingIndex = ref(false)
 
 // 恢复任务相关状态：用户输入 novelCode，查询历史 job 列表，选中后恢复为 currentJob
 const recoverForm = reactive({
@@ -270,6 +275,13 @@ const canGenerate = computed(
     currentJob.value.processedChunks < currentJob.value.totalChunks
 )
 const canAbort = computed(() => !!currentJob.value && (currentJob.value.status === 'splitting' || currentJob.value.status === 'generating'))
+const canRebuildIndex = computed(
+  () =>
+    !!currentJob.value &&
+    currentJob.value.status !== 'splitting' &&
+    currentJob.value.status !== 'meta_generating' &&
+    currentJob.value.status !== 'generating'
+)
 
 const genPercent = computed(() => {
   if (!currentJob.value || !currentJob.value.totalChunks) return 0
@@ -339,7 +351,7 @@ function statusText(s: NovelOutlineJob['status']) {
   return (
     {
       splitting: '拆分中',
-      meta_generating: 'Meta生成中',
+      meta_generating: '索引生成中',
       split_done: '导入完成',
       generating: '生成中',
       done: '已完成',
@@ -390,7 +402,7 @@ async function handleUpload() {
     if (res.data) {
       currentJob.value = res.data
       queryNovelCode.value = res.data.novelCode
-      antMessage.success(`拆分完成，共 ${res.data.totalChunks} 块`)
+      antMessage.success(`拆分与索引完成，共 ${res.data.totalChunks} 块`)
       // 拆分完了就预加载一下已有大纲（可能是之前生成的）
       await loadOutline()
     }
@@ -417,6 +429,25 @@ async function handleGenerate() {
     antMessage.error(e?.response?.data?.msg || e?.message || '启动失败')
   } finally {
     generating.value = false
+  }
+}
+
+async function handleRebuildIndex() {
+  if (!currentJob.value) return
+  rebuildingIndex.value = true
+  try {
+    const res = await rebuildNovelMetaIndex({
+      novelCode: currentJob.value.novelCode,
+      jobId: currentJob.value.jobId
+    })
+    if (res.data) {
+      currentJob.value = res.data
+    }
+    antMessage.success('索引重建完成')
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '索引重建失败')
+  } finally {
+    rebuildingIndex.value = false
   }
 }
 

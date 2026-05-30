@@ -12,6 +12,7 @@ import {
   NovelOutline,
   NovelOutlineSchema,
 } from './schemas/novel-outline.schema';
+import { NovelMeta, NovelMetaSchema } from './schemas/novel-meta.schema';
 import { OpenaiModule } from '../../shared/openai/openai.module';
 
 /**
@@ -23,6 +24,7 @@ import { OpenaiModule } from '../../shared/openai/openai.module';
     MongooseModule.forFeature([
       { name: NovelSplitJob.name, schema: NovelSplitJobSchema },
       { name: NovelOutline.name, schema: NovelOutlineSchema },
+      { name: NovelMeta.name, schema: NovelMetaSchema },
     ]),
     OpenaiModule,
   ],

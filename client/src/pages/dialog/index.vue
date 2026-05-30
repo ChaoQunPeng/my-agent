@@ -3,7 +3,7 @@
     <!-- 左侧会话列表 -->
     <div class="session-sidebar">
       <div class="sidebar-header">
-        <a-button type="primary" block @click="handleCreateSession"> <PlusOutlined /> 新建对话 </a-button>
+        <a-button type="primary" block :disabled="createSessionDisabled" @click="handleCreateSession"> <PlusOutlined /> 新建对话 </a-button>
       </div>
 
       <div class="session-list">
@@ -35,6 +35,26 @@
 
     <!-- 素材区域 -->
     <div class="material-area">
+      <div v-if="currentSessionType === 'novel'" class="novel-selector-card">
+        <div class="novel-selector-title">小说对话</div>
+        <div class="novel-selector-subtitle">输入或选择 `novelCode`，切换当前小说的会话和百科问答上下文。</div>
+        <div class="novel-selector-row">
+          <a-auto-complete
+            v-model:value="novelCodeDraft"
+            :options="novelCodeOptions"
+            :filter-option="filterNovelCodeOption"
+            placeholder="输入或选择 novelCode，如 longzu"
+            class="novel-selector-input"
+            @select="handleNovelCodeSelect"
+            @keyup.enter="handleNovelCodeSubmit()"
+          />
+          <a-button type="primary" @click="handleNovelCodeSubmit()">切换</a-button>
+        </div>
+        <div class="novel-selector-current">
+          当前小说：{{ currentNovelCode || '未选择' }}
+        </div>
+      </div>
+
       <!-- 人物选择组件（仅在type为character时显示） -->
       <CharacterSelector
         v-if="currentSessionType == 'character' && currentSessionId"
@@ -74,6 +94,7 @@ import WritingAssistant from './components/writing-assistant.vue'
 import CharacterSelector from './components/character-selector.vue'
 import { chatStreamApi } from '../../composables/chat-stream'
 import { getSessions, createSession, updateSession, deleteSession, type Session } from '@/api/session'
+import { listOutlineJobs } from '@/api/novel-outline'
 // 导入获取会话绑定角色的 API
 import { getCharacterBySessionId } from '@/api/character'
 
@@ -96,14 +117,22 @@ const currentSessionType = computed(() => {
   return route.meta?.sessionType as string
 })
 
-const currentNovelCode = computed(() => {
+const routeNovelCode = computed(() => {
   return (route.meta?.resourceId || route.meta?.novelCode || '') as string
 })
+
+const currentNovelCode = ref('')
+const novelCodeDraft = ref('')
+const novelCodeOptions = ref<Array<{ value: string }>>([])
 
 const currentResourceId = computed(() => {
   if (currentSessionType.value === 'character')
     return currentCharacterId.value
-  return currentNovelCode.value
+  return currentNovelCode.value.trim()
+})
+
+const createSessionDisabled = computed(() => {
+  return currentSessionType.value === 'novel' && !currentNovelCode.value.trim()
 })
 
 // 当前会话绑定的角色ID（用于聊天API调用）
@@ -126,7 +155,11 @@ const editForm = ref({
 })
 
 onMounted(() => {
+  syncNovelCodeFromRoute()
   fetchSessions()
+  if (currentSessionType.value === 'novel') {
+    loadNovelCodeOptions()
+  }
 })
 
 onUnmounted(() => {
@@ -139,6 +172,11 @@ onUnmounted(() => {
 // 获取会话列表
 const fetchSessions = async () => {
   try {
+    if (currentSessionType.value === 'novel' && !currentNovelCode.value.trim()) {
+      sessions.value = []
+      return
+    }
+
     // 根据新的schema，使用category、type、resourceId作为筛选条件
     const res = await getSessions(currentSessionType.value, currentNovelCode.value || undefined)
     sessions.value = res.data || []
@@ -150,6 +188,11 @@ const fetchSessions = async () => {
 // 创建新会话
 const handleCreateSession = async () => {
   try {
+    if (currentSessionType.value === 'novel' && !currentNovelCode.value.trim()) {
+      antMessage.warning('请先输入 novelCode')
+      return
+    }
+
     // 根据新的schema，使用type和resourceId代替novelCode
     const res = await createSession({
       type: currentSessionType.value,
@@ -187,6 +230,70 @@ const handleSelectSession = async (sessionId: string) => {
   }
 
   messageListRef.value?.scrollToBottom()
+}
+
+const syncNovelCodeFromRoute = () => {
+  if (currentSessionType.value !== 'novel') {
+    currentNovelCode.value = ''
+    novelCodeDraft.value = ''
+    return
+  }
+
+  const code = routeNovelCode.value.trim()
+  currentNovelCode.value = code
+  novelCodeDraft.value = code
+}
+
+const loadNovelCodeOptions = async () => {
+  if (currentSessionType.value !== 'novel') return
+
+  try {
+    const res = await listOutlineJobs()
+    const codes = Array.from(
+      new Set((res.data || []).map(job => job.novelCode).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b))
+
+    novelCodeOptions.value = codes.map(code => ({
+      value: code
+    }))
+  } catch (error) {
+    console.error('加载 novelCode 列表失败', error)
+  }
+}
+
+const handleNovelCodeSubmit = async (selectedValue?: string) => {
+  const nextCode = (selectedValue || novelCodeDraft.value).trim()
+  novelCodeDraft.value = nextCode
+
+  if (!nextCode) {
+    currentNovelCode.value = ''
+    currentSessionId.value = ''
+    chatPanelRef.value?.clearMessages()
+    sessions.value = []
+    antMessage.warning('请先输入 novelCode')
+    return
+  }
+
+  if (nextCode === currentNovelCode.value.trim()) {
+    await fetchSessions()
+    return
+  }
+
+  currentNovelCode.value = nextCode
+  currentSessionId.value = ''
+  currentCharacterId.value = ''
+  chatPanelRef.value?.clearMessages()
+  await fetchSessions()
+  antMessage.success(`已切换到小说 ${nextCode}`)
+}
+
+const handleNovelCodeSelect = (value: string | number | { value?: string | number }) => {
+  const nextValue = typeof value === 'object' ? value?.value : value
+  void handleNovelCodeSubmit(nextValue == null ? '' : String(nextValue))
+}
+
+const filterNovelCodeOption = (input: string, option: { value: string }) => {
+  return option.value.toLowerCase().includes(input.toLowerCase())
 }
 
 /**
@@ -291,10 +398,15 @@ const handleUpdateSession = async () => {
 watch(
   () => [route.meta?.sessionCategory, route.meta?.resourceType, route.meta?.resourceId],
   () => {
+    syncNovelCodeFromRoute()
     // 清空当前选中的会话和消息
     currentSessionId.value = ''
+    chatPanelRef.value?.clearMessages()
     // 重新获取会话列表
     fetchSessions()
+    if (currentSessionType.value === 'novel') {
+      loadNovelCodeOptions()
+    }
   }
 )
 </script>
@@ -399,6 +511,46 @@ watch(
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #fcfcfd 0%, #f5f7fb 100%);
+}
+
+.novel-selector-card {
+  margin: 16px;
+  padding: 16px;
+  border: 1px solid #e7ebf3;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.novel-selector-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.novel-selector-subtitle {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.novel-selector-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.novel-selector-input {
+  flex: 1;
+}
+
+.novel-selector-current {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #4b5563;
 }
 
 // 右侧聊天区域
@@ -469,6 +621,12 @@ watch(
     height: 200px;
     border-right: none;
     border-bottom: 1px solid #f0f0f0;
+  }
+
+  .material-area {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #f0f0f0;
   }
 }
 </style>

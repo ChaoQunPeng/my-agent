@@ -61,6 +61,12 @@ export class NovelCodeDto {
   novelCode: string;
 }
 
+export class RebuildNovelMetaDto extends NovelCodeDto {
+  @IsString()
+  @IsOptional()
+  jobId?: string;
+}
+
 /**
  * 查询 novel_split_jobs
  */

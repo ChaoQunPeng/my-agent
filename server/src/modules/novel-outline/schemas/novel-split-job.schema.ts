@@ -58,8 +58,8 @@ export class NovelSplitJob {
   @Prop({ required: true, comment: '切片文件所在目录' })
   chunkDir!: string;
 
-  // chunk meta 所在目录（绝对路径）
-  @Prop({ default: '', comment: 'chunk meta 文件所在目录' })
+  // 已废弃：历史 meta.json 目录，保留字段仅用于兼容旧数据
+  @Prop({ default: '', comment: '已废弃：历史 chunk meta 文件所在目录' })
   metaDir!: string;
 
   // 源 txt 文件的存档路径（绝对路径，万一要重新拆分）
@@ -76,7 +76,7 @@ export class NovelSplitJob {
   @Prop({ default: 0, comment: '已完成提取的切片数量' })
   processedChunks!: number;
 
-  @Prop({ default: 0, comment: '已生成 meta 的切片数量' })
+  @Prop({ default: 0, comment: '已完成索引生成的切片数量' })
   metaGeneratedChunks!: number;
 
   @Prop({ default: 0, comment: '当前正在处理的切片序号（便于展示运行进度）' })

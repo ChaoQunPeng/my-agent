@@ -263,7 +263,23 @@ export function getNovelOutline(novelCode: string) {
   }))
 }
 
-export function listOutlineJobs(novelCode: string) {
+export function rebuildNovelMetaIndex(params: {
+  novelCode: string
+  jobId?: string
+}) {
+  return request.post<RawNovelOutlineJob>(
+    '/novel-outline/rebuild-meta-index',
+    params,
+    {
+      timeout: 300000,
+    },
+  ).then((res) => ({
+    ...res,
+    data: res.data ? normalizeJob(res.data) : res.data,
+  }))
+}
+
+export function listOutlineJobs(novelCode?: string) {
   return request.post<{
     list: RawNovelOutlineJob[]
     total: number

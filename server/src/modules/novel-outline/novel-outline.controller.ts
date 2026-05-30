@@ -21,6 +21,7 @@ import { NovelOutlineService } from './novel-outline.service';
 import {
   UploadAndSplitDto,
   NovelCodeDto,
+  RebuildNovelMetaDto,
   SplitJobQueryDto,
   JobIdDto,
   MergeAliasDto,
@@ -124,6 +125,15 @@ export class NovelOutlineController {
       body.novelCode,
     );
     return ApiResponseDto.success(result);
+  }
+
+  @Post('rebuild-meta-index')
+  async rebuildMetaIndex(@Body() body: RebuildNovelMetaDto) {
+    const result = await this.novelOutlineService.rebuildNovelMetaIndex({
+      novelCode: body.novelCode,
+      jobId: body.jobId,
+    });
+    return ApiResponseDto.success(result, '索引重建完成');
   }
 
   /**

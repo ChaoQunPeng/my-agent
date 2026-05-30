@@ -45,6 +45,17 @@ export default [
           resourceId: 'yi_quan_po_tian'
         }
       },
+      {
+        path: '/writer-assistant/novel-dialog',
+        name: 'WriterAssistantNovelDialog',
+        component: () => import('~/pages/dialog/index.vue'),
+        meta: {
+          title: '小说对话',
+          icon: 'CommentOutlined',
+          sessionType: 'novel',
+          sessionCategory: 'writing'
+        }
+      },
       // 小说大纲生成：上传 txt → 拆分 → 调用大模型增量生成大纲
       {
         path: '/writer-assistant/novel-outline',
