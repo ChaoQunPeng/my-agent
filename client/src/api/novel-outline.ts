@@ -74,14 +74,6 @@ interface RawNovelOutlineResult {
   updatedAt?: string
 }
 
-interface RawSecondPassResult {
-  novelCode: string
-  worldView?: RawWorldView
-  characters?: RawOutlineCharacter[]
-  events?: RawOutlineEvent[]
-  updatedAt?: string | null
-}
-
 export interface OutlineCharacter {
   name: string
   aliases?: string[]
@@ -105,20 +97,6 @@ export interface NovelOutlineResult {
   rawLastResponse: string
   createdAt?: string
   updatedAt?: string
-}
-
-export interface SecondPassResult {
-  novelCode: string
-  worldSetting: string
-  characters: OutlineCharacter[]
-  eventsText: string
-  events: Array<{
-    title: string
-    summary: string
-    characters: string[]
-    chunkIndex?: number
-  }>
-  updatedAt?: string | null
 }
 
 function normalizeStringList(values?: Array<string | undefined | null>): string[] {
@@ -210,52 +188,6 @@ function normalizeOutline(outline: RawNovelOutlineResult | null): NovelOutlineRe
     rawLastResponse: '',
     createdAt: outline.createdAt,
     updatedAt: outline.updatedAt,
-  }
-}
-
-function normalizeSecondPass(result: RawSecondPassResult | null): SecondPassResult | null {
-  if (!result) return null
-
-  const worldView = result.worldView || {}
-  const characters = (result.characters || []).map((character) => ({
-    name: character.name,
-    aliases: normalizeStringList(character.aliases),
-    aliasCandidates: normalizeStringList(character.aliasCandidates),
-    identity: joinLines(character.identity),
-    personality: joinLines(character.personality),
-    goals: joinLines(character.goals),
-    traits: joinLines(character.traits),
-    relations: joinLines(character.relations),
-  }))
-  const events = (result.events || []).map((event) => ({
-    title: event.title,
-    summary: joinLines(event.summary),
-    characters: normalizeStringList(event.characters),
-    chunkIndex: event.chunkIndex,
-  }))
-
-  const worldSettingParts = [
-    ...normalizeStringList(worldView.worldType).map((value) => `世界类型：${value}`),
-    ...normalizeStringList(worldView.summary),
-    ...normalizeStringList(worldView.socialStructure).map(
-      (value) => `社会结构：${value}`,
-    ),
-    ...normalizeStringList(worldView.coreRules).map((value) => `核心规则：${value}`),
-  ]
-
-  return {
-    novelCode: result.novelCode,
-    worldSetting: worldSettingParts.join('\n'),
-    characters,
-    eventsText: events
-      .map((event, index) =>
-        event.summary
-          ? `${index + 1}. ${event.title}\n${event.summary}`
-          : `${index + 1}. ${event.title}`,
-      )
-      .join('\n\n'),
-    events,
-    updatedAt: result.updatedAt,
   }
 }
 
@@ -357,29 +289,4 @@ export function mergeAlias(params: {
   aliasesToConfirm: string[]
 }) {
   return request.post('/novel-outline/merge-alias', params)
-}
-
-export function startSecondPassSummary(novelCode: string) {
-  return request.post<{
-    novelCode: string
-    worldView: {
-      worldType: string[]
-      summary: string[]
-      socialStructure: string[]
-      coreRules: string[]
-    }
-    characterCount: number
-    eventCount: number
-  }>('/novel-outline/start-second-pass', {
-    novelCode,
-  })
-}
-
-export function getSecondPassSummary(novelCode: string) {
-  return request.post<RawSecondPassResult | null>('/novel-outline/get-second-pass', {
-    novelCode,
-  }).then((res) => ({
-    ...res,
-    data: normalizeSecondPass(res.data ?? null),
-  }))
 }

@@ -12,18 +12,6 @@ import {
   NovelOutline,
   NovelOutlineSchema,
 } from './schemas/novel-outline.schema';
-import {
-  NovelWorldView,
-  NovelWorldViewSchema,
-} from './schemas/novel-world-view.schema';
-import {
-  NovelCharacters,
-  NovelCharactersSchema,
-} from './schemas/novel-characters.schema';
-import {
-  NovelEvents,
-  NovelEventsSchema,
-} from './schemas/novel-events.schema';
 import { OpenaiModule } from '../../shared/openai/openai.module';
 
 /**
@@ -35,9 +23,6 @@ import { OpenaiModule } from '../../shared/openai/openai.module';
     MongooseModule.forFeature([
       { name: NovelSplitJob.name, schema: NovelSplitJobSchema },
       { name: NovelOutline.name, schema: NovelOutlineSchema },
-      { name: NovelWorldView.name, schema: NovelWorldViewSchema },
-      { name: NovelCharacters.name, schema: NovelCharactersSchema },
-      { name: NovelEvents.name, schema: NovelEventsSchema },
     ]),
     OpenaiModule,
   ],
