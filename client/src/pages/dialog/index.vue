@@ -1,79 +1,64 @@
 <template>
-  <div class="chat-page">
-    <!-- 左侧会话列表 -->
-    <div class="session-sidebar">
-      <div class="sidebar-header">
-        <a-button type="primary" block :disabled="createSessionDisabled" @click="handleCreateSession"> <PlusOutlined /> 新建对话 </a-button>
+  <div
+    class="session-chat-page"
+    :class="{ 'session-chat-page--with-material': hasMaterial }"
+  >
+    <div class="session-chat-page__sidebar">
+      <div class="session-chat-page__sidebar-header">
+        <a-button
+          type="primary"
+          block
+          :disabled="createSessionDisabled"
+          @click="emit('create-session')"
+        >
+          <PlusOutlined />
+          新建对话
+        </a-button>
       </div>
 
-      <div class="session-list">
+      <div class="session-chat-page__session-list">
         <SessionItem
           v-for="session in sessions"
           :key="session.sessionId"
           :session="session"
           :is-active="currentSessionId === session.sessionId"
-          @click="handleSelectSession"
+          @click="emit('select-session', session.sessionId)"
           @action="handleSessionAction"
         />
 
-        <a-empty v-if="sessions.length === 0" description="暂无会话" class="mt-48" />
+        <a-empty
+          v-if="sessions.length === 0"
+          description="暂无会话"
+          class="mt-48"
+        />
       </div>
     </div>
 
-    <!-- 右侧聊天区域 -->
-    <div class="chat-container">
+    <div class="session-chat-page__chat">
       <ChatPanel
         ref="chatPanelRef"
-        :session-id="currentSessionId"
-        :api-func="chatStreamApi"
-        :api-params="{
-          type: currentSessionType,
-          resourceId: currentResourceId
-        }"
+        :session-id="sessionId"
+        :api-func="apiFunc"
+        :api-params="apiParams"
       />
     </div>
 
-    <!-- 素材区域 -->
-    <div class="material-area">
-      <div v-if="currentSessionType === 'novel'" class="novel-selector-card">
-        <div class="novel-selector-title">小说对话</div>
-        <div class="novel-selector-subtitle">输入或选择 `novelCode`，切换当前小说的会话和百科问答上下文。</div>
-        <div class="novel-selector-row">
-          <a-auto-complete
-            v-model:value="novelCodeDraft"
-            :options="novelCodeOptions"
-            :filter-option="filterNovelCodeOption"
-            placeholder="输入或选择 novelCode，如 longzu"
-            class="novel-selector-input"
-            @select="handleNovelCodeSelect"
-            @keyup.enter="handleNovelCodeSubmit()"
-          />
-          <a-button type="primary" @click="handleNovelCodeSubmit()">切换</a-button>
-        </div>
-        <div class="novel-selector-current">当前小说：{{ currentNovelCode || '未选择' }}</div>
-      </div>
-
-      <!-- 人物选择组件（仅在type为character时显示） -->
-      <CharacterSelector
-        v-else-if="currentSessionType == 'character' && currentSessionId"
-        :session-id="currentSessionId"
-        v-model="selectedCharacterId"
-        @character-bound="handleCharacterBound"
-      />
-
-      <!-- 写作助手（仅在type为novel时显示） -->
-      <WritingAssistant
-        v-else-if="currentSessionType == 'novel' && currentSessionId"
-        :session-id="currentSessionId"
-        :novel-code="currentNovelCode"
-      />
+    <div v-if="hasMaterial" class="session-chat-page__material">
+      <slot name="material" />
     </div>
 
-    <!-- 编辑会话对话框 -->
-    <a-modal v-model:open="editModalVisible" title="编辑会话" @ok="handleUpdateSession" @cancel="editModalVisible = false">
+    <a-modal
+      v-model:open="editModalVisible"
+      title="编辑会话"
+      @ok="handleSaveSessionTitle"
+      @cancel="editModalVisible = false"
+    >
       <a-form :model="editForm" layout="vertical">
         <a-form-item label="会话标题" required>
-          <a-input v-model:value="editForm.title" placeholder="请输入会话标题" />
+          <a-input
+            v-model:value="editForm.title"
+            placeholder="请输入会话标题"
+          />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -81,426 +66,157 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { message as antMessage, Modal } from 'ant-design-vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
-import ChatPanel from '~@/components/chat/chat-panel.vue'
-import SessionItem from '@/components/chat/session-item.vue'
-import MessageList from '@/components/chat/message-list.vue'
-import WritingAssistant from './components/writing-assistant.vue'
-import CharacterSelector from './components/character-selector.vue'
-import { chatStreamApi } from '../../composables/chat-stream'
-import { getSessions, createSession, updateSession, deleteSession, type Session } from '@/api/session'
-import { listOutlineJobs } from '@/api/novel-outline'
-// 导入获取会话绑定角色的 API
-import { getCharacterBySessionId } from '@/api/character'
+import { computed, ref, useSlots } from "vue";
+import { message as antMessage, Modal } from "ant-design-vue";
+import { PlusOutlined } from "@ant-design/icons-vue";
+import ChatPanel from "@/components/chat/chat-panel.vue";
+import SessionItem from "@/components/chat/session-item.vue";
+import type { Session } from "@/api/session";
 
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  loading?: boolean
-  loadingText?: string
-}
+const props = withDefaults(
+  defineProps<{
+    sessions: Session[];
+    currentSessionId: string;
+    sessionId?: string;
+    apiFunc: (params: any) => Promise<any>;
+    apiParams?: Record<string, unknown>;
+    createSessionDisabled?: boolean;
+  }>(),
+  {
+    sessionId: "",
+    apiParams: () => ({}),
+    createSessionDisabled: false,
+  },
+);
 
-// 会话相关
-const sessions = ref<Session[]>([])
-const currentSessionId = ref<string>('')
-const chatPanelRef = ref<InstanceType<typeof ChatPanel> | null>(null)
+const emit = defineEmits<{
+  (e: "create-session"): void;
+  (e: "select-session", sessionId: string): void;
+  (e: "delete-session", sessionId: string): void;
+  (
+    e: "save-session-title",
+    payload: { sessionId: string; title: string },
+  ): void;
+}>();
 
-// 获取当前路由信息
-const route = useRoute()
-
-const currentSessionType = computed(() => {
-  return route.meta?.sessionType as string
-})
-
-const routeNovelCode = computed(() => {
-  return (route.meta?.resourceId || route.meta?.novelCode || '') as string
-})
-
-const currentNovelCode = ref('')
-const novelCodeDraft = ref('')
-const novelCodeOptions = ref<Array<{ value: string }>>([])
-
-const currentResourceId = computed(() => {
-  if (currentSessionType.value === 'character') return currentCharacterId.value
-  return currentNovelCode.value.trim()
-})
-
-const createSessionDisabled = computed(() => {
-  return currentSessionType.value === 'novel' && !currentNovelCode.value.trim()
-})
-
-// 当前会话绑定的角色ID（用于聊天API调用）
-const currentCharacterId = ref<string>('')
-
-// 选中的角色ID（用于人物选择器双向绑定）
-const selectedCharacterId = ref<string>('')
-
-// 消息相关
-const messages = ref<ChatMessage[]>([])
-const sending = ref(false)
-const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
-const abortController = ref<AbortController | null>(null)
-
-// 编辑会话
-const editModalVisible = ref(false)
+const slots = useSlots();
+const chatPanelRef = ref<InstanceType<typeof ChatPanel> | null>(null);
+const editModalVisible = ref(false);
 const editForm = ref({
-  sessionId: '',
-  title: ''
-})
+  sessionId: "",
+  title: "",
+});
 
-onMounted(() => {
-  syncNovelCodeFromRoute()
-  fetchSessions()
-  if (currentSessionType.value === 'novel') {
-    loadNovelCodeOptions()
-  }
-})
+const hasMaterial = computed(() => Boolean(slots.material));
 
-onUnmounted(() => {
-  // 清理未完成的请求
-  if (abortController.value) {
-    abortController.value.abort()
-  }
-})
-
-// 获取会话列表
-const fetchSessions = async () => {
-  try {
-    if (currentSessionType.value === 'novel' && !currentNovelCode.value.trim()) {
-      sessions.value = []
-      return
-    }
-
-    // 根据新的schema，使用category、type、resourceId作为筛选条件
-    const res = await getSessions(currentSessionType.value, currentNovelCode.value || undefined)
-    sessions.value = res.data || []
-  } catch (error: any) {
-    antMessage.error('获取会话列表失败')
-  }
-}
-
-// 创建新会话
-const handleCreateSession = async () => {
-  try {
-    if (currentSessionType.value === 'novel' && !currentNovelCode.value.trim()) {
-      antMessage.warning('请先输入 novelCode')
-      return
-    }
-
-    // 根据新的schema，使用type和resourceId代替novelCode
-    const res = await createSession({
-      type: currentSessionType.value,
-      resourceId: currentNovelCode.value || undefined
-    })
-    const newSession = res.data
-
-    // 添加到列表顶部
-    sessions.value.unshift(newSession)
-
-    // 自动切换到新会话
-    await handleSelectSession(newSession.sessionId)
-
-    antMessage.success('会话创建成功')
-  } catch (error: any) {
-    antMessage.error('创建会话失败')
-  }
-}
-
-// 选择会话
-const handleSelectSession = async (sessionId: string) => {
-  // if (currentSessionId.value === sessionId) return
-
-  // 如果正在发送，先停止
-  if (sending.value && abortController.value) {
-    chatPanelRef.value?.stopGeneration()
-  }
-
-  currentSessionId.value = sessionId
-  await nextTick()
-  chatPanelRef.value?.getMessages()
-  // 如果会话类型为character，获取绑定的角色ID
-  if (currentSessionType.value === 'character') {
-    await fetchCurrentCharacterId(sessionId)
-  }
-
-  messageListRef.value?.scrollToBottom()
-}
-
-const syncNovelCodeFromRoute = () => {
-  if (currentSessionType.value !== 'novel') {
-    currentNovelCode.value = ''
-    novelCodeDraft.value = ''
-    return
-  }
-
-  const code = routeNovelCode.value.trim()
-  currentNovelCode.value = code
-  novelCodeDraft.value = code
-}
-
-const loadNovelCodeOptions = async () => {
-  if (currentSessionType.value !== 'novel') return
-
-  try {
-    const res = await listOutlineJobs()
-    const codes = Array.from(new Set((res.data || []).map(job => job.novelCode).filter(Boolean))).sort((a, b) => a.localeCompare(b))
-
-    novelCodeOptions.value = codes.map(code => ({
-      value: code
-    }))
-  } catch (error) {
-    console.error('加载 novelCode 列表失败', error)
-  }
-}
-
-const handleNovelCodeSubmit = async (selectedValue?: string) => {
-  const nextCode = (selectedValue || novelCodeDraft.value).trim()
-  novelCodeDraft.value = nextCode
-
-  if (!nextCode) {
-    currentNovelCode.value = ''
-    currentSessionId.value = ''
-    chatPanelRef.value?.clearMessages()
-    sessions.value = []
-    antMessage.warning('请先输入 novelCode')
-    return
-  }
-
-  if (nextCode === currentNovelCode.value.trim()) {
-    await fetchSessions()
-    return
-  }
-
-  currentNovelCode.value = nextCode
-  currentSessionId.value = ''
-  currentCharacterId.value = ''
-  chatPanelRef.value?.clearMessages()
-  await fetchSessions()
-  antMessage.success(`已切换到小说 ${nextCode}`)
-}
-
-const handleNovelCodeSelect = (value: string | number | { value?: string | number }) => {
-  const nextValue = typeof value === 'object' ? value?.value : value
-  void handleNovelCodeSubmit(nextValue == null ? '' : String(nextValue))
-}
-
-const filterNovelCodeOption = (input: string, option: { value: string }) => {
-  return option.value.toLowerCase().includes(input.toLowerCase())
-}
-
-/**
- * 获取当前会话绑定的角色ID
- */
-const fetchCurrentCharacterId = async (sessionId: string) => {
-  try {
-    const res = await getCharacterBySessionId(sessionId)
-    if (res.data) {
-      // 这里保留characterId用于聊天API调用
-      currentCharacterId.value = res.data.characterId
-    } else {
-      currentCharacterId.value = ''
-    }
-  } catch (error) {
-    console.error('获取会话绑定角色失败', error)
-    currentCharacterId.value = ''
-  }
-}
-
-/**
- * 处理角色绑定事件
- */
-const handleCharacterBound = (characterId: string) => {
-  currentCharacterId.value = characterId
-}
-
-// 会话操作（编辑、删除）
 const handleSessionAction = (action: string, sessionId: string) => {
-  if (action === 'edit') {
-    const session = sessions.value.find(s => s.sessionId === sessionId)
-    if (session) {
-      editForm.value = {
-        sessionId: session.sessionId,
-        title: session.title
-      }
-      editModalVisible.value = true
-    }
-  } else if (action === 'delete') {
+  if (action === "edit") {
+    const session = props.sessions.find((item) => item.sessionId === sessionId);
+
+    if (!session) return;
+
+    editForm.value = {
+      sessionId: session.sessionId,
+      title: session.title,
+    };
+    editModalVisible.value = true;
+    return;
+  }
+
+  if (action === "delete") {
     Modal.confirm({
-      title: '确认删除',
-      content: '确定要删除这个会话吗？删除后无法恢复。',
-      okText: '确定',
-      cancelText: '取消',
-      okType: 'danger',
+      title: "确认删除",
+      content: "确定要删除这个会话吗？删除后无法恢复。",
+      okText: "确定",
+      cancelText: "取消",
+      okType: "danger",
       onOk: async () => {
-        await handleDeleteSession(sessionId)
-      }
-    })
+        emit("delete-session", sessionId);
+      },
+    });
   }
-}
+};
 
-// 删除会话
-const handleDeleteSession = async (sessionId: string) => {
-  try {
-    await deleteSession(sessionId)
+const handleSaveSessionTitle = () => {
+  const nextTitle = editForm.value.title.trim();
 
-    // 从列表中移除
-    const index = sessions.value.findIndex(s => s.sessionId === sessionId)
-    if (index > -1) {
-      sessions.value.splice(index, 1)
-    }
-
-    // 如果删除的是当前会话，清空消息
-    if (currentSessionId.value === sessionId) {
-      currentSessionId.value = ''
-      messages.value = []
-    }
-
-    antMessage.success('会话删除成功')
-  } catch (error: any) {
-    antMessage.error('删除会话失败')
-  }
-}
-
-// 更新会话
-const handleUpdateSession = async () => {
-  if (!editForm.value.title.trim()) {
-    antMessage.warning('请输入会话标题')
-    return
+  if (!nextTitle) {
+    antMessage.warning("请输入会话标题");
+    return;
   }
 
-  try {
-    await updateSession(editForm.value.sessionId, {
-      title: editForm.value.title
-    })
+  emit("save-session-title", {
+    sessionId: editForm.value.sessionId,
+    title: nextTitle,
+  });
+  editModalVisible.value = false;
+};
 
-    // 更新本地列表
-    const session = sessions.value.find(s => s.sessionId === editForm.value.sessionId)
-    if (session) {
-      session.title = editForm.value.title
-    }
+const stopGeneration = () => {
+  chatPanelRef.value?.stopGeneration();
+};
 
-    editModalVisible.value = false
-    antMessage.success('更新成功')
-  } catch (error: any) {
-    antMessage.error('更新失败')
-  }
-}
+const clearMessages = () => {
+  chatPanelRef.value?.clearMessages();
+};
 
-// 监听路由变化，当sessionCategory、resourceType或resourceId改变时重新获取会话列表
-watch(
-  () => [route.meta?.sessionCategory, route.meta?.resourceType, route.meta?.resourceId],
-  () => {
-    syncNovelCodeFromRoute()
-    // 清空当前选中的会话和消息
-    currentSessionId.value = ''
-    chatPanelRef.value?.clearMessages()
-    // 重新获取会话列表
-    fetchSessions()
-    if (currentSessionType.value === 'novel') {
-      loadNovelCodeOptions()
-    }
-  }
-)
+const getMessages = () => {
+  chatPanelRef.value?.getMessages();
+};
+
+defineExpose({
+  stopGeneration,
+  clearMessages,
+  getMessages,
+});
 </script>
 
-<style lang="less" scoped>
-.chat-page {
+<style scoped lang="less">
+.session-chat-page {
   display: flex;
   height: 100%;
   background: #fff;
 }
 
-// 左侧会话列表
-.session-sidebar {
+.session-chat-page__sidebar {
   width: 240px;
   border-right: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  // background: #fafafa;
+}
 
-  .sidebar-header {
-    padding: 16px;
-    border-bottom: 1px solid #f0f0f0;
+.session-chat-page__sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.session-chat-page__session-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
   }
 
-  .session-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #d9d9d9;
-      border-radius: 3px;
-
-      &:hover {
-        background: #bfbfbf;
-      }
-    }
-  }
-
-  .session-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px;
-    margin-bottom: 4px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s;
+  &::-webkit-scrollbar-thumb {
+    background: #d9d9d9;
+    border-radius: 3px;
 
     &:hover {
-      background: #e6f7ff;
-
-      .session-actions {
-        opacity: 1;
-      }
-    }
-
-    &.active {
-      background: #e6f7ff;
-    }
-
-    .session-info {
-      flex: 1;
-      min-width: 0;
-
-      .session-title {
-        font-size: 14px;
-        font-weight: 500;
-        color: #262626;
-        margin-bottom: 4px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .session-time {
-        font-size: 12px;
-        color: #8c8c8c;
-      }
-    }
-
-    .session-actions {
-      opacity: 0;
-      transition: opacity 0.2s;
-      margin-left: 8px;
-    }
-
-    &:last-child {
-      border-bottom: none;
+      background: #bfbfbf;
     }
   }
 }
 
-.material-area {
+.session-chat-page__chat {
+  flex: 1;
+  min-width: 0;
+  padding: 24px;
+}
+
+.session-chat-page__material {
   width: 380px;
   border-left: 1px solid #f0f0f0;
   display: flex;
@@ -508,115 +224,38 @@ watch(
   flex-shrink: 0;
   overflow-y: auto;
   background: linear-gradient(180deg, #fcfcfd 0%, #f5f7fb 100%);
-}
 
-.novel-selector-card {
-  padding: 16px;
-  background: #fff;
-  height: 100%;
-  // box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
-}
-
-.novel-selector-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.novel-selector-subtitle {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #6b7280;
-}
-
-.novel-selector-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.novel-selector-input {
-  flex: 1;
-}
-
-.novel-selector-current {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #4b5563;
-}
-
-// 右侧聊天区域
-.chat-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  padding: 24px;
-
-  .loading-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
+  &::-webkit-scrollbar {
+    width: 6px;
   }
 
-  .chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 0 20px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    // max-width: 900px;
-    // margin: 0 auto;
-    width: 100%;
+  &::-webkit-scrollbar-thumb {
+    background: #d9d9d9;
+    border-radius: 3px;
 
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: transparent;
-      border-radius: 3px;
-
-      &:hover {
-        background: transparent;
-      }
+    &:hover {
+      background: #bfbfbf;
     }
   }
-}
-
-// 不保存记录的对话按钮样式
-.no-record-chat-btn {
-  padding: 12px 0;
-  text-align: center;
-  border-top: 1px solid #f0f0f0;
 }
 
 @media (max-width: 768px) {
-  .chat-page {
+  .session-chat-page {
     flex-direction: column;
   }
 
-  .session-sidebar {
+  .session-chat-page__sidebar {
     width: 100%;
     height: 200px;
     border-right: none;
     border-bottom: 1px solid #f0f0f0;
   }
 
-  .material-area {
+  .session-chat-page__chat {
+    padding: 16px;
+  }
+
+  .session-chat-page__material {
     width: 100%;
     border-left: none;
     border-top: 1px solid #f0f0f0;

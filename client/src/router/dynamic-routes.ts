@@ -1,35 +1,35 @@
-import type { RouteRecordRaw } from 'vue-router'
-import { AccessEnum } from '~@/utils/constant'
-import { basicRouteMap } from './router-modules'
+import type { RouteRecordRaw } from "vue-router";
+import { AccessEnum } from "~@/utils/constant";
+import { basicRouteMap } from "./router-modules";
 
 export default [
   {
-    path: '/self',
-    name: 'self',
-    component: () => import('~/pages/self/index.vue'),
+    path: "/self",
+    name: "self",
+    component: () => import("~/pages/self/index.vue"),
     meta: {
-      title: '我的',
-      icon: 'SmileOutlined',
-      sessionType: 'self'
-    }
+      title: "我的",
+      icon: "SmileOutlined",
+      sessionType: "self",
+    },
   },
   {
-    path: '/npc',
-    name: 'npc',
-    component: () => import('~/pages/dialog/index.vue'),
+    path: "/npc",
+    name: "npc",
+    component: () => import("~/pages/npc/index.vue"),
     meta: {
-      title: 'NPC们',
-      icon: 'CommentOutlined',
-      sessionType: 'character'
-    }
+      title: "NPC们",
+      icon: "CommentOutlined",
+      sessionType: "character",
+    },
   },
   {
-    path: '/dialog',
-    name: 'WriterAssistant',
-    redirect: '/writer-assistant/writer-assistan',
+    path: "/dialog",
+    name: "WriterAssistant",
+    redirect: "/writer-assistant/writer-assistan",
     meta: {
-      title: '写作助手',
-      icon: 'EditOutlined'
+      title: "写作助手",
+      icon: "EditOutlined",
     },
     component: basicRouteMap.RouteView,
     children: [
@@ -47,26 +47,28 @@ export default [
       // },
       // 小说大纲生成：上传 txt → 拆分 → 调用大模型增量生成大纲
       {
-        path: '/writer-assistant/novel-outline',
-        name: 'WriterAssistantNovelOutline',
-        component: () => import('~/pages/writer-assistant/novel-outline/index.vue'),
+        path: "/writer-assistant/novel-outline",
+        name: "WriterAssistantNovelOutline",
+        component: () =>
+          import("~/pages/writer-assistant/novel-outline/index.vue"),
         meta: {
-          title: '大纲生成',
-          icon: 'FileTextOutlined'
-        }
+          title: "大纲生成",
+          icon: "FileTextOutlined",
+        },
       },
       {
-        path: '/writer-assistant/novel-dialog',
-        name: 'WriterAssistantNovelDialog',
-        component: () => import('~/pages/dialog/index.vue'),
+        path: "/writer-assistant/novel-dialog",
+        name: "WriterAssistantNovelDialog",
+        component: () =>
+          import("~/pages/writer-assistant/novel-dialog/index.vue"),
         meta: {
-          title: '百科问答',
-          icon: 'CommentOutlined',
-          sessionType: 'novel',
-          sessionCategory: 'writing'
-        }
-      }
-    ]
+          title: "百科问答",
+          icon: "CommentOutlined",
+          sessionType: "novel",
+          sessionCategory: "writing",
+        },
+      },
+    ],
   },
   // {
   //   path: '/dialog/diary',
@@ -101,460 +103,461 @@ export default [
   //   }
   // },
   {
-    path: '/account',
-    redirect: '/account/center',
-    name: 'Account',
+    path: "/account",
+    redirect: "/account/center",
+    name: "Account",
     meta: {
-      title: '个人页',
-      icon: 'UserOutlined',
-      locale: 'menu.account',
-      hideInMenu: true
+      title: "个人页",
+      icon: "UserOutlined",
+      locale: "menu.account",
+      hideInMenu: true,
     },
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/account/center',
-        name: 'AccountCenter',
-        component: () => import('~/pages/account/center.vue'),
+        path: "/account/center",
+        name: "AccountCenter",
+        component: () => import("~/pages/account/center.vue"),
         meta: {
-          title: '个人主页',
-          locale: 'menu.account.center'
-        }
+          title: "个人主页",
+          locale: "menu.account.center",
+        },
       },
       {
-        path: '/account/settings',
-        name: 'AccountSettings',
-        component: () => import('~/pages/account/settings.vue'),
+        path: "/account/settings",
+        name: "AccountSettings",
+        component: () => import("~/pages/account/settings.vue"),
         meta: {
-          title: '个人设置',
-          locale: 'menu.account.settings'
-        }
+          title: "个人设置",
+          locale: "menu.account.settings",
+        },
       },
       {
-        path: '/account/settings/:id',
-        name: 'AccountSettings1',
-        component: () => import('~/pages/account/settings.vue'),
+        path: "/account/settings/:id",
+        name: "AccountSettings1",
+        component: () => import("~/pages/account/settings.vue"),
         meta: {
-          title: '个人设置1',
-          locale: 'menu.account.settings',
+          title: "个人设置1",
+          locale: "menu.account.settings",
           hideInMenu: true,
-          parentKeys: ['/account/settings']
-        }
-      }
-    ]
-  }
-] as RouteRecordRaw[]
+          parentKeys: ["/account/settings"],
+        },
+      },
+    ],
+  },
+] as RouteRecordRaw[];
 
 export const systemRoute = [
   {
-    path: '/dashboard',
-    redirect: '/dashboard/analysis',
-    name: 'Dashboard',
+    path: "/dashboard",
+    redirect: "/dashboard/analysis",
+    name: "Dashboard",
     meta: {
-      title: '仪表盘',
-      icon: 'DashboardOutlined'
+      title: "仪表盘",
+      icon: "DashboardOutlined",
     },
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/dashboard/analysis',
-        name: 'DashboardAnalysis',
-        component: () => import('~/pages/dashboard/analysis/index.vue'),
+        path: "/dashboard/analysis",
+        name: "DashboardAnalysis",
+        component: () => import("~/pages/dashboard/analysis/index.vue"),
         meta: {
-          title: '分析页'
-        }
+          title: "分析页",
+        },
       },
       {
-        path: '/dashboard/monitor',
-        name: 'DashboardMonitor',
-        component: () => import('~/pages/dashboard/monitor/index.vue'),
+        path: "/dashboard/monitor",
+        name: "DashboardMonitor",
+        component: () => import("~/pages/dashboard/monitor/index.vue"),
         meta: {
-          title: '监控页'
-        }
+          title: "监控页",
+        },
       },
       {
-        path: '/dashboard/workplace',
-        name: 'DashboardWorkplace',
-        component: () => import('~/pages/dashboard/workplace/index.vue'),
+        path: "/dashboard/workplace",
+        name: "DashboardWorkplace",
+        component: () => import("~/pages/dashboard/workplace/index.vue"),
         meta: {
-          title: '监控页'
-        }
-      }
-    ]
+          title: "监控页",
+        },
+      },
+    ],
   },
   {
-    path: '/form',
-    redirect: '/form/basic-form',
-    name: 'Form',
+    path: "/form",
+    redirect: "/form/basic-form",
+    name: "Form",
     meta: {
-      title: '表单页',
-      icon: 'FormOutlined'
+      title: "表单页",
+      icon: "FormOutlined",
     },
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/form/basic-form',
-        name: 'FormBasic',
-        component: () => import('~/pages/form/basic-form/index.vue'),
+        path: "/form/basic-form",
+        name: "FormBasic",
+        component: () => import("~/pages/form/basic-form/index.vue"),
         meta: {
-          title: '基础表单',
-          locale: 'menu.form.basic-form'
-        }
+          title: "基础表单",
+          locale: "menu.form.basic-form",
+        },
       },
       {
-        path: '/form/step-form',
-        name: 'FormStep',
-        component: () => import('~/pages/form/step-form/index.vue'),
+        path: "/form/step-form",
+        name: "FormStep",
+        component: () => import("~/pages/form/step-form/index.vue"),
         meta: {
-          title: '分步表单',
-          locale: 'menu.form.step-form'
-        }
+          title: "分步表单",
+          locale: "menu.form.step-form",
+        },
       },
       {
-        path: '/form/advanced-form',
-        name: 'FormAdvanced',
-        component: () => import('~/pages/form/advanced-form/index.vue'),
+        path: "/form/advanced-form",
+        name: "FormAdvanced",
+        component: () => import("~/pages/form/advanced-form/index.vue"),
         meta: {
-          title: '高级表单',
-          locale: 'menu.form.advanced-form'
-        }
-      }
-    ]
+          title: "高级表单",
+          locale: "menu.form.advanced-form",
+        },
+      },
+    ],
   },
   {
-    path: '/link',
-    redirect: '/link/iframe',
-    name: 'Link',
+    path: "/link",
+    redirect: "/link/iframe",
+    name: "Link",
     meta: {
-      title: '链接',
-      icon: 'LinkOutlined'
+      title: "链接",
+      icon: "LinkOutlined",
     },
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/link/iframe',
-        name: 'LinkIframe',
+        path: "/link/iframe",
+        name: "LinkIframe",
         component: basicRouteMap.Iframe,
         meta: {
-          title: 'AntDesign',
-          url: 'https://ant.design/'
-        }
+          title: "AntDesign",
+          url: "https://ant.design/",
+        },
       },
       {
-        path: '/link/antdv',
-        name: 'LinkAntdv',
+        path: "/link/antdv",
+        name: "LinkAntdv",
         component: basicRouteMap.Iframe,
         meta: {
-          title: 'AntDesignVue',
-          url: 'https://antdv.com/'
-        }
+          title: "AntDesignVue",
+          url: "https://antdv.com/",
+        },
       },
       {
-        path: 'https://www.baidu.com',
-        name: 'LinkExternal',
+        path: "https://www.baidu.com",
+        name: "LinkExternal",
         meta: {
-          title: '跳转百度'
+          title: "跳转百度",
           // target: '_self',
-        }
-      }
-    ]
+        },
+      },
+    ],
   },
   {
-    path: '/menu',
-    redirect: '/menu/menu1',
-    name: 'Menu',
+    path: "/menu",
+    redirect: "/menu/menu1",
+    name: "Menu",
     meta: {
-      title: '菜单',
-      icon: 'BarsOutlined'
+      title: "菜单",
+      icon: "BarsOutlined",
     },
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/menu/menu1',
-        name: 'MenuMenu11',
-        component: () => import('~/pages/menu/menu1.vue'),
+        path: "/menu/menu1",
+        name: "MenuMenu11",
+        component: () => import("~/pages/menu/menu1.vue"),
         meta: {
-          title: '菜单1'
-        }
+          title: "菜单1",
+        },
       },
       {
-        path: '/menu/menu2',
-        name: 'MenuMenu12',
-        component: () => import('~/pages/menu/menu2.vue'),
+        path: "/menu/menu2",
+        name: "MenuMenu12",
+        component: () => import("~/pages/menu/menu2.vue"),
         meta: {
-          title: '菜单2'
-        }
+          title: "菜单2",
+        },
       },
       {
-        path: '/menu/menu3',
-        redirect: '/menu/menu3/menu1',
-        name: 'MenuMenu1-1',
+        path: "/menu/menu3",
+        redirect: "/menu/menu3/menu1",
+        name: "MenuMenu1-1",
         meta: {
-          title: '菜单1-1'
+          title: "菜单1-1",
         },
         children: [
           {
-            path: '/menu/menu3/menu1',
-            name: 'MenuMenu111',
-            component: () => import('~/pages/menu/menu-1-1/menu1.vue'),
+            path: "/menu/menu3/menu1",
+            name: "MenuMenu111",
+            component: () => import("~/pages/menu/menu-1-1/menu1.vue"),
             meta: {
-              title: '菜单1-1-1'
-            }
+              title: "菜单1-1-1",
+            },
           },
           {
-            path: '/menu/menu3/menu2',
-            name: 'MenuMenu112',
-            component: () => import('~/pages/menu/menu-1-1/menu2.vue'),
+            path: "/menu/menu3/menu2",
+            name: "MenuMenu112",
+            component: () => import("~/pages/menu/menu-1-1/menu2.vue"),
             meta: {
-              title: '菜单1-1-2'
-            }
-          }
-        ]
+              title: "菜单1-1-2",
+            },
+          },
+        ],
       },
       {
-        path: '/menu/menu4',
-        redirect: '/menu/menu4/menu1',
-        name: 'MenuMenu2-1',
+        path: "/menu/menu4",
+        redirect: "/menu/menu4/menu1",
+        name: "MenuMenu2-1",
         meta: {
-          title: '菜单2-1'
+          title: "菜单2-1",
         },
         children: [
           {
-            path: '/menu/menu4/menu1',
-            name: 'MenuMenu211',
-            component: () => import('~/pages/menu/menu-2-1/menu1.vue'),
+            path: "/menu/menu4/menu1",
+            name: "MenuMenu211",
+            component: () => import("~/pages/menu/menu-2-1/menu1.vue"),
             meta: {
-              title: '菜单2-1-1'
-            }
+              title: "菜单2-1-1",
+            },
           },
           {
-            path: '/menu/menu4/menu2',
-            name: 'MenuMenu212',
-            component: () => import('~/pages/menu/menu-2-1/menu2.vue'),
+            path: "/menu/menu4/menu2",
+            name: "MenuMenu212",
+            component: () => import("~/pages/menu/menu-2-1/menu2.vue"),
             meta: {
-              title: '菜单2-1-2'
-            }
-          }
-        ]
-      }
-    ]
+              title: "菜单2-1-2",
+            },
+          },
+        ],
+      },
+    ],
   },
   {
-    path: '/profile',
-    name: 'profile',
-    redirect: '/profile/basic',
+    path: "/profile",
+    name: "profile",
+    redirect: "/profile/basic",
     meta: {
-      title: 'menu.profile',
-      icon: 'ProfileOutlined',
-      locale: 'menu.profile'
+      title: "menu.profile",
+      icon: "ProfileOutlined",
+      locale: "menu.profile",
     },
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/profile/basic',
-        name: 'ProfileBasic',
-        component: () => import('~/pages/profile/basic/index.vue'),
+        path: "/profile/basic",
+        name: "ProfileBasic",
+        component: () => import("~/pages/profile/basic/index.vue"),
         meta: {
-          title: 'menu.profile.basic',
-          locale: 'menu.profile.basic'
-        }
-      }
-    ]
+          title: "menu.profile.basic",
+          locale: "menu.profile.basic",
+        },
+      },
+    ],
   },
   {
-    path: '/access',
-    redirect: '/access/common',
-    name: 'Access',
+    path: "/access",
+    redirect: "/access/common",
+    name: "Access",
     meta: {
-      title: '权限模块',
-      icon: 'ClusterOutlined'
+      title: "权限模块",
+      icon: "ClusterOutlined",
     },
     children: [
       {
-        path: '/access/common',
-        name: 'AccessCommon',
-        component: () => import('~/pages/access/common.vue'),
+        path: "/access/common",
+        name: "AccessCommon",
+        component: () => import("~/pages/access/common.vue"),
         meta: {
-          title: '通用权限'
-        }
+          title: "通用权限",
+        },
       },
       {
-        path: '/access/user',
-        name: 'AccessUser',
-        component: () => import('~/pages/access/user.vue'),
+        path: "/access/user",
+        name: "AccessUser",
+        component: () => import("~/pages/access/user.vue"),
         meta: {
-          title: '普通用户',
-          access: [AccessEnum.USER, AccessEnum.ADMIN]
-        }
+          title: "普通用户",
+          access: [AccessEnum.USER, AccessEnum.ADMIN],
+        },
       },
       {
-        path: '/access/admin',
-        name: 'AccessAdmin',
-        component: () => import('~/pages/access/admin.vue'),
+        path: "/access/admin",
+        name: "AccessAdmin",
+        component: () => import("~/pages/access/admin.vue"),
         meta: {
-          title: '管理员',
-          access: [AccessEnum.ADMIN]
-        }
-      }
-    ]
+          title: "管理员",
+          access: [AccessEnum.ADMIN],
+        },
+      },
+    ],
   },
   {
-    path: '/exception',
-    redirect: '/exception/403',
-    name: 'Exception',
+    path: "/exception",
+    redirect: "/exception/403",
+    name: "Exception",
     meta: {
-      title: '异常页',
-      icon: 'WarningOutlined',
-      locale: 'menu.exception'
+      title: "异常页",
+      icon: "WarningOutlined",
+      locale: "menu.exception",
     },
     children: [
       {
-        path: '/exception/403',
-        name: 'Exception403',
-        component: () => import('~/pages/exception/403.vue'),
+        path: "/exception/403",
+        name: "Exception403",
+        component: () => import("~/pages/exception/403.vue"),
         meta: {
-          title: '403',
-          locale: 'menu.exception.not-permission'
-        }
+          title: "403",
+          locale: "menu.exception.not-permission",
+        },
       },
       {
-        path: '/exception/404',
-        name: 'Exception404',
-        component: () => import('~/pages/exception/404.vue'),
+        path: "/exception/404",
+        name: "Exception404",
+        component: () => import("~/pages/exception/404.vue"),
         meta: {
-          title: '404',
-          locale: 'menu.exception.not-find'
-        }
+          title: "404",
+          locale: "menu.exception.not-find",
+        },
       },
       {
-        path: '/exception/500',
-        name: 'Exception500',
-        component: () => import('~/pages/exception/500.vue'),
+        path: "/exception/500",
+        name: "Exception500",
+        component: () => import("~/pages/exception/500.vue"),
         meta: {
-          title: '500',
-          locale: 'menu.exception.server-error'
-        }
-      }
-    ]
+          title: "500",
+          locale: "menu.exception.server-error",
+        },
+      },
+    ],
   },
   // 结果页
   {
-    path: '/result',
-    redirect: '/result/success',
-    name: 'Result',
+    path: "/result",
+    redirect: "/result/success",
+    name: "Result",
     meta: {
-      title: '结果页',
-      icon: 'CheckCircleOutlined',
-      locale: 'menu.result'
+      title: "结果页",
+      icon: "CheckCircleOutlined",
+      locale: "menu.result",
     },
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/result/success',
-        name: 'ResultSuccess',
-        component: () => import('~/pages/result/success.vue'),
+        path: "/result/success",
+        name: "ResultSuccess",
+        component: () => import("~/pages/result/success.vue"),
         meta: {
-          title: '成功页',
-          locale: 'menu.result.success'
-        }
+          title: "成功页",
+          locale: "menu.result.success",
+        },
       },
       {
-        path: '/result/fail',
-        name: 'ResultFail',
-        component: () => import('~/pages/result/fail.vue'),
+        path: "/result/fail",
+        name: "ResultFail",
+        component: () => import("~/pages/result/fail.vue"),
         meta: {
-          title: '失败页',
-          locale: 'menu.result.fail'
-        }
-      }
-    ]
+          title: "失败页",
+          locale: "menu.result.fail",
+        },
+      },
+    ],
   },
   {
-    path: '/list',
-    redirect: '/list/card-list',
-    name: 'List',
+    path: "/list",
+    redirect: "/list/card-list",
+    name: "List",
     meta: {
-      title: '列表页',
-      icon: 'TableOutlined',
-      locale: 'menu.list'
+      title: "列表页",
+      icon: "TableOutlined",
+      locale: "menu.list",
     },
     component: basicRouteMap.RouteView,
     children: [
       {
-        path: '/list/card-list',
-        name: 'CardList',
-        component: () => import('~/pages/list/card-list.vue'),
+        path: "/list/card-list",
+        name: "CardList",
+        component: () => import("~/pages/list/card-list.vue"),
         meta: {
-          title: '卡片列表',
-          locale: 'menu.list.card-list'
-        }
-      },
-      {
-        path: '/list/table-list',
-        name: 'ConsultTable',
-        component: () => import('~/pages/list/table-list.vue'),
-        meta: {
-          title: '查询表格',
-          locale: 'menu.list.consult-table'
-        }
-      },
-      {
-        path: '/list/crud-table',
-        name: 'CrudTable',
-        component: () => import('~/pages/list/crud-table.vue'),
-        meta: {
-          title: '增删改查表格',
-          locale: 'menu.list.crud-table'
-        }
-      },
-      {
-        path: '/list/basic-list',
-        name: 'BasicList',
-        component: () => import('~/pages/list/basic-list.vue'),
-        meta: {
-          title: '标准列表',
-          locale: 'menu.list.basic-list'
-        }
-      },
-      {
-        path: '/list/search-list',
-        name: 'SearchList',
-        component: () => import('~/pages/list/search-list/index.vue'),
-        meta: {
-          title: '搜索列表',
-          locale: 'menu.list.search-list'
+          title: "卡片列表",
+          locale: "menu.list.card-list",
         },
-        redirect: '/list/search-list/articles',
+      },
+      {
+        path: "/list/table-list",
+        name: "ConsultTable",
+        component: () => import("~/pages/list/table-list.vue"),
+        meta: {
+          title: "查询表格",
+          locale: "menu.list.consult-table",
+        },
+      },
+      {
+        path: "/list/crud-table",
+        name: "CrudTable",
+        component: () => import("~/pages/list/crud-table.vue"),
+        meta: {
+          title: "增删改查表格",
+          locale: "menu.list.crud-table",
+        },
+      },
+      {
+        path: "/list/basic-list",
+        name: "BasicList",
+        component: () => import("~/pages/list/basic-list.vue"),
+        meta: {
+          title: "标准列表",
+          locale: "menu.list.basic-list",
+        },
+      },
+      {
+        path: "/list/search-list",
+        name: "SearchList",
+        component: () => import("~/pages/list/search-list/index.vue"),
+        meta: {
+          title: "搜索列表",
+          locale: "menu.list.search-list",
+        },
+        redirect: "/list/search-list/articles",
         children: [
           {
-            path: '/list/search-list/articles',
-            name: 'SearchListArticles',
-            component: () => import('~/pages/list/search-list/articles.vue'),
+            path: "/list/search-list/articles",
+            name: "SearchListArticles",
+            component: () => import("~/pages/list/search-list/articles.vue"),
             meta: {
-              title: '搜索列表（文章）',
-              locale: 'menu.list.search-list.articles'
-            }
+              title: "搜索列表（文章）",
+              locale: "menu.list.search-list.articles",
+            },
           },
           {
-            path: '/list/search-list/projects',
-            name: 'SearchListProjects',
-            component: () => import('~/pages/list/search-list/projects.vue'),
+            path: "/list/search-list/projects",
+            name: "SearchListProjects",
+            component: () => import("~/pages/list/search-list/projects.vue"),
             meta: {
-              title: '搜索列表（项目）',
-              locale: 'menu.list.search-list.projects'
-            }
+              title: "搜索列表（项目）",
+              locale: "menu.list.search-list.projects",
+            },
           },
           {
-            path: '/list/search-list/applications',
-            name: 'SearchListApplications',
-            component: () => import('~/pages/list/search-list/applications.vue'),
+            path: "/list/search-list/applications",
+            name: "SearchListApplications",
+            component: () =>
+              import("~/pages/list/search-list/applications.vue"),
             meta: {
-              title: '搜索列表（应用）',
-              locale: 'menu.list.search-list.applications'
-            }
-          }
-        ]
-      }
-    ]
-  }
-]
+              title: "搜索列表（应用）",
+              locale: "menu.list.search-list.applications",
+            },
+          },
+        ],
+      },
+    ],
+  },
+];
