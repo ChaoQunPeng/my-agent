@@ -614,7 +614,8 @@ export class NovelOutlineService {
           lastError: '任务已中止',
           processingChunkIndex:
             job.lastCompletedChunkIndex || job.processingChunkIndex || 0,
-          processedChunks: job.lastCompletedChunkIndex || job.processedChunks || 0,
+          processedChunks:
+            job.lastCompletedChunkIndex || job.processedChunks || 0,
         },
       },
     );
@@ -665,7 +666,10 @@ export class NovelOutlineService {
       throw new BadRequestException('aliasesToConfirm 不能为空');
     }
 
-    target.aliases = uniqueStrings([...(target.aliases || []), ...aliasesToConfirm]);
+    target.aliases = uniqueStrings([
+      ...(target.aliases || []),
+      ...aliasesToConfirm,
+    ]);
     target.aliasCandidates = uniqueStrings(target.aliasCandidates || []).filter(
       (alias) => !aliasesToConfirm.includes(alias),
     );
@@ -1042,7 +1046,10 @@ export class NovelOutlineService {
     chunkIndex: number,
   ): Promise<string> {
     const chunkId = String(chunkIndex).padStart(4, '0');
-    const chunkFilePath = await this.resolveChunkFilePath(job.chunkDir, chunkId);
+    const chunkFilePath = await this.resolveChunkFilePath(
+      job.chunkDir,
+      chunkId,
+    );
 
     try {
       return await fs.readFile(chunkFilePath, 'utf-8');
@@ -1061,15 +1068,21 @@ export class NovelOutlineService {
       resetExisting?: boolean;
     },
   ): Promise<void> {
-    const chunkFiles = params.chunkFiles || (await this.scanChunkFiles(params.chunkDir));
+    const chunkFiles =
+      params.chunkFiles || (await this.scanChunkFiles(params.chunkDir));
     const totalChunks = params.totalChunks || chunkFiles.length;
 
     if (params.resetExisting) {
-      await this.novelMetaModel.deleteMany({ novelCode: params.novelCode }).exec();
+      await this.novelMetaModel
+        .deleteMany({ novelCode: params.novelCode })
+        .exec();
     }
 
     for (let index = 0; index < chunkFiles.length; index += 1) {
       const chunkFile = chunkFiles[index];
+      this.logger.log(
+        `[chunk-meta] 开始处理 chunk=${chunkFile.chunkId}, 进度=${index + 1}/${totalChunks}, novelCode=${params.novelCode}`,
+      );
       const chunkText = await fs.readFile(chunkFile.filePath, 'utf-8');
       const meta = await this.generateSingleChunkMeta({
         id: chunkFile.chunkId,
@@ -1089,6 +1102,10 @@ export class NovelOutlineService {
           { upsert: true },
         )
         .exec();
+
+      this.logger.log(
+        `[chunk-meta] 保存成功 chunk=${meta.chunkId}, 当前处理进度：${index + 1}/${totalChunks}, novelCode=${params.novelCode}`,
+      );
 
       await this.jobModel.updateOne(
         { jobId },
@@ -1115,8 +1132,8 @@ export class NovelOutlineService {
       '你的任务是基于一个 chunk 生成可检索的结构化 Metadata，用于 MongoDB 检索索引。',
       '必须遵守：前文参考和后文参考只用于理解上下文，不允许重复提取。',
       '只能从【本段正文】提取当前 chunk 新增的信息。',
-      'summary 必须使用第三人称，50 到 150 字，保留核心剧情与设定，适合后续搜索。',
-      'keywords 必须返回 5 到 20 个关键词，优先提取人物、地点、组织、世界观设定、能力、境界、特殊名词、关键道具、事件名称。',
+      'summary 使用第三人称描述当前 chunk 的核心内容，原则上长度控制在 100~200 字之间（可以超过200字，要保证内容完整，不能截断），优先保留后续检索需要的重要人物、设定、事件和结论。',
+      'keywords 必须返回 5 到 10 个关键词，优先提取人物、地点、组织、世界观设定、能力、境界、特殊名词、关键道具、事件名称。',
       'characters、locations、organizations、concepts、events 必须返回字符串数组，没有则返回空数组。',
       'events 只保留当前 chunk 明确发生的关键事件短语，不要写成长段。',
       '禁止输出 markdown、解释文字或额外说明。',
@@ -1217,7 +1234,10 @@ export class NovelOutlineService {
         continue;
       }
 
-      const chunkFilePath = await this.resolveChunkFilePath(chunkDir, meta.chunkId);
+      const chunkFilePath = await this.resolveChunkFilePath(
+        chunkDir,
+        meta.chunkId,
+      );
       hits.push({
         id: meta.chunkId,
         score,
@@ -1396,7 +1416,9 @@ export class NovelOutlineService {
         filePath: path.join(chunkDir, fileName),
       }))
       .filter((item) => item.chunkId)
-      .sort((a, b) => a.chunkId.localeCompare(b.chunkId, 'en', { numeric: true }));
+      .sort((a, b) =>
+        a.chunkId.localeCompare(b.chunkId, 'en', { numeric: true }),
+      );
 
     if (!chunkFiles.length) {
       throw new NotFoundException(`切片目录中未找到 chunk 文件：${chunkDir}`);

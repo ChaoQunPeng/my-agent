@@ -50,14 +50,12 @@
           />
           <a-button type="primary" @click="handleNovelCodeSubmit()">切换</a-button>
         </div>
-        <div class="novel-selector-current">
-          当前小说：{{ currentNovelCode || '未选择' }}
-        </div>
+        <div class="novel-selector-current">当前小说：{{ currentNovelCode || '未选择' }}</div>
       </div>
 
       <!-- 人物选择组件（仅在type为character时显示） -->
       <CharacterSelector
-        v-if="currentSessionType == 'character' && currentSessionId"
+        v-else-if="currentSessionType == 'character' && currentSessionId"
         :session-id="currentSessionId"
         v-model="selectedCharacterId"
         @character-bound="handleCharacterBound"
@@ -65,7 +63,7 @@
 
       <!-- 写作助手（仅在type为novel时显示） -->
       <WritingAssistant
-        v-if="currentSessionType == 'novel' && currentSessionId"
+        v-else-if="currentSessionType == 'novel' && currentSessionId"
         :session-id="currentSessionId"
         :novel-code="currentNovelCode"
       />
@@ -126,8 +124,7 @@ const novelCodeDraft = ref('')
 const novelCodeOptions = ref<Array<{ value: string }>>([])
 
 const currentResourceId = computed(() => {
-  if (currentSessionType.value === 'character')
-    return currentCharacterId.value
+  if (currentSessionType.value === 'character') return currentCharacterId.value
   return currentNovelCode.value.trim()
 })
 
@@ -249,9 +246,7 @@ const loadNovelCodeOptions = async () => {
 
   try {
     const res = await listOutlineJobs()
-    const codes = Array.from(
-      new Set((res.data || []).map(job => job.novelCode).filter(Boolean))
-    ).sort((a, b) => a.localeCompare(b))
+    const codes = Array.from(new Set((res.data || []).map(job => job.novelCode).filter(Boolean))).sort((a, b) => a.localeCompare(b))
 
     novelCodeOptions.value = codes.map(code => ({
       value: code
@@ -516,12 +511,10 @@ watch(
 }
 
 .novel-selector-card {
-  margin: 16px;
   padding: 16px;
-  border: 1px solid #e7ebf3;
-  border-radius: 14px;
   background: #fff;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  height: 100%;
+  // box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
 }
 
 .novel-selector-title {
