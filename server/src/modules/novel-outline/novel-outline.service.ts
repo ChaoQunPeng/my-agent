@@ -27,9 +27,7 @@ import { normalize, toStringArray, uniqueStrings } from './outline-merge.utils';
  */
 
 interface ExtractParams {
-  novelCode?: string;
-  jobId?: string;
-
+  jobId: string;
   signal?: AbortSignal;
 }
 
@@ -41,13 +39,8 @@ interface SplitJobQueryParams {
   status?: string;
 }
 
-interface SplitJobDetailQueryParams {
-  jobId?: string;
-  novelCode?: string;
-}
-
 type ResolvedExtractParams = ExtractParams & {
-  jobId: string;
+  novelCode: string;
   chunkText: string;
   chunkIndex: number;
   totalChunks: number;
@@ -262,27 +255,17 @@ export class NovelOutlineService {
   /**
    * 根据 jobId 或 novelCode 获取单个 novel_split_jobs 数据
    */
-  async findSplitJob(
-    params: SplitJobDetailQueryParams,
-  ): Promise<NovelSplitJob | null> {
-    const jobId = params.jobId?.trim();
-    if (jobId) {
-      return this.jobModel.findOne({ jobId }).exec();
+  async findSplitJob(jobId: string): Promise<NovelSplitJob | null> {
+    const normalizedJobId = jobId?.trim();
+    if (!normalizedJobId) {
+      throw new BadRequestException('jobId 不能为空');
     }
 
-    const novelCode = params.novelCode?.trim();
-    if (novelCode) {
-      return this.jobModel
-        .findOne({ novelCode })
-        .sort({ createdAt: -1 })
-        .exec();
-    }
-
-    throw new BadRequestException('jobId 或 novelCode 不能为空');
+    return this.jobModel.findOne({ jobId: normalizedJobId }).exec();
   }
 
-  async startExtractInBackground(params: ExtractParams): Promise<NovelSplitJob> {
-    const job = await this.resolveJob(params);
+  async startExtractInBackground(jobId: string): Promise<NovelSplitJob> {
+    const job = await this.resolveJob(jobId);
     if (job.status === 'splitting') {
       throw new BadRequestException('任务仍在拆分中，暂不能开始提取');
     }
@@ -308,11 +291,7 @@ export class NovelOutlineService {
       },
     );
 
-    void this.startExtract({
-      jobId: job.jobId,
-      novelCode: job.novelCode,
-      signal: controller.signal,
-    })
+    void this.startExtract({ jobId: job.jobId, signal: controller.signal })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.error(`后台提取任务失败 jobId=${job.jobId}: ${message}`);
@@ -410,42 +389,21 @@ export class NovelOutlineService {
     return outline;
   }
 
-  private async resolveJob(params: ExtractParams): Promise<NovelSplitJobDocument> {
-    const jobId = params.jobId?.trim();
-    const novelCode = params.novelCode?.trim();
-
-    let job: NovelSplitJobDocument | null = null;
-    if (jobId) {
-      job = await this.jobModel
-        .findOne({
-          jobId,
-          chunkDir: { $ne: '' },
-          totalChunks: { $gt: 0 },
-        })
-        .exec();
-      if (!job) {
-        throw new NotFoundException(`未找到任务 ${jobId}`);
-      }
-      if (novelCode && job.novelCode !== novelCode) {
-        throw new BadRequestException('jobId 与 novelCode 不匹配');
-      }
-      return job;
+  private async resolveJob(jobId: string): Promise<NovelSplitJobDocument> {
+    const normalizedJobId = jobId?.trim();
+    if (!normalizedJobId) {
+      throw new BadRequestException('jobId 不能为空');
     }
 
-    if (!novelCode) {
-      throw new BadRequestException('jobId 或 novelCode 不能为空');
-    }
-
-    job = await this.jobModel
+    const job = await this.jobModel
       .findOne({
-        novelCode,
+        jobId: normalizedJobId,
         chunkDir: { $ne: '' },
         totalChunks: { $gt: 0 },
       })
-      .sort({ createdAt: -1 })
       .exec();
     if (!job) {
-      throw new NotFoundException(`未找到小说 ${novelCode} 对应的拆分任务`);
+      throw new NotFoundException(`未找到任务 ${normalizedJobId}`);
     }
 
     return job;
@@ -454,9 +412,9 @@ export class NovelOutlineService {
   /**
    * 启动生成任务
    */
-  async startExtract(params: ExtractParams) {
+  private async startExtract(params: ExtractParams) {
     const { signal } = params;
-    const job = await this.resolveJob(params);
+    const job = await this.resolveJob(params.jobId);
     const novelCode = job.novelCode;
     const jobId = job.jobId;
     if (job.status === 'splitting') {
@@ -790,7 +748,7 @@ export class NovelOutlineService {
   /**
    * 提取（并发执行所有提取任务）
    */
-  async chunkExtractor(params: ResolvedExtractParams) {
+  private async chunkExtractor(params: ResolvedExtractParams) {
     this.logger.log(`开始并发提取角色、世界观、剧情...`);
 
     const [characterResult, worldResult, plotResult] = await Promise.all([
@@ -888,7 +846,7 @@ export class NovelOutlineService {
   /**
    * 角色提取器
    */
-  async characterExtractor(params: ResolvedExtractParams) {
+  private async characterExtractor(params: ResolvedExtractParams) {
     this.logger.log(`正在提取角色...`);
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 
@@ -943,7 +901,7 @@ ${chunkText}
   /**
    * 世界观提取器
    */
-  async worldExtractor(params: ResolvedExtractParams) {
+  private async worldExtractor(params: ResolvedExtractParams) {
     this.logger.log(`正在提取世界观...`);
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 
@@ -1001,7 +959,7 @@ ${chunkText}
   /**
    * 剧情提取器
    */
-  async plotExtractor(params: ResolvedExtractParams) {
+  private async plotExtractor(params: ResolvedExtractParams) {
     this.logger.log(`正在提取剧情...`);
     const { chunkText, chunkIndex, totalChunks, novelCode, signal } = params;
 

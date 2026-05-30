@@ -45,32 +45,11 @@ export class UploadAndSplitDto {
 }
 
 /**
- * 单块文本提取
- */
-export class StartExtractDto {
-  @IsString()
-  novelCode: string;
-}
-
-/**
  * 通用的 jobId 查询入参
  */
 export class JobIdDto {
   @IsString()
   jobId: string;
-}
-
-/**
- * 查询单个 novel_split_jobs，支持 jobId 或 novelCode
- */
-export class SplitJobDetailQueryDto {
-  @IsString()
-  @IsOptional()
-  jobId?: string;
-
-  @IsString()
-  @IsOptional()
-  novelCode?: string;
 }
 
 /**
