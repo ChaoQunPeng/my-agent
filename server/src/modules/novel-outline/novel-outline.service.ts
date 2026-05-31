@@ -32,6 +32,7 @@ import { normalize, toStringArray, uniqueStrings } from './outline-merge.utils';
 interface ExtractParams {
   jobId: string;
   signal?: AbortSignal;
+  stopHandle?: RunningJobHandle;
 }
 
 interface SplitJobQueryParams {
@@ -76,6 +77,12 @@ interface SearchChunkMetaParams {
   includeChunks?: boolean;
 }
 
+interface NovelMetaDetailParams {
+  novelCode: string;
+  chunkId: string;
+  includeChunk?: boolean;
+}
+
 export interface SearchChunkMetaHit {
   id: string;
   score: number;
@@ -90,9 +97,23 @@ export interface SearchChunkMetaHit {
   chunkText?: string;
 }
 
+export interface NovelMetaDetail extends ChunkMeta {
+  novelCode: string;
+  createdAt?: Date;
+  chunkText?: string;
+}
+
 interface ChunkFileEntry {
   chunkId: string;
   filePath: string;
+}
+
+type RunningJobStopStatus = 'paused' | 'aborted';
+
+interface RunningJobHandle {
+  controller: AbortController;
+  stopStatus?: RunningJobStopStatus;
+  stopMessage?: string;
 }
 
 @Injectable()
@@ -100,8 +121,8 @@ export class NovelOutlineService {
   // 上传根目录（放在 server/uploads/novel-splits 下）
   private readonly uploadRoot: string;
   private readonly logger = new Logger(NovelOutlineService.name);
-  private readonly runningJobs = new Map<string, AbortController>();
-  private readonly runningMetaJobs = new Map<string, AbortController>();
+  private readonly runningJobs = new Map<string, RunningJobHandle>();
+  private readonly runningMetaJobs = new Map<string, RunningJobHandle>();
   private readonly chunkMetaMaxAttempts: number;
   constructor(
     @InjectModel(NovelSplitJob.name)
@@ -480,6 +501,43 @@ export class NovelOutlineService {
     return (await this.jobModel.findOne({ _id: job._id }).exec())!;
   }
 
+  async pauseJob(jobId: string): Promise<NovelSplitJob> {
+    const normalizedJobId = jobId?.trim();
+    if (!normalizedJobId) {
+      throw new BadRequestException('jobId 不能为空');
+    }
+
+    const job = await this.jobModel.findOne({ jobId: normalizedJobId }).exec();
+    if (!job) {
+      throw new NotFoundException(`未找到任务 ${normalizedJobId}`);
+    }
+
+    if (job.status === 'paused') {
+      return job;
+    }
+    if (!['meta_generating', 'generating'].includes(job.status)) {
+      throw new BadRequestException('当前任务不在运行中，无法暂停');
+    }
+
+    this.requestStop(normalizedJobId, 'paused', '任务已暂停');
+
+    await this.jobModel.updateOne(
+      { _id: job._id },
+      {
+        $set: {
+          status: 'paused',
+          lastError: '任务已暂停',
+          processingChunkIndex:
+            job.lastCompletedChunkIndex || job.processingChunkIndex || 0,
+          processedChunks:
+            job.lastCompletedChunkIndex || job.processedChunks || 0,
+        },
+      },
+    );
+
+    return (await this.jobModel.findOne({ jobId: normalizedJobId }).exec())!;
+  }
+
   async startNovelMetaGenerateInBackground(params: {
     novelCode: string;
     jobId?: string;
@@ -492,8 +550,8 @@ export class NovelOutlineService {
       throw new BadRequestException('任务正在生成大纲，暂不能开始生成 meta');
     }
 
-    const runningController = this.runningMetaJobs.get(job.jobId);
-    if (runningController && !runningController.signal.aborted) {
+    const runningHandle = this.runningMetaJobs.get(job.jobId);
+    if (runningHandle && !runningHandle.controller.signal.aborted) {
       return (await this.jobModel.findOne({ _id: job._id }).exec())!;
     }
 
@@ -519,8 +577,8 @@ export class NovelOutlineService {
       return (await this.jobModel.findOne({ _id: job._id }).exec())!;
     }
 
-    const controller = new AbortController();
-    this.runningMetaJobs.set(job.jobId, controller);
+    const handle: RunningJobHandle = { controller: new AbortController() };
+    this.runningMetaJobs.set(job.jobId, handle);
 
     await this.jobModel.updateOne(
       { _id: job._id },
@@ -535,7 +593,7 @@ export class NovelOutlineService {
       },
     );
 
-    void this.runNovelMetaGenerate(job, novelCode, chunkFiles, controller, {
+    void this.runNovelMetaGenerate(job, novelCode, chunkFiles, handle, {
       pendingChunkFiles: resumeState.pendingChunkFiles,
       completedBeforeStart: resumeState.completedCount,
     })
@@ -545,7 +603,7 @@ export class NovelOutlineService {
       })
       .finally(() => {
         const current = this.runningMetaJobs.get(job.jobId);
-        if (current === controller) {
+        if (current === handle) {
           this.runningMetaJobs.delete(job.jobId);
         }
       });
@@ -597,6 +655,50 @@ export class NovelOutlineService {
     };
   }
 
+  async findNovelMetaDetail(
+    params: NovelMetaDetailParams,
+  ): Promise<NovelMetaDetail> {
+    const novelCode = params.novelCode?.trim();
+    const chunkId = normalize(params.chunkId || '');
+    if (!novelCode) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+    if (!chunkId) {
+      throw new BadRequestException('chunkId 不能为空');
+    }
+
+    const doc = await this.novelMetaModel
+      .findOne({ novelCode, chunkId })
+      .lean()
+      .exec();
+    if (!doc) {
+      throw new NotFoundException(
+        `未找到小说 ${novelCode} 的 chunk ${chunkId} meta 数据`,
+      );
+    }
+
+    const detail: NovelMetaDetail = {
+      novelCode: doc.novelCode,
+      chunkId: normalize(doc.chunkId),
+      summary: normalize(doc.summary),
+      keywords: uniqueStrings(doc.keywords || []),
+      characters: uniqueStrings(doc.characters || []),
+      locations: uniqueStrings(doc.locations || []),
+      organizations: uniqueStrings(doc.organizations || []),
+      concepts: uniqueStrings(doc.concepts || []),
+      events: uniqueStrings(doc.events || []),
+      createdAt: doc.createdAt,
+    };
+
+    if (params.includeChunk) {
+      const chunkDir = await this.resolveChunkDirByNovelCode(novelCode);
+      const chunkFilePath = await this.resolveChunkFilePath(chunkDir, chunkId);
+      detail.chunkText = await fs.readFile(chunkFilePath, 'utf-8');
+    }
+
+    return detail;
+  }
+
   /**
    * 根据 novelCode 获取大纲数据
    */
@@ -615,13 +717,45 @@ export class NovelOutlineService {
     if (job.status === 'meta_generating') {
       return job.processedChunks ? 'done' : 'split_done';
     }
-    if (
-      (job.status === 'failed' || job.status === 'aborted') &&
-      !job.processedChunks
-    ) {
+    if (this.isRecoverableStoppedStatus(job.status) && !job.processedChunks) {
       return 'split_done';
     }
     return job.status;
+  }
+
+  private isRecoverableStoppedStatus(
+    status: NovelSplitJobStatus,
+  ): status is 'failed' | 'aborted' | 'paused' {
+    return status === 'failed' || status === 'aborted' || status === 'paused';
+  }
+
+  private requestStop(
+    jobId: string,
+    stopStatus: RunningJobStopStatus,
+    stopMessage: string,
+  ) {
+    const handles = [
+      this.runningJobs.get(jobId),
+      this.runningMetaJobs.get(jobId),
+    ].filter(Boolean) as RunningJobHandle[];
+
+    for (const handle of handles) {
+      handle.stopStatus = stopStatus;
+      handle.stopMessage = stopMessage;
+      handle.controller.abort();
+    }
+  }
+
+  private resolveStopResult(handle?: RunningJobHandle): {
+    status: RunningJobStopStatus;
+    message: string;
+  } {
+    const status = handle?.stopStatus || 'aborted';
+    return {
+      status,
+      message:
+        handle?.stopMessage || (status === 'paused' ? '任务已暂停' : '任务已中止'),
+    };
   }
 
   /**
@@ -686,13 +820,13 @@ export class NovelOutlineService {
       return job;
     }
 
-    const runningController = this.runningJobs.get(job.jobId);
-    if (runningController && !runningController.signal.aborted) {
+    const runningHandle = this.runningJobs.get(job.jobId);
+    if (runningHandle && !runningHandle.controller.signal.aborted) {
       return job;
     }
 
-    const controller = new AbortController();
-    this.runningJobs.set(job.jobId, controller);
+    const handle: RunningJobHandle = { controller: new AbortController() };
+    this.runningJobs.set(job.jobId, handle);
 
     await this.jobModel.updateOne(
       { _id: job._id },
@@ -704,14 +838,18 @@ export class NovelOutlineService {
       },
     );
 
-    void this.startExtract({ jobId: job.jobId, signal: controller.signal })
+    void this.startExtract({
+      jobId: job.jobId,
+      signal: handle.controller.signal,
+      stopHandle: handle,
+    })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.error(`后台提取任务失败 jobId=${job.jobId}: ${message}`);
       })
       .finally(() => {
         const current = this.runningJobs.get(job.jobId);
-        if (current === controller) {
+        if (current === handle) {
           this.runningJobs.delete(job.jobId);
         }
       });
@@ -730,12 +868,7 @@ export class NovelOutlineService {
       throw new NotFoundException(`未找到任务 ${normalizedJobId}`);
     }
 
-    const controller = this.runningJobs.get(normalizedJobId);
-    const metaController = this.runningMetaJobs.get(normalizedJobId);
-    controller?.abort();
-    metaController?.abort();
-    this.runningJobs.delete(normalizedJobId);
-    this.runningMetaJobs.delete(normalizedJobId);
+    this.requestStop(normalizedJobId, 'aborted', '任务已中止');
 
     await this.jobModel.updateOne(
       { _id: job._id },
@@ -876,7 +1009,7 @@ export class NovelOutlineService {
     job: NovelSplitJobDocument,
     novelCode: string,
     chunkFiles: ChunkFileEntry[],
-    controller: AbortController,
+    handle: RunningJobHandle,
     options?: {
       pendingChunkFiles?: ChunkFileEntry[];
       completedBeforeStart?: number;
@@ -893,7 +1026,7 @@ export class NovelOutlineService {
         totalChunks: chunkFiles.length,
         chunkFiles: options?.pendingChunkFiles || chunkFiles,
         completedBeforeStart: options?.completedBeforeStart || 0,
-        signal: controller.signal,
+        signal: handle.controller.signal,
       });
 
       await this.jobModel.updateOne(
@@ -910,14 +1043,16 @@ export class NovelOutlineService {
       );
     } catch (err) {
       const error = err as Error;
-      const aborted = error?.name === 'AbortError' || controller.signal.aborted;
+      const aborted =
+        error?.name === 'AbortError' || handle.controller.signal.aborted;
+      const stopResult = this.resolveStopResult(handle);
 
       await this.jobModel.updateOne(
         { _id: job._id },
         {
           $set: {
-            status: aborted ? 'aborted' : 'failed',
-            lastError: aborted ? '任务已中止' : error.message,
+            status: aborted ? stopResult.status : 'failed',
+            lastError: aborted ? stopResult.message : error.message,
           },
         },
       );
@@ -1020,11 +1155,12 @@ export class NovelOutlineService {
     } catch (err) {
       const e = err as Error;
       const aborted = e?.name === 'AbortError' || signal?.aborted;
+      const stopResult = this.resolveStopResult(params.stopHandle);
       const latestJob = await this.jobModel.findOne(jobFilter).exec();
       await this.jobModel.updateOne(jobFilter, {
         $set: {
-          status: aborted ? 'aborted' : 'failed',
-          lastError: aborted ? '任务已中止' : e.message,
+          status: aborted ? stopResult.status : 'failed',
+          lastError: aborted ? stopResult.message : e.message,
           processedChunks: latestJob?.lastCompletedChunkIndex || 0,
         },
       });

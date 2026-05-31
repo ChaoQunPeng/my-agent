@@ -1,7 +1,7 @@
 <template>
   <div class="novel-meta-page">
     <div class="left-panel">
-      <a-card size="small" class="left-panel-card">
+      <a-card size="small" class="left-panel-card" :body-style="{ 'padding-top': 0 }">
         <a-tabs v-model:activeKey="activeLeftTab" class="left-panel-tabs">
           <a-tab-pane key="entry" tab="任务入口">
             <a-form layout="vertical">
@@ -73,15 +73,15 @@
 
           <a-tab-pane v-if="showCurrentTaskTab" key="current" tab="当前任务">
             <a-descriptions v-if="currentJob" :column="1" size="small" bordered :label-style="{ width: '100px' }">
-              <a-descriptions-item label="jobId">
+              <!-- <a-descriptions-item label="jobId">
                 {{ currentJob.jobId }}
-              </a-descriptions-item>
+              </a-descriptions-item> -->
               <a-descriptions-item label="小说编码">
                 {{ currentJob.novelCode }}
               </a-descriptions-item>
-              <a-descriptions-item label="原文文件">
+              <!-- <a-descriptions-item label="原文文件">
                 {{ currentJob.sourceFileName }}
-              </a-descriptions-item>
+              </a-descriptions-item> -->
               <a-descriptions-item label="状态">
                 <a-tag :color="statusColor(currentJob.status)">
                   {{ statusText(currentJob.status) }}
@@ -92,11 +92,6 @@
               </a-descriptions-item>
               <a-descriptions-item label="拆分进度">
                 <a-progress :percent="metaPercent" :status="currentJob.status === 'failed' ? 'exception' : undefined" size="small" />
-                <!-- <span class="fs-12">
-                  {{ currentJob.metaGeneratedChunks }} /
-                  {{ currentJob.totalChunks }}
-                  块
-                </span> -->
               </a-descriptions-item>
               <a-descriptions-item v-if="currentJob.lastError" label="错误信息">
                 <span class="error-text">{{ currentJob.lastError }}</span>
@@ -105,6 +100,7 @@
 
             <div class="action-row">
               <a-button @click="handleRefresh">刷新</a-button>
+              <a-button :loading="pausing" :disabled="!canPause" @click="handlePause">暂停任务</a-button>
               <a-button :loading="rebuildingIndex" :disabled="!canRebuildIndex" @click="handleRebuildIndex">同步重建</a-button>
             </div>
           </a-tab-pane>
@@ -121,158 +117,158 @@
           </a-space>
         </template>
 
-        <a-tabs v-model:activeKey="activeRightTab">
-          <a-tab-pane key="list" tab="Chunk Meta 列表">
-            <div class="toolbar">
-              <a-input-search
-                v-model:value="metaKeyword"
-                placeholder="按 chunkId / 摘要 / 实体关键词过滤"
-                allow-clear
-                style="max-width: 360px"
-                enter-button="筛选"
-                @search="handleMetaFilter"
-              />
-              <a-button :loading="metaLoading" @click="loadMetaList(1)"> 刷新列表 </a-button>
-            </div>
+        <div class="meta-section">
+          <div class="section-title">Chunk Meta 列表</div>
 
-            <a-empty
-              v-if="!metaLoading && !metaList.length"
-              :description="queryNovelCode ? '暂无 meta 数据' : '先输入或恢复一个 novelCode'"
+          <div class="toolbar">
+            <a-input-search
+              v-model:value="metaKeyword"
+              placeholder="字段筛选：按 chunkId / 摘要 / 实体关键词过滤"
+              allow-clear
+              style="max-width: 420px"
+              enter-button="筛选"
+              @search="handleMetaFilter"
             />
+            <a-button :loading="metaLoading" @click="loadMetaList(1)">刷新列表</a-button>
+          </div>
 
-            <a-table
-              v-else
-              :columns="metaColumns"
-              :data-source="metaList"
-              :loading="metaLoading"
-              :pagination="metaPagination"
-              size="small"
-              row-key="chunkId"
-              bordered
-              :scroll="{ x: 1500 }"
-              @change="handleMetaTableChange"
-            >
-              <template #bodyCell="{ column, text, record }">
-                <template v-if="column.dataIndex === 'chunkId'">
-                  <span class="chunk-id">{{ text }}</span>
-                </template>
-                <template v-else-if="column.dataIndex === 'summary'">
-                  <div class="summary-cell">{{ text || '-' }}</div>
-                </template>
-                <template v-else-if="column.dataIndex === 'createdAt'">
-                  {{ formatTime(text) }}
-                </template>
-                <template v-else>
-                  <a-space v-if="Array.isArray(text) && text.length" wrap>
-                    <a-tag v-for="item in text" block :key="`${record.chunkId}-${column.dataIndex}-${item}`">
-                      {{ item }}
-                    </a-tag>
-                  </a-space>
-                  <span v-else>-</span>
-                </template>
+          <!-- <div class="toolbar toolbar-secondary">
+            <a-input-search
+              v-model:value="searchForm.query"
+              placeholder="智能检索：如 林雷第一次觉醒发生在哪里"
+              allow-clear
+              style="min-width: 320px; max-width: 520px"
+              enter-button="智能检索"
+              :loading="searching"
+              @search="handleSearchMeta"
+            />
+            <a-input-number v-model:value="searchForm.topN" :min="1" :max="20" :step="1" style="width: 120px" />
+            <a-switch v-model:checked="scoreSearchEnabled" />
+            <span class="toolbar-label">按 score 搜索</span>
+            <a-button @click="handleResetSmartSearch">清空智能检索</a-button>
+          </div>
+
+          <div v-if="searchResult" class="search-result-meta">
+            <span>智能检索命中 {{ searchResult.total }} 条</span>
+            <span v-if="searchResult.queryWords.length">分词：{{ searchResult.queryWords.join(' / ') }}</span>
+            <span v-if="!scoreSearchEnabled">已完成检索，打开“按 score 搜索”后表格将展示排序结果</span>
+          </div> -->
+
+          <a-empty v-if="!displayedMetaLoading && !displayedMetaRows.length" :description="metaTableEmptyDescription" />
+
+          <a-table
+            v-else
+            :columns="metaColumns"
+            :data-source="displayedMetaRows"
+            :loading="displayedMetaLoading"
+            :pagination="displayedMetaPagination"
+            size="small"
+            row-key="chunkId"
+            bordered
+            :scroll="{ x: 1680 }"
+            @change="handleMetaTableChange"
+          >
+            <template #bodyCell="{ column, text, record }">
+              <template v-if="column.dataIndex === 'chunkId'">
+                <span class="chunk-id">{{ text }}</span>
               </template>
-            </a-table>
-          </a-tab-pane>
-
-          <a-tab-pane key="search" tab="Meta 检索">
-            <a-form layout="vertical">
-              <a-form-item label="检索问题 / 关键词">
-                <a-input-search
-                  v-model:value="searchForm.query"
-                  placeholder="如 林雷第一次觉醒发生在哪里"
-                  enter-button="检索"
-                  :loading="searching"
-                  @search="handleSearchMeta"
-                />
-              </a-form-item>
-              <div class="search-settings">
-                <a-form-item label="返回条数">
-                  <a-input-number v-model:value="searchForm.topN" :min="1" :max="20" :step="1" style="width: 120px" />
-                </a-form-item>
-                <a-form-item label="附带原文片段">
-                  <a-switch v-model:checked="searchForm.includeChunks" />
-                </a-form-item>
-              </div>
-            </a-form>
-
-            <a-empty
-              v-if="!searching && !searchResult"
-              :description="queryNovelCode ? '输入问题后开始检索' : '先输入或恢复一个 novelCode'"
-            />
-
-            <template v-else-if="searchResult">
-              <div class="search-result-meta">
-                <span>命中 {{ searchResult.total }} 条</span>
-                <span v-if="searchResult.queryWords.length"> 分词：{{ searchResult.queryWords.join(' / ') }} </span>
-              </div>
-
-              <a-empty v-if="!searchResult.hits.length" description="没有匹配到相关 meta" />
-
-              <a-collapse v-else accordion>
-                <a-collapse-panel v-for="hit in searchResult.hits" :key="hit.id" :header="`${hit.id} · score ${hit.score}`">
-                  <a-descriptions :column="1" size="small" bordered>
-                    <a-descriptions-item label="摘要">
-                      <div class="summary-cell">{{ hit.summary }}</div>
-                    </a-descriptions-item>
-                    <a-descriptions-item label="关键词">
-                      <a-space v-if="hit.keywords.length" wrap>
-                        <a-tag v-for="item in hit.keywords" :key="item">
-                          {{ item }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </a-descriptions-item>
-                    <a-descriptions-item label="人物">
-                      <a-space v-if="hit.characters.length" wrap>
-                        <a-tag v-for="item in hit.characters" :key="item">
-                          {{ item }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </a-descriptions-item>
-                    <a-descriptions-item label="地点">
-                      <a-space v-if="hit.locations.length" wrap>
-                        <a-tag v-for="item in hit.locations" :key="item">
-                          {{ item }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </a-descriptions-item>
-                    <a-descriptions-item label="组织">
-                      <a-space v-if="hit.organizations.length" wrap>
-                        <a-tag v-for="item in hit.organizations" :key="item">
-                          {{ item }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </a-descriptions-item>
-                    <a-descriptions-item label="概念">
-                      <a-space v-if="hit.concepts.length" wrap>
-                        <a-tag v-for="item in hit.concepts" :key="item">
-                          {{ item }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </a-descriptions-item>
-                    <a-descriptions-item label="事件">
-                      <a-space v-if="hit.events.length" wrap>
-                        <a-tag v-for="item in hit.events" :key="item">
-                          {{ item }}
-                        </a-tag>
-                      </a-space>
-                      <span v-else>-</span>
-                    </a-descriptions-item>
-                    <a-descriptions-item v-if="hit.chunkText" label="原文片段">
-                      <pre class="chunk-text">{{ hit.chunkText }}</pre>
-                    </a-descriptions-item>
-                  </a-descriptions>
-                </a-collapse-panel>
-              </a-collapse>
+              <template v-else-if="column.dataIndex === 'score'">
+                <span>{{ text ?? '-' }}</span>
+              </template>
+              <template v-else-if="column.dataIndex === 'summary'">
+                <div class="summary-cell">{{ text || '-' }}</div>
+              </template>
+              <template v-else-if="column.dataIndex === 'createdAt'">
+                {{ formatTime(text) }}
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <a-button type="link" size="small" @click="openMetaDetail(record)">详情</a-button>
+              </template>
+              <template v-else>
+                <a-space v-if="Array.isArray(text) && text.length" wrap>
+                  <a-tag v-for="item in text" :key="`${record.chunkId}-${column.dataIndex}-${item}`">
+                    {{ item }}
+                  </a-tag>
+                </a-space>
+                <span v-else>-</span>
+              </template>
             </template>
-          </a-tab-pane>
-        </a-tabs>
+          </a-table>
+        </div>
       </a-card>
     </div>
+
+    <a-drawer v-model:open="detailVisible" title="Chunk Meta 详情" width="920" destroy-on-close>
+      <a-spin :spinning="detailLoading">
+        <a-empty v-if="!detailRecord" description="暂无详情数据" />
+        <a-descriptions v-else :column="1" size="small" bordered>
+          <a-descriptions-item label="Chunk">
+            <span class="chunk-id">{{ detailRecord.chunkId }}</span>
+          </a-descriptions-item>
+          <a-descriptions-item v-if="detailRecord.score != null" label="Score">
+            {{ detailRecord.score }}
+          </a-descriptions-item>
+          <a-descriptions-item label="创建时间">
+            {{ formatTime(detailRecord.createdAt) }}
+          </a-descriptions-item>
+          <a-descriptions-item label="摘要">
+            <div class="summary-cell">{{ detailRecord.summary || '-' }}</div>
+          </a-descriptions-item>
+          <a-descriptions-item label="关键词">
+            <a-space v-if="detailRecord.keywords.length" wrap>
+              <a-tag v-for="item in detailRecord.keywords" :key="item">
+                {{ item }}
+              </a-tag>
+            </a-space>
+            <span v-else>-</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="人物">
+            <a-space v-if="detailRecord.characters.length" wrap>
+              <a-tag v-for="item in detailRecord.characters" :key="item">
+                {{ item }}
+              </a-tag>
+            </a-space>
+            <span v-else>-</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="地点">
+            <a-space v-if="detailRecord.locations.length" wrap>
+              <a-tag v-for="item in detailRecord.locations" :key="item">
+                {{ item }}
+              </a-tag>
+            </a-space>
+            <span v-else>-</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="组织">
+            <a-space v-if="detailRecord.organizations.length" wrap>
+              <a-tag v-for="item in detailRecord.organizations" :key="item">
+                {{ item }}
+              </a-tag>
+            </a-space>
+            <span v-else>-</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="概念">
+            <a-space v-if="detailRecord.concepts.length" wrap>
+              <a-tag v-for="item in detailRecord.concepts" :key="item">
+                {{ item }}
+              </a-tag>
+            </a-space>
+            <span v-else>-</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="事件">
+            <a-space v-if="detailRecord.events.length" wrap>
+              <a-tag v-for="item in detailRecord.events" :key="item">
+                {{ item }}
+              </a-tag>
+            </a-space>
+            <span v-else>-</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="原文">
+            <pre v-if="detailRecord.chunkText" class="chunk-text">{{ detailRecord.chunkText }}</pre>
+            <span v-else class="empty-chunk-text">当前未附带原文，可打开“详情附带原文”后重新查看。</span>
+          </a-descriptions-item>
+        </a-descriptions>
+      </a-spin>
+    </a-drawer>
   </div>
 </template>
 
@@ -282,23 +278,29 @@ import { message as antMessage } from 'ant-design-vue'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import type { TablePaginationConfig, UploadFile } from 'ant-design-vue'
 import {
+  getNovelMetaDetail,
   getOutlineJobStatus,
   listNovelMetas,
   listOutlineJobs,
+  pauseOutlineJob,
   rebuildNovelMetaIndex,
-  searchNovelMeta,
   startNovelMetaGenerate,
   uploadAndSplitNovel,
   type NovelChunkMeta,
+  type NovelChunkMetaDetail,
   type NovelChunkMetaSearchResult,
   type NovelOutlineJob
 } from '@/api/novel-outline'
 
 type HistoryCheckStatus = 'idle' | 'checking' | 'has-history' | 'no-history'
+type MetaTableRow = NovelChunkMeta & {
+  score?: number
+  chunkText?: string
+}
+
 const NOVEL_META_CURRENT_JOB_STORAGE_KEY = 'writer-assistant:novel-meta:current-job'
 
 const activeLeftTab = ref('entry')
-const activeRightTab = ref('list')
 
 const uploadForm = reactive({
   novelCode: '',
@@ -319,8 +321,12 @@ const checkedNovelCode = ref('')
 const uploading = ref(false)
 const recovering = ref(false)
 const rebuildingIndex = ref(false)
+const pausing = ref(false)
 const metaLoading = ref(false)
 const searching = ref(false)
+const scoreSearchEnabled = ref(false)
+const detailVisible = ref(false)
+const detailLoading = ref(false)
 
 const metaList = ref<NovelChunkMeta[]>([])
 const metaKeyword = ref('')
@@ -340,72 +346,155 @@ const metaPagination = computed<TablePaginationConfig>(() => ({
 const searchForm = reactive({
   query: '',
   topN: 5,
-  includeChunks: false
+  includeChunks: true
 })
 const searchResult = ref<NovelChunkMetaSearchResult | null>(null)
-
-const metaColumns = [
-  {
-    title: 'Chunk',
-    dataIndex: 'chunkId',
-    key: 'chunkId',
-    width: 100,
-    fixed: 'left' as const
-  },
-  {
-    title: '摘要',
-    dataIndex: 'summary',
-    key: 'summary',
-    width: 360
-  },
-  {
-    title: '关键词',
-    dataIndex: 'keywords',
-    key: 'keywords',
-    width: 240
-  },
-  {
-    title: '人物',
-    dataIndex: 'characters',
-    key: 'characters',
-    width: 200
-  },
-  {
-    title: '地点',
-    dataIndex: 'locations',
-    key: 'locations',
-    width: 200
-  },
-  {
-    title: '组织',
-    dataIndex: 'organizations',
-    key: 'organizations',
-    width: 200
-  },
-  {
-    title: '概念',
-    dataIndex: 'concepts',
-    key: 'concepts',
-    width: 200
-  },
-  {
-    title: '事件',
-    dataIndex: 'events',
-    key: 'events',
-    width: 240
-  },
-  {
-    title: '创建时间',
-    dataIndex: 'createdAt',
-    key: 'createdAt',
-    width: 170
-  }
-]
+const detailRecord = ref<(NovelChunkMetaDetail & { score?: number }) | null>(null)
 
 const canUpload = computed(
   () => historyCheckStatus.value === 'no-history' && !!uploadForm.novelCode.trim() && !!pickedFile.value && !uploading.value
 )
 const showCurrentTaskTab = computed(() => !!currentJob.value)
+const isScoreSearchActive = computed(() => scoreSearchEnabled.value && !!searchResult.value)
+
+const searchedMetaRows = computed<MetaTableRow[]>(() =>
+  (searchResult.value?.hits || []).map(hit => ({
+    novelCode: searchResult.value?.novelCode || queryNovelCode.value || currentJob.value?.novelCode || '',
+    chunkId: hit.id,
+    summary: hit.summary,
+    keywords: hit.keywords,
+    characters: hit.characters,
+    locations: hit.locations,
+    organizations: hit.organizations,
+    concepts: hit.concepts,
+    events: hit.events,
+    score: hit.score,
+    chunkText: hit.chunkText
+  }))
+)
+
+const displayedMetaRows = computed<MetaTableRow[]>(() => {
+  if (!isScoreSearchActive.value) {
+    return metaList.value
+  }
+
+  const keyword = metaKeyword.value.trim().toLowerCase()
+  if (!keyword) {
+    return searchedMetaRows.value
+  }
+
+  return searchedMetaRows.value.filter(row => {
+    const searchableText = [
+      row.chunkId,
+      row.summary,
+      ...row.keywords,
+      ...row.characters,
+      ...row.locations,
+      ...row.organizations,
+      ...row.concepts,
+      ...row.events
+    ]
+      .join('\n')
+      .toLowerCase()
+
+    return searchableText.includes(keyword)
+  })
+})
+
+const metaTableEmptyDescription = computed(() => {
+  if (!queryNovelCode.value) {
+    return '先输入或恢复一个 novelCode'
+  }
+  if (isScoreSearchActive.value) {
+    return '没有匹配到相关 meta'
+  }
+  return '暂无 meta 数据'
+})
+
+const displayedMetaPagination = computed<TablePaginationConfig | false>(() => (isScoreSearchActive.value ? false : metaPagination.value))
+
+const displayedMetaLoading = computed(() => metaLoading.value || (scoreSearchEnabled.value && searching.value))
+
+const metaColumns = computed<any[]>(() => {
+  const columns: any[] = [
+    // {
+    //   title: '编号',
+    //   dataIndex: 'chunkId',
+    //   key: 'chunkId',
+    //   width: 80,
+    //   fixed: 'left' as const
+    // }
+  ]
+
+  if (isScoreSearchActive.value) {
+    columns.push({
+      title: 'Score',
+      dataIndex: 'score',
+      key: 'score',
+      width: 100
+    })
+  }
+
+  columns.push(
+    {
+      title: '摘要',
+      dataIndex: 'summary',
+      key: 'summary',
+      ellipsis: true
+    },
+    // {
+    //   title: '关键词',
+    //   dataIndex: 'keywords',
+    //   key: 'keywords',
+    //   width: 240
+    // },
+    // {
+    //   title: '人物',
+    //   dataIndex: 'characters',
+    //   key: 'characters',
+    //   width: 200
+    // },
+    // {
+    //   title: '地点',
+    //   dataIndex: 'locations',
+    //   key: 'locations',
+    //   width: 200
+    // },
+    // {
+    //   title: '组织',
+    //   dataIndex: 'organizations',
+    //   key: 'organizations',
+    //   width: 200
+    // },
+    // {
+    //   title: '概念',
+    //   dataIndex: 'concepts',
+    //   key: 'concepts',
+    //   width: 200
+    // },
+    // {
+    //   title: '事件',
+    //   dataIndex: 'events',
+    //   key: 'events',
+    //   width: 240
+    // },
+    // {
+    //   title: '创建时间',
+    //   dataIndex: 'createdAt',
+    //   key: 'createdAt',
+    //   width: 170
+    // },
+    {
+      title: '操作',
+      key: 'action',
+      dataIndex: 'action',
+      width: 90,
+      fixed: 'right' as const
+    }
+  )
+
+  return columns
+})
 
 const canRebuildIndex = computed(
   () =>
@@ -413,6 +502,10 @@ const canRebuildIndex = computed(
     currentJob.value.status !== 'splitting' &&
     currentJob.value.status !== 'meta_generating' &&
     currentJob.value.status !== 'generating'
+)
+
+const canPause = computed(
+  () => !!currentJob.value && (currentJob.value.status === 'meta_generating' || currentJob.value.status === 'generating')
 )
 
 const metaPercent = computed(() => {
@@ -437,6 +530,7 @@ function statusColor(status: NovelOutlineJob['status']) {
       generating: 'processing',
       done: 'success',
       failed: 'error',
+      paused: 'orange',
       aborted: 'default'
     }[status] || 'default'
   )
@@ -453,6 +547,7 @@ function statusText(status: NovelOutlineJob['status']) {
       generating: '大纲生成中',
       done: '全部完成',
       failed: '失败',
+      paused: '已暂停',
       aborted: '已中止'
     }[status] || status
   )
@@ -693,6 +788,11 @@ async function handleRecover() {
       return
     }
 
+    if (res.data.status === 'paused' && isMetaComplete(res.data)) {
+      antMessage.info('任务当前已暂停；如需继续生成大纲，请前往大纲页面恢复')
+      return
+    }
+
     const shouldResumeMeta = !isMetaComplete(res.data) && res.data.status !== 'generating'
 
     if (shouldResumeMeta) {
@@ -739,6 +839,23 @@ async function handleRebuildIndex() {
   }
 }
 
+async function handlePause() {
+  if (!currentJob.value) return
+  pausing.value = true
+  try {
+    const res = await pauseOutlineJob(currentJob.value.jobId)
+    if (res.data) {
+      applyCurrentJob(res.data)
+    }
+    await loadMetaList(metaPaginationState.current, true)
+    antMessage.success('任务已暂停')
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '暂停失败')
+  } finally {
+    pausing.value = false
+  }
+}
+
 async function handleRefresh() {
   if (!currentJob.value) return
   const res = await getOutlineJobStatus(currentJob.value.jobId)
@@ -781,11 +898,17 @@ async function loadMetaList(page = metaPaginationState.current, silent = false) 
 }
 
 async function handleMetaFilter() {
+  if (isScoreSearchActive.value) {
+    return
+  }
   metaPaginationState.current = 1
   await loadMetaList(1)
 }
 
 async function handleMetaTableChange(pagination: TablePaginationConfig) {
+  if (isScoreSearchActive.value) {
+    return
+  }
   const nextPage = pagination.current || 1
   const nextPageSize = pagination.pageSize || metaPaginationState.pageSize
   const pageSizeChanged = nextPageSize !== metaPaginationState.pageSize
@@ -803,34 +926,50 @@ async function handleQueryMeta() {
   queryNovelCode.value = novelCode
   metaPaginationState.current = 1
   searchResult.value = null
+  scoreSearchEnabled.value = false
   await loadMetaList(1)
 }
 
-async function handleSearchMeta() {
-  const novelCode = queryNovelCode.value || currentJob.value?.novelCode
+async function openMetaDetail(record: Record<string, any>) {
+  const novelCode = record.novelCode || queryNovelCode.value || currentJob.value?.novelCode
   if (!novelCode) {
     antMessage.warning('请先输入 novelCode')
     return
   }
-  if (!searchForm.query.trim()) {
-    antMessage.warning('请输入检索内容')
-    return
+
+  detailVisible.value = true
+  detailLoading.value = true
+  detailRecord.value = {
+    novelCode,
+    chunkId: record.chunkId,
+    summary: record.summary,
+    keywords: record.keywords,
+    characters: record.characters,
+    locations: record.locations,
+    organizations: record.organizations,
+    concepts: record.concepts,
+    events: record.events,
+    createdAt: record.createdAt,
+    chunkText: record.chunkText,
+    score: record.score
   }
 
-  searching.value = true
   try {
-    const res = await searchNovelMeta({
+    const res = await getNovelMetaDetail({
       novelCode,
-      query: searchForm.query.trim(),
-      topN: searchForm.topN,
-      includeChunks: searchForm.includeChunks
+      chunkId: record.chunkId,
+      includeChunk: searchForm.includeChunks
     })
-    searchResult.value = res.data ?? null
-    activeRightTab.value = 'search'
+    if (res.data) {
+      detailRecord.value = {
+        ...res.data,
+        score: record.score
+      }
+    }
   } catch (e: any) {
-    antMessage.error(e?.response?.data?.msg || e?.message || '检索失败')
+    antMessage.error(e?.response?.data?.msg || e?.message || '加载详情失败')
   } finally {
-    searching.value = false
+    detailLoading.value = false
   }
 }
 
@@ -857,7 +996,11 @@ watch(
   }
 )
 
-watch(queryNovelCode, value => {
+watch(queryNovelCode, (value, oldValue) => {
+  if (value !== oldValue) {
+    searchResult.value = null
+    scoreSearchEnabled.value = false
+  }
   if (!value) {
     metaList.value = []
     metaPaginationState.total = 0
@@ -916,6 +1059,13 @@ onMounted(() => {
   overflow-y: auto;
 }
 
+.section-title {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
 .toolbar {
   display: flex;
   gap: 12px;
@@ -924,10 +1074,13 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.search-settings {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+.toolbar-secondary {
+  margin-bottom: 16px;
+}
+
+.toolbar-label {
+  font-size: 13px;
+  color: #666;
 }
 
 .search-result-meta {
@@ -971,11 +1124,6 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.fs-12 {
-  font-size: 12px;
-  color: #999;
-}
-
 .error-text {
   color: #ff4d4f;
 }
@@ -997,7 +1145,11 @@ onMounted(() => {
   word-break: break-word;
   max-height: 420px;
   overflow-y: auto;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
+}
+
+.empty-chunk-text {
+  color: #999;
 }
 </style>

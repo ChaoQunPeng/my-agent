@@ -123,6 +123,7 @@ export class SplitJobQueryDto {
     'generating',
     'done',
     'failed',
+    'paused',
     'aborted',
   ])
   @IsOptional()
@@ -147,6 +148,16 @@ export class SearchChunkMetaDto {
   @IsBoolean()
   @IsOptional()
   includeChunks?: boolean;
+}
+
+export class NovelMetaDetailDto extends NovelCodeDto {
+  @IsString()
+  chunkId!: string;
+
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
+  includeChunk?: boolean;
 }
 
 export class AnswerByMetaDto {

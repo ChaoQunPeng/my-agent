@@ -34,7 +34,7 @@
           <div class="novel-selector-card__current">当前小说：{{ currentNovelCode || '未选择' }}</div>
         </div>
 
-        <WritingAssistant v-if="currentSessionId && currentNovelCode" :session-id="currentSessionId" :novel-code="currentNovelCode" />
+        <!-- <WritingAssistant v-if="currentSessionId && currentNovelCode" :session-id="currentSessionId" :novel-code="currentNovelCode" /> -->
       </div>
     </template>
   </SessionChatWorkspace>
@@ -175,6 +175,7 @@ onMounted(async () => {
 .novel-selector-card {
   padding: 16px;
   background: #fff;
+  height: 100%;
 }
 
 .novel-selector-card__title {

@@ -15,4 +15,3 @@ export class OpenaiService {
     this.model = this.configService.getOrThrow<string>('DEEPSEEK_MODEL');
   }
 }
-

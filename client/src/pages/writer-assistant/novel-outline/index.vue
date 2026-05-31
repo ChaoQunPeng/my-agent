@@ -268,13 +268,14 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const canUpload = computed(() => !!form.novelCode && !!pickedFile.value && !uploading.value)
 // 允许续跑的状态：
-// - split_done / failed / aborted：常规可续跑
+// - split_done / failed / paused / aborted：常规可续跑
 // - generating：后端重启后残留的"假在跑"任务，允许强制再次拉起（后端有二次校验）
 const canGenerate = computed(
   () =>
     !!currentJob.value &&
     (currentJob.value.status === 'split_done' ||
       currentJob.value.status === 'failed' ||
+      currentJob.value.status === 'paused' ||
       currentJob.value.status === 'aborted' ||
       currentJob.value.status === 'generating') &&
     currentJob.value.processedChunks < currentJob.value.totalChunks
@@ -348,6 +349,7 @@ function statusColor(s: NovelOutlineJob['status']) {
       generating: 'processing',
       done: 'success',
       failed: 'error',
+      paused: 'orange',
       aborted: 'default'
     }[s] || 'default'
   )
@@ -361,6 +363,7 @@ function statusText(s: NovelOutlineJob['status']) {
       generating: '生成中',
       done: '已完成',
       failed: '失败',
+      paused: '已暂停',
       aborted: '已中止'
     }[s] || s
   )
@@ -501,10 +504,11 @@ function startPolling() {
 
       // 终态则停止轮询
       const s = currentJob.value.status
-      if (s === 'done' || s === 'failed' || s === 'aborted') {
+      if (s === 'done' || s === 'failed' || s === 'paused' || s === 'aborted') {
         stopPolling()
         if (s === 'done') antMessage.success('大纲生成完成')
         if (s === 'failed') antMessage.error('生成失败：' + (currentJob.value.lastError || '未知错误'))
+        if (s === 'paused') antMessage.info('任务已暂停')
       }
     } catch (e) {
       // 轮询错误不打断，下一轮继续
@@ -674,6 +678,8 @@ async function handleRecover() {
     if (res.data.status === 'generating') {
       startPolling()
       antMessage.warning('任务状态仍为 generating，若确认后端已停止，请点击"继续生成大纲"强制续跑')
+    } else if (res.data.status === 'paused') {
+      antMessage.info('任务已恢复，当前处于暂停状态，可点击“继续生成大纲”继续')
     } else {
       antMessage.success('任务已恢复')
     }

@@ -11,6 +11,7 @@ export type NovelSplitJobDocument = NovelSplitJob & Document;
  * - generating: 正在调用大模型生成大纲
  * - done: 全部完成
  * - failed: 任务失败
+ * - paused: 用户暂停，可继续恢复
  * - aborted: 用户中止
  */
 export type NovelSplitJobStatus =
@@ -20,6 +21,7 @@ export type NovelSplitJobStatus =
   | 'generating'
   | 'done'
   | 'failed'
+  | 'paused'
   | 'aborted';
 
 /**
@@ -98,6 +100,7 @@ export class NovelSplitJob {
       'generating',
       'done',
       'failed',
+      'paused',
       'aborted',
     ],
     default: 'splitting',

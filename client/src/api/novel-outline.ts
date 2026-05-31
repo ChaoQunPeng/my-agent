@@ -7,6 +7,7 @@ export type NovelOutlineJobStatus =
   | 'generating'
   | 'done'
   | 'failed'
+  | 'paused'
   | 'aborted'
 
 interface RawNovelOutlineJob {
@@ -115,6 +116,10 @@ export interface NovelChunkMeta {
   concepts: string[]
   events: string[]
   createdAt?: string
+}
+
+export interface NovelChunkMetaDetail extends NovelChunkMeta {
+  chunkText?: string
 }
 
 export interface NovelChunkMetaHit {
@@ -290,6 +295,15 @@ export function abortOutlineJob(jobId: string) {
   }))
 }
 
+export function pauseOutlineJob(jobId: string) {
+  return request.post<RawNovelOutlineJob>('/novel-outline/pause-job', {
+    jobId,
+  }).then((res) => ({
+    ...res,
+    data: res.data ? normalizeJob(res.data) : res.data,
+  }))
+}
+
 export function getNovelOutline(novelCode: string) {
   return request.post<RawNovelOutlineResult | null>(
     '/novel-outline/find-by-novel-code',
@@ -359,6 +373,17 @@ export function listNovelMetas(params: {
     current: number
     pageSize: number
   }>('/novel-outline/get-meta-list', params)
+}
+
+export function getNovelMetaDetail(params: {
+  novelCode: string
+  chunkId: string
+  includeChunk?: boolean
+}) {
+  return request.post<NovelChunkMetaDetail>(
+    '/novel-outline/get-meta-detail',
+    params,
+  )
 }
 
 export function searchNovelMeta(params: {

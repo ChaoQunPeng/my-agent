@@ -28,6 +28,7 @@ import {
   MergeAliasDto,
   SearchChunkMetaDto,
   AnswerByMetaDto,
+  NovelMetaDetailDto,
 } from './dto/novel-outline.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
@@ -154,6 +155,16 @@ export class NovelOutlineController {
     return ApiResponseDto.success(result);
   }
 
+  @Post('get-meta-detail')
+  async getMetaDetail(@Body() body: NovelMetaDetailDto) {
+    const result = await this.novelOutlineService.findNovelMetaDetail({
+      novelCode: body.novelCode,
+      chunkId: body.chunkId,
+      includeChunk: body.includeChunk,
+    });
+    return ApiResponseDto.success(result);
+  }
+
   /**
    * 获取 novel_split_jobs 中的数据
    */
@@ -176,6 +187,12 @@ export class NovelOutlineController {
   async abortJob(@Body() body: JobIdDto) {
     const result = await this.novelOutlineService.abortJob(body.jobId);
     return ApiResponseDto.success(result, '任务已中止');
+  }
+
+  @Post('pause-job')
+  async pauseJob(@Body() body: JobIdDto) {
+    const result = await this.novelOutlineService.pauseJob(body.jobId);
+    return ApiResponseDto.success(result, '任务已暂停');
   }
 
   @Post('get-alias-candidates')
