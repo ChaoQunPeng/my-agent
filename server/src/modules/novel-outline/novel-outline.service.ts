@@ -510,9 +510,7 @@ export class NovelOutlineService {
     void this.runNovelMetaGenerate(job, novelCode, chunkFiles, controller)
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `后台 meta 生成失败 jobId=${job.jobId}: ${message}`,
-        );
+        this.logger.error(`后台 meta 生成失败 jobId=${job.jobId}: ${message}`);
       })
       .finally(() => {
         const current = this.runningMetaJobs.get(job.jobId);
@@ -1304,10 +1302,44 @@ export class NovelOutlineService {
       '你的任务是基于一个 chunk 生成可检索的结构化 Metadata，用于 MongoDB 检索索引。',
       '必须遵守：前文参考和后文参考只用于理解上下文，不允许重复提取。',
       '只能从【本段正文】提取当前 chunk 新增的信息。',
-      'summary 使用第三人称描述当前 chunk 的核心内容，原则上长度控制在 100~200 字之间（可以超过200字，要保证内容完整，不能截断），优先保留后续检索需要的重要人物、设定、事件和结论。',
+      ` summary 使用第三人称生成高信息密度摘要。
+        摘要不仅描述事件经过，还应尽可能保留：
+
+        - 人物关系
+        - 人物心理与情绪变化
+        - 人物目标、动机与立场
+        - 重要背景信息
+        - 世界观设定
+        - 关键冲突
+        - 事件结果与影响
+        - 对后续剧情有价值的结论
+
+        优先保留后续用于：
+        人物分析、关系分析、剧情问答、世界观问答、续写参考的重要信息。
+
+        避免流水账式复述正文，不要逐句概括。
+
+        应总结：
+        “发生了什么”
+        以及
+        “为什么重要”。
+
+        如果本段重点是人物心理、人物关系、成长经历、回忆内容或情感冲突，应优先保留这些内容，而非单纯记录动作事件。
+
+        使用第三人称描述，原则上控制在100~300字，可根据内容适当增加，保证关键信息完整。
+      `,
       'keywords 必须返回 5 到 10 个关键词，优先提取人物、地点、组织、世界观设定、能力、境界、特殊名词、关键道具、事件名称。',
       'characters、locations、organizations、concepts、events 必须返回字符串数组，没有则返回空数组。',
-      'events 只保留当前 chunk 明确发生的关键事件短语，不要写成长段。',
+      `
+       events 仅提取当前 chunk 中明确发生或被确认的重要剧情事件。
+       每个事件使用简短事件短语描述，优先采用“人物 + 动作”的形式（如：路明非进入卡塞尔学院、诺诺邀请路明非）。
+           
+       不要记录人物心理、情绪、背景回忆、世界观设定或纯对话内容。
+           
+       不要写成长段摘要。
+           
+       没有明确事件则返回空数组。
+      `,
       '禁止输出 markdown、解释文字或额外说明。',
       '必须返回合法 JSON，格式严格如下：{"summary":"","keywords":[],"characters":[],"locations":[],"organizations":[],"concepts":[],"events":[]}',
     ].join('\n');
