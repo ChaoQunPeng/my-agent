@@ -103,6 +103,42 @@ export interface NovelOutlineResult {
   updatedAt?: string
 }
 
+export interface NovelChunkMeta {
+  _id?: string
+  novelCode: string
+  chunkId: string
+  summary: string
+  keywords: string[]
+  characters: string[]
+  locations: string[]
+  organizations: string[]
+  concepts: string[]
+  events: string[]
+  createdAt?: string
+}
+
+export interface NovelChunkMetaHit {
+  id: string
+  score: number
+  summary: string
+  keywords: string[]
+  characters: string[]
+  locations: string[]
+  organizations: string[]
+  concepts: string[]
+  events: string[]
+  chunkFilePath: string
+  chunkText?: string
+}
+
+export interface NovelChunkMetaSearchResult {
+  novelCode: string
+  query: string
+  queryWords: string[]
+  total: number
+  hits: NovelChunkMetaHit[]
+}
+
 function normalizeStringList(values?: Array<string | undefined | null>): string[] {
   return Array.from(
     new Set(
@@ -279,6 +315,19 @@ export function rebuildNovelMetaIndex(params: {
   }))
 }
 
+export function startNovelMetaGenerate(params: {
+  novelCode: string
+  jobId?: string
+}) {
+  return request.post<RawNovelOutlineJob>(
+    '/novel-outline/start-meta-generate',
+    params,
+  ).then((res) => ({
+    ...res,
+    data: res.data ? normalizeJob(res.data) : res.data,
+  }))
+}
+
 export function listOutlineJobs(novelCode?: string) {
   return request.post<{
     list: RawNovelOutlineJob[]
@@ -293,6 +342,32 @@ export function listOutlineJobs(novelCode?: string) {
     ...res,
     data: (res.data?.list || []).map(normalizeJob),
   }))
+}
+
+export function listNovelMetas(params: {
+  novelCode: string
+  current?: number
+  pageSize?: number
+  keyword?: string
+}) {
+  return request.post<{
+    list: NovelChunkMeta[]
+    total: number
+    current: number
+    pageSize: number
+  }>('/novel-outline/get-meta-list', params)
+}
+
+export function searchNovelMeta(params: {
+  novelCode: string
+  query: string
+  topN?: number
+  includeChunks?: boolean
+}) {
+  return request.post<NovelChunkMetaSearchResult>(
+    '/novel-outline/search-meta',
+    params,
+  )
 }
 
 export function getAliasCandidates(novelCode: string) {

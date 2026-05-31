@@ -41,6 +41,13 @@ interface SplitJobQueryParams {
   status?: string;
 }
 
+interface NovelMetaQueryParams {
+  current?: number;
+  pageSize?: number;
+  novelCode: string;
+  keyword?: string;
+}
+
 type ResolvedExtractParams = ExtractParams & {
   novelCode: string;
   chunkText: string;
@@ -93,6 +100,7 @@ export class NovelOutlineService {
   private readonly uploadRoot: string;
   private readonly logger = new Logger(NovelOutlineService.name);
   private readonly runningJobs = new Map<string, AbortController>();
+  private readonly runningMetaJobs = new Map<string, AbortController>();
   private readonly chunkMetaMaxAttempts: number;
   constructor(
     @InjectModel(NovelSplitJob.name)
@@ -406,17 +414,7 @@ export class NovelOutlineService {
     novelCode: string;
     jobId?: string;
   }): Promise<NovelSplitJob> {
-    const novelCode = params.novelCode?.trim();
-    if (!novelCode) {
-      throw new BadRequestException('novelCode 不能为空');
-    }
-
-    const job = params.jobId?.trim()
-      ? await this.resolveJob(params.jobId)
-      : await this.resolveLatestJobByNovelCode(novelCode);
-    if (job.novelCode !== novelCode) {
-      throw new BadRequestException('jobId 与 novelCode 不匹配');
-    }
+    const { novelCode, job } = await this.resolveMetaRebuildJob(params);
     if (['splitting', 'meta_generating', 'generating'].includes(job.status)) {
       throw new BadRequestException('任务运行中，暂不能重建索引');
     }
@@ -473,6 +471,101 @@ export class NovelOutlineService {
     }
 
     return (await this.jobModel.findOne({ _id: job._id }).exec())!;
+  }
+
+  async startNovelMetaGenerateInBackground(params: {
+    novelCode: string;
+    jobId?: string;
+  }): Promise<NovelSplitJob> {
+    const { novelCode, job } = await this.resolveMetaRebuildJob(params);
+    if (job.status === 'splitting') {
+      throw new BadRequestException('任务仍在拆分中，暂不能开始生成 meta');
+    }
+    if (job.status === 'generating') {
+      throw new BadRequestException('任务正在生成大纲，暂不能开始生成 meta');
+    }
+
+    const runningController = this.runningMetaJobs.get(job.jobId);
+    if (runningController && !runningController.signal.aborted) {
+      return (await this.jobModel.findOne({ _id: job._id }).exec())!;
+    }
+
+    const chunkFiles = await this.scanChunkFiles(job.chunkDir);
+    const controller = new AbortController();
+    this.runningMetaJobs.set(job.jobId, controller);
+
+    await this.jobModel.updateOne(
+      { _id: job._id },
+      {
+        $set: {
+          totalChunks: chunkFiles.length,
+          splittedChunks: chunkFiles.length,
+          metaGeneratedChunks: 0,
+          status: 'meta_generating',
+          lastError: '',
+        },
+      },
+    );
+
+    void this.runNovelMetaGenerate(job, novelCode, chunkFiles, controller)
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `后台 meta 生成失败 jobId=${job.jobId}: ${message}`,
+        );
+      })
+      .finally(() => {
+        const current = this.runningMetaJobs.get(job.jobId);
+        if (current === controller) {
+          this.runningMetaJobs.delete(job.jobId);
+        }
+      });
+
+    return (await this.jobModel.findOne({ _id: job._id }).exec())!;
+  }
+
+  async findNovelMetas(params: NovelMetaQueryParams) {
+    const novelCode = params.novelCode?.trim();
+    if (!novelCode) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+
+    const current = Math.max(1, Number(params.current) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20));
+    const keyword = normalize(params.keyword || '');
+    const filter: Record<string, unknown> = { novelCode };
+
+    if (keyword) {
+      const regex = new RegExp(this.escapeRegex(keyword), 'i');
+      filter.$or = [
+        { chunkId: regex },
+        { summary: regex },
+        { keywords: regex },
+        { characters: regex },
+        { locations: regex },
+        { organizations: regex },
+        { concepts: regex },
+        { events: regex },
+      ];
+    }
+
+    const [list, total] = await Promise.all([
+      this.novelMetaModel
+        .find(filter)
+        .sort({ chunkId: 1 })
+        .skip((current - 1) * pageSize)
+        .limit(pageSize)
+        .lean()
+        .exec(),
+      this.novelMetaModel.countDocuments(filter).exec(),
+    ]);
+
+    return {
+      list,
+      total,
+      current,
+      pageSize,
+    };
   }
 
   /**
@@ -603,8 +696,11 @@ export class NovelOutlineService {
     }
 
     const controller = this.runningJobs.get(normalizedJobId);
+    const metaController = this.runningMetaJobs.get(normalizedJobId);
     controller?.abort();
+    metaController?.abort();
     this.runningJobs.delete(normalizedJobId);
+    this.runningMetaJobs.delete(normalizedJobId);
 
     await this.jobModel.updateOne(
       { _id: job._id },
@@ -719,6 +815,76 @@ export class NovelOutlineService {
     }
 
     return job;
+  }
+
+  private async resolveMetaRebuildJob(params: {
+    novelCode: string;
+    jobId?: string;
+  }): Promise<{ novelCode: string; job: NovelSplitJobDocument }> {
+    const novelCode = params.novelCode?.trim();
+    if (!novelCode) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+
+    const job = params.jobId?.trim()
+      ? await this.resolveJob(params.jobId)
+      : await this.resolveLatestJobByNovelCode(novelCode);
+
+    if (job.novelCode !== novelCode) {
+      throw new BadRequestException('jobId 与 novelCode 不匹配');
+    }
+
+    return { novelCode, job };
+  }
+
+  private async runNovelMetaGenerate(
+    job: NovelSplitJobDocument,
+    novelCode: string,
+    chunkFiles: ChunkFileEntry[],
+    controller: AbortController,
+  ): Promise<void> {
+    const restoredStatus = this.resolveStatusAfterRebuild(job);
+    const restoredError =
+      job.status === 'failed' || job.status === 'aborted' ? job.lastError : '';
+
+    try {
+      await this.rebuildNovelMetaIndexForChunks(job.jobId, {
+        novelCode,
+        chunkDir: job.chunkDir,
+        totalChunks: chunkFiles.length,
+        chunkFiles,
+        resetExisting: true,
+        signal: controller.signal,
+      });
+
+      await this.jobModel.updateOne(
+        { _id: job._id },
+        {
+          $set: {
+            totalChunks: chunkFiles.length,
+            splittedChunks: chunkFiles.length,
+            metaGeneratedChunks: chunkFiles.length,
+            status: restoredStatus,
+            lastError: restoredError,
+          },
+        },
+      );
+    } catch (err) {
+      const error = err as Error;
+      const aborted = error?.name === 'AbortError' || controller.signal.aborted;
+
+      await this.jobModel.updateOne(
+        { _id: job._id },
+        {
+          $set: {
+            status: aborted ? 'aborted' : 'failed',
+            lastError: aborted ? '任务已中止' : error.message,
+          },
+        },
+      );
+
+      throw err;
+    }
   }
 
   /**
@@ -1066,6 +1232,7 @@ export class NovelOutlineService {
       totalChunks?: number;
       chunkFiles?: ChunkFileEntry[];
       resetExisting?: boolean;
+      signal?: AbortSignal;
     },
   ): Promise<void> {
     const chunkFiles =
@@ -1079,6 +1246,11 @@ export class NovelOutlineService {
     }
 
     for (let index = 0; index < chunkFiles.length; index += 1) {
+      if (params.signal?.aborted) {
+        const abortError = new Error('任务已中止');
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
       const chunkFile = chunkFiles[index];
       this.logger.log(
         `[chunk-meta] 开始处理 chunk=${chunkFile.chunkId}, 进度=${index + 1}/${totalChunks}, novelCode=${params.novelCode}`,
@@ -1336,6 +1508,10 @@ export class NovelOutlineService {
     }
 
     return Array.from(tokens);
+  }
+
+  private escapeRegex(input: string): string {
+    return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private buildNovelQaContextPrompt(

@@ -22,6 +22,7 @@ import {
   UploadAndSplitDto,
   NovelCodeDto,
   RebuildNovelMetaDto,
+  NovelMetaQueryDto,
   SplitJobQueryDto,
   JobIdDto,
   MergeAliasDto,
@@ -134,6 +135,22 @@ export class NovelOutlineController {
       jobId: body.jobId,
     });
     return ApiResponseDto.success(result, '索引重建完成');
+  }
+
+  @Post('start-meta-generate')
+  async startMetaGenerate(@Body() body: RebuildNovelMetaDto) {
+    const result =
+      await this.novelOutlineService.startNovelMetaGenerateInBackground({
+        novelCode: body.novelCode,
+        jobId: body.jobId,
+      });
+    return ApiResponseDto.success(result, 'Meta 生成任务已启动');
+  }
+
+  @Post('get-meta-list')
+  async getMetaList(@Body() body: NovelMetaQueryDto) {
+    const result = await this.novelOutlineService.findNovelMetas(body);
+    return ApiResponseDto.success(result);
   }
 
   /**

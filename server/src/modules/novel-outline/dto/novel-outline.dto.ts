@@ -67,6 +67,25 @@ export class RebuildNovelMetaDto extends NovelCodeDto {
   jobId?: string;
 }
 
+export class NovelMetaQueryDto extends NovelCodeDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  current?: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  pageSize?: number;
+
+  @IsString()
+  @IsOptional()
+  keyword?: string;
+}
+
 /**
  * 查询 novel_split_jobs
  */

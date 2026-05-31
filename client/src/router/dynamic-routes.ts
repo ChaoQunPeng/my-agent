@@ -57,6 +57,16 @@ export default [
         },
       },
       {
+        path: "/writer-assistant/novel-meta",
+        name: "WriterAssistantNovelMeta",
+        component: () =>
+          import("~/pages/writer-assistant/novel-meta/index.vue"),
+        meta: {
+          title: "Meta 生成",
+          icon: "DatabaseOutlined",
+        },
+      },
+      {
         path: "/writer-assistant/novel-dialog",
         name: "WriterAssistantNovelDialog",
         component: () =>
