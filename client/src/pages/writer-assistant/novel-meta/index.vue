@@ -273,7 +273,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { message as antMessage } from 'ant-design-vue'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import type { TablePaginationConfig, UploadFile } from 'ant-design-vue'
@@ -299,6 +299,7 @@ type MetaTableRow = NovelChunkMeta & {
 }
 
 const NOVEL_META_CURRENT_JOB_STORAGE_KEY = 'writer-assistant:novel-meta:current-job'
+const CURRENT_JOB_AUTO_REFRESH_INTERVAL = 5000
 
 const activeLeftTab = ref('entry')
 
@@ -327,6 +328,9 @@ const searching = ref(false)
 const scoreSearchEnabled = ref(false)
 const detailVisible = ref(false)
 const detailLoading = ref(false)
+
+let currentJobAutoRefreshTimer: number | null = null
+let currentJobRefreshing = false
 
 const metaList = ref<NovelChunkMeta[]>([])
 const metaKeyword = ref('')
@@ -507,6 +511,7 @@ const canRebuildIndex = computed(
 const canPause = computed(
   () => !!currentJob.value && (currentJob.value.status === 'meta_generating' || currentJob.value.status === 'generating')
 )
+const shouldAutoRefreshCurrentJob = computed(() => activeLeftTab.value === 'current' && isRunningJob(currentJob.value))
 
 const metaPercent = computed(() => {
   if (!currentJob.value || !currentJob.value.totalChunks) return 0
@@ -857,15 +862,46 @@ async function handlePause() {
 }
 
 async function handleRefresh() {
-  if (!currentJob.value) return
-  const res = await getOutlineJobStatus(currentJob.value.jobId)
-  if (res.data) {
-    applyCurrentJob(res.data)
-  } else {
-    currentJob.value = null
-    clearPersistedCurrentJob()
-  }
+  await refreshCurrentJobStatus()
   await loadMetaList(metaPaginationState.current, true)
+}
+
+async function refreshCurrentJobStatus(silent = false) {
+  if (!currentJob.value) return
+  if (currentJobRefreshing) return
+
+  currentJobRefreshing = true
+  try {
+    const res = await getOutlineJobStatus(currentJob.value.jobId)
+    if (res.data) {
+      applyCurrentJob(res.data)
+    } else {
+      currentJob.value = null
+      clearPersistedCurrentJob()
+    }
+  } catch (e: any) {
+    if (!silent) {
+      antMessage.error(e?.response?.data?.msg || e?.message || '刷新失败')
+    } else {
+      console.warn('自动刷新当前任务失败', e)
+    }
+  } finally {
+    currentJobRefreshing = false
+  }
+}
+
+function stopCurrentJobAutoRefresh() {
+  if (currentJobAutoRefreshTimer) {
+    clearInterval(currentJobAutoRefreshTimer)
+    currentJobAutoRefreshTimer = null
+  }
+}
+
+function startCurrentJobAutoRefresh() {
+  if (currentJobAutoRefreshTimer) return
+  currentJobAutoRefreshTimer = window.setInterval(() => {
+    void refreshCurrentJobStatus(true)
+  }, CURRENT_JOB_AUTO_REFRESH_INTERVAL)
 }
 
 async function loadMetaList(page = metaPaginationState.current, silent = false) {
@@ -1022,8 +1058,25 @@ watch(currentJob, value => {
   }
 })
 
+watch(
+  shouldAutoRefreshCurrentJob,
+  value => {
+    if (value) {
+      startCurrentJobAutoRefresh()
+      void refreshCurrentJobStatus(true)
+      return
+    }
+    stopCurrentJobAutoRefresh()
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
   void initializeCurrentJob()
+})
+
+onBeforeUnmount(() => {
+  stopCurrentJobAutoRefresh()
 })
 </script>
 
