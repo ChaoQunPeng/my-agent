@@ -237,6 +237,7 @@ export function uploadAndSplitNovel(params: {
   novelCode: string
   chunkSize?: number
   overlap?: number
+  forceResplit?: boolean
   file: File
 }) {
   const form = new FormData()
@@ -245,6 +246,8 @@ export function uploadAndSplitNovel(params: {
     form.append('chunkSize', String(params.chunkSize))
   if (params.overlap != null)
     form.append('overlap', String(params.overlap))
+  if (params.forceResplit != null)
+    form.append('forceResplit', String(params.forceResplit))
   form.append('file', params.file)
 
   return request.post<RawNovelOutlineJob>(

@@ -25,7 +25,7 @@
               v-model:value="novelCodeDraft"
               :options="novelCodeOptions"
               :filter-option="filterNovelCodeOption"
-              placeholder="输入或选择 novelCode，如 longzu"
+              placeholder="输入或选择 novelCode，如 longzu 或 龙族"
               class="novel-selector-card__input"
               @select="handleNovelCodeSelect"
               @keyup.enter="handleNovelCodeSubmit()"

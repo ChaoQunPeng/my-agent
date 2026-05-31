@@ -66,8 +66,8 @@ export class NovelOutlineController {
       throw new BadRequestException('仅支持 .txt 文件');
     }
 
-    // 参数兜底：默认每个切片最多 15000 字原文，前后各 300 字上下文
-    const chunkSize = body.chunkSize ?? 15000;
+    // 参数兜底：默认每个切片最多 5000 字原文，前后各 300 字上下文
+    const chunkSize = body.chunkSize ?? 5000;
     const overlap = body.overlap ?? 300;
     if (overlap * 2 >= chunkSize) {
       throw new BadRequestException('overlap * 2 必须小于 chunkSize');
@@ -79,6 +79,7 @@ export class NovelOutlineController {
       overlap,
       sourceFileName: originalName,
       fileBuffer: file.buffer,
+      forceResplit: body.forceResplit,
     });
     return ApiResponseDto.success(job, '导入完成');
   }

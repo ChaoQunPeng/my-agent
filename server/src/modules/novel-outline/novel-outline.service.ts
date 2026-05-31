@@ -9,6 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import {
   NovelSplitJob,
   NovelSplitJobDocument,
@@ -130,17 +131,27 @@ export class NovelOutlineService {
     overlap: number;
     sourceFileName: string;
     fileBuffer: Buffer;
+    forceResplit?: boolean;
   }): Promise<NovelSplitJob> {
     console.log('[novel-outline] upload-and-split: 开始创建拆分任务');
-    const { novelCode, chunkSize, overlap, sourceFileName, fileBuffer } =
-      params;
+    const {
+      novelCode,
+      chunkSize,
+      overlap,
+      sourceFileName,
+      fileBuffer,
+      forceResplit,
+    } = params;
 
-    const safeNovelCode =
-      (novelCode || '').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) ||
-      'unknown';
+    const { novelDir, chunkDir, safeNovelCode } =
+      this.resolveNovelDirs(novelCode);
     const jobId = `novel_${safeNovelCode}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const novelDir = path.join(this.uploadRoot, safeNovelCode);
-    const chunkDir = path.join(novelDir, 'chunks');
+    const hasExistingChunks = await this.hasChunkFiles(chunkDir);
+    if (hasExistingChunks && !forceResplit) {
+      throw new BadRequestException(
+        `novelCode=${novelCode} 已存在 chunk，请直接恢复任务或确认后重新拆分`,
+      );
+    }
     await this.safeRemoveDir(chunkDir);
     await fs.mkdir(chunkDir, { recursive: true });
 
@@ -151,6 +162,10 @@ export class NovelOutlineService {
     );
     const sourceFilePath = path.join(novelDir, '__source__.txt');
     await fs.writeFile(sourceFilePath, sourceText, 'utf-8');
+    await Promise.all([
+      this.novelMetaModel.deleteMany({ novelCode }).exec(),
+      this.outlineModel.deleteOne({ novelCode }).exec(),
+    ]);
 
     const totalChars = Array.from(sourceText).length;
     const estimated = this.splitter.estimateChunkCount(totalChars, {
@@ -196,23 +211,6 @@ export class NovelOutlineService {
           $set: {
             totalChunks: actualTotal,
             splittedChunks: actualTotal,
-            status: 'meta_generating',
-          },
-        },
-      );
-      await this.rebuildNovelMetaIndexForChunks(jobId, {
-        chunkDir,
-        novelCode,
-        totalChunks: actualTotal,
-        resetExisting: true,
-      });
-      await this.jobModel.updateOne(
-        { jobId },
-        {
-          $set: {
-            totalChunks: actualTotal,
-            splittedChunks: actualTotal,
-            metaGeneratedChunks: actualTotal,
             status: 'split_done',
             lastError: '',
           },
@@ -239,6 +237,15 @@ export class NovelOutlineService {
       await fs.rm(dir, { recursive: true, force: true });
     } catch {
       return;
+    }
+  }
+
+  private async hasChunkFiles(dir: string): Promise<boolean> {
+    try {
+      const fileNames = await fs.readdir(dir);
+      return fileNames.some((fileName) => fileName.endsWith('.txt'));
+    } catch {
+      return false;
     }
   }
 
@@ -491,6 +498,10 @@ export class NovelOutlineService {
     }
 
     const chunkFiles = await this.scanChunkFiles(job.chunkDir);
+    const resumeState = await this.resolveMetaResumeState(
+      novelCode,
+      chunkFiles,
+    );
     const controller = new AbortController();
     this.runningMetaJobs.set(job.jobId, controller);
 
@@ -500,14 +511,17 @@ export class NovelOutlineService {
         $set: {
           totalChunks: chunkFiles.length,
           splittedChunks: chunkFiles.length,
-          metaGeneratedChunks: 0,
+          metaGeneratedChunks: resumeState.completedCount,
           status: 'meta_generating',
           lastError: '',
         },
       },
     );
 
-    void this.runNovelMetaGenerate(job, novelCode, chunkFiles, controller)
+    void this.runNovelMetaGenerate(job, novelCode, chunkFiles, controller, {
+      pendingChunkFiles: resumeState.pendingChunkFiles,
+      completedBeforeStart: resumeState.completedCount,
+    })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.error(`后台 meta 生成失败 jobId=${job.jobId}: ${message}`);
@@ -581,7 +595,13 @@ export class NovelOutlineService {
   private resolveStatusAfterRebuild(
     job: NovelSplitJobDocument,
   ): NovelSplitJobStatus {
-    if (job.status === 'failed' && !job.processedChunks) {
+    if (job.status === 'meta_generating') {
+      return job.processedChunks ? 'done' : 'split_done';
+    }
+    if (
+      (job.status === 'failed' || job.status === 'aborted') &&
+      !job.processedChunks
+    ) {
       return 'split_done';
     }
     return job.status;
@@ -840,6 +860,10 @@ export class NovelOutlineService {
     novelCode: string,
     chunkFiles: ChunkFileEntry[],
     controller: AbortController,
+    options?: {
+      pendingChunkFiles?: ChunkFileEntry[];
+      completedBeforeStart?: number;
+    },
   ): Promise<void> {
     const restoredStatus = this.resolveStatusAfterRebuild(job);
     const restoredError =
@@ -850,8 +874,8 @@ export class NovelOutlineService {
         novelCode,
         chunkDir: job.chunkDir,
         totalChunks: chunkFiles.length,
-        chunkFiles,
-        resetExisting: true,
+        chunkFiles: options?.pendingChunkFiles || chunkFiles,
+        completedBeforeStart: options?.completedBeforeStart || 0,
         signal: controller.signal,
       });
 
@@ -1230,12 +1254,14 @@ export class NovelOutlineService {
       totalChunks?: number;
       chunkFiles?: ChunkFileEntry[];
       resetExisting?: boolean;
+      completedBeforeStart?: number;
       signal?: AbortSignal;
     },
   ): Promise<void> {
     const chunkFiles =
       params.chunkFiles || (await this.scanChunkFiles(params.chunkDir));
     const totalChunks = params.totalChunks || chunkFiles.length;
+    const completedBeforeStart = Math.max(0, params.completedBeforeStart || 0);
 
     if (params.resetExisting) {
       await this.novelMetaModel
@@ -1251,7 +1277,7 @@ export class NovelOutlineService {
       }
       const chunkFile = chunkFiles[index];
       this.logger.log(
-        `[chunk-meta] 开始处理 chunk=${chunkFile.chunkId}, 进度=${index + 1}/${totalChunks}, novelCode=${params.novelCode}`,
+        `[chunk-meta] 开始处理 chunk=${chunkFile.chunkId}, 进度=${completedBeforeStart + index + 1}/${totalChunks}, novelCode=${params.novelCode}`,
       );
       const chunkText = await fs.readFile(chunkFile.filePath, 'utf-8');
       const meta = await this.generateSingleChunkMeta({
@@ -1274,7 +1300,7 @@ export class NovelOutlineService {
         .exec();
 
       this.logger.log(
-        `[chunk-meta] 保存成功 chunk=${meta.chunkId}, 当前处理进度：${index + 1}/${totalChunks}, novelCode=${params.novelCode}`,
+        `[chunk-meta] 保存成功 chunk=${meta.chunkId}, 当前处理进度：${completedBeforeStart + index + 1}/${totalChunks}, novelCode=${params.novelCode}`,
       );
 
       await this.jobModel.updateOne(
@@ -1282,12 +1308,37 @@ export class NovelOutlineService {
         {
           $set: {
             status: 'meta_generating',
-            metaGeneratedChunks: index + 1,
+            metaGeneratedChunks: completedBeforeStart + index + 1,
             lastError: '',
           },
         },
       );
     }
+  }
+
+  private async resolveMetaResumeState(
+    novelCode: string,
+    chunkFiles: ChunkFileEntry[],
+  ): Promise<{
+    completedCount: number;
+    pendingChunkFiles: ChunkFileEntry[];
+  }> {
+    const docs = await this.novelMetaModel
+      .find({ novelCode }, { chunkId: 1, _id: 0 })
+      .lean()
+      .exec();
+
+    const completedChunkIds = new Set(
+      docs.map((item) => normalize(String(item.chunkId || ''))).filter(Boolean),
+    );
+    const pendingChunkFiles = chunkFiles.filter(
+      (chunkFile) => !completedChunkIds.has(normalize(chunkFile.chunkId)),
+    );
+
+    return {
+      completedCount: chunkFiles.length - pendingChunkFiles.length,
+      pendingChunkFiles,
+    };
   }
 
   private async generateSingleChunkMeta(params: {
@@ -1326,7 +1377,7 @@ export class NovelOutlineService {
 
         如果本段重点是人物心理、人物关系、成长经历、回忆内容或情感冲突，应优先保留这些内容，而非单纯记录动作事件。
 
-        使用第三人称描述，原则上控制在100~300字，可根据内容适当增加，保证关键信息完整。
+        使用第三人称描述，保证关键信息完整。
       `,
       'keywords 必须返回 5 到 10 个关键词，优先提取人物、地点、组织、世界观设定、能力、境界、特殊名词、关键道具、事件名称。',
       'characters、locations、organizations、concepts、events 必须返回字符串数组，没有则返回空数组。',
@@ -1354,23 +1405,20 @@ export class NovelOutlineService {
     ].join('\n');
 
     const response = await this.callLLM<{
-      summary?: unknown;
-      keywords?: unknown;
-      characters?: unknown;
-      locations?: unknown;
-      organizations?: unknown;
-      concepts?: unknown;
-      events?: unknown;
+      summary?: string;
+      keywords?: string[];
+      characters?: string[];
+      locations?: string[];
+      organizations?: string[];
+      concepts?: string[];
+      events?: string[];
     }>({
       system,
       user,
       maxAttempts: this.chunkMetaMaxAttempts,
     });
 
-    const summary = this.truncateByChars(
-      normalize(String(response.summary ?? '')),
-      150,
-    );
+    const summary = normalize(String(response.summary ?? ''));
     const characters = this.normalizeMetaArray(response.characters, 20);
     const locations = this.normalizeMetaArray(response.locations, 20);
     const organizations = this.normalizeMetaArray(response.organizations, 20);
@@ -1410,7 +1458,6 @@ export class NovelOutlineService {
     topN: number;
     includeChunks?: boolean;
   }): Promise<SearchChunkMetaHit[]> {
-    const { chunkDir } = this.resolveNovelDirs(params.novelCode);
     const docs = await this.novelMetaModel
       .find({ novelCode: params.novelCode })
       .sort({ chunkId: 1 })
@@ -1419,6 +1466,7 @@ export class NovelOutlineService {
     if (!docs.length) {
       throw new NotFoundException(`未找到小说 ${params.novelCode} 的索引数据`);
     }
+    const chunkDir = await this.resolveChunkDirByNovelCode(params.novelCode);
 
     const hits: SearchChunkMetaHit[] = [];
     for (const doc of docs) {
@@ -1583,16 +1631,51 @@ export class NovelOutlineService {
     const safeNovelCode = this.toSafeNovelCode(novelCode);
     const novelDir = path.join(this.uploadRoot, safeNovelCode);
     return {
+      safeNovelCode,
       novelDir,
       chunkDir: path.join(novelDir, 'chunks'),
     };
   }
 
   private toSafeNovelCode(novelCode: string): string {
-    return (
-      (novelCode || '').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40) ||
-      'unknown'
-    );
+    const normalizedNovelCode = (novelCode || '').trim();
+    if (!normalizedNovelCode) {
+      return 'unknown';
+    }
+
+    const readablePart = normalizedNovelCode
+      .normalize('NFKC')
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_-]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 24);
+    const hash = createHash('sha256')
+      .update(normalizedNovelCode)
+      .digest('hex')
+      .slice(0, 12);
+
+    return readablePart ? `${readablePart}_${hash}` : `novel_${hash}`;
+  }
+
+  private async resolveChunkDirByNovelCode(novelCode: string): Promise<string> {
+    const normalizedNovelCode = novelCode?.trim();
+    if (!normalizedNovelCode) {
+      throw new BadRequestException('novelCode 不能为空');
+    }
+
+    try {
+      const job = await this.resolveLatestJobByNovelCode(normalizedNovelCode);
+      if (job.chunkDir?.trim()) {
+        return job.chunkDir;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `[chunk-meta] 未找到 novelCode=${normalizedNovelCode} 的任务目录，回退到推导目录`,
+      );
+    }
+
+    return this.resolveNovelDirs(normalizedNovelCode).chunkDir;
   }
 
   private extractChunkId(fileName: string): string {

@@ -9,7 +9,7 @@
               <a-form-item label="小说编码 novelCode">
                 <a-input-search
                   v-model:value="recoverForm.novelCode"
-                  placeholder="输入 novelCode 查询历史任务"
+                  placeholder="输入 novelCode（支持中文）查询历史任务"
                   enter-button="列出任务"
                   :loading="listingJobs"
                   @search="handleListJobs"
@@ -39,7 +39,7 @@
           <a-tab-pane key="upload" tab="上传 TXT 并拆分">
             <a-form layout="vertical" :model="form">
               <a-form-item label="小说编码 novelCode" required>
-                <a-input v-model:value="form.novelCode" placeholder="如 yi_quan_po_tian" />
+                <a-input v-model:value="form.novelCode" placeholder="如 yi_quan_po_tian 或 一拳破天" />
               </a-form-item>
               <a-form-item label="每块原文总字数（chunkSize）">
                 <a-input-number v-model:value="form.chunkSize" :min="500" :max="20000" :step="500" style="width: 100%" />
@@ -94,7 +94,7 @@
       <a-card title="3. 大纲结果" size="small">
         <template #extra>
           <a-space>
-            <a-input v-model:value="queryNovelCode" placeholder="输入 novelCode" style="width: 200px" />
+            <a-input v-model:value="queryNovelCode" placeholder="输入 novelCode（支持中文）" style="width: 200px" />
             <a-button size="small" @click="loadOutline">查询</a-button>
           </a-space>
         </template>
@@ -232,7 +232,7 @@ import {
 // 表单数据：novelCode + 拆分参数
 const form = reactive({
   novelCode: '',
-  chunkSize: 15000, // 默认每块最多15000字原文，包含前后上下文
+  chunkSize: 5000, // 默认每块最多5000字原文，包含前后上下文
   overlap: 300 // 每块前后各保留300字上下文
 })
 
@@ -397,10 +397,36 @@ async function handleUpload() {
   if (!pickedFile.value) return
   uploading.value = true
   try {
+    let forceResplit = false
+    const code = form.novelCode.trim()
+    const jobsRes = await listOutlineJobs(code)
+    const latestJob = jobsRes.data?.[0]
+
+    if (latestJob?.totalChunks) {
+      const confirmed = window.confirm(
+        `novelCode ${code} 已存在 chunk。\n点击“确定”将重新拆分并覆盖本地 chunk；点击“取消”将直接恢复最新任务 ${latestJob.jobId}。`
+      )
+      if (!confirmed) {
+        currentJob.value = latestJob
+        activeLeftTab.value = 'progress'
+        queryNovelCode.value = latestJob.novelCode
+        await loadOutline()
+        if (latestJob.status === 'generating') {
+          startPolling()
+          antMessage.warning('已恢复现有任务，当前大纲仍在生成中')
+        } else {
+          antMessage.info('已恢复现有 chunk 任务')
+        }
+        return
+      }
+      forceResplit = true
+    }
+
     const res = await uploadAndSplitNovel({
       novelCode: form.novelCode,
       chunkSize: form.chunkSize,
       overlap: form.overlap,
+      forceResplit,
       file: pickedFile.value
     })
     // axios 拦截器已返回后端的 { code, msg, data }，非 200 会走 catch
@@ -408,7 +434,7 @@ async function handleUpload() {
       currentJob.value = res.data
       activeLeftTab.value = 'progress'
       queryNovelCode.value = res.data.novelCode
-      antMessage.success(`拆分与索引完成，共 ${res.data.totalChunks} 块`)
+      antMessage.success(`拆分完成，共 ${res.data.totalChunks} 块`)
       // 拆分完了就预加载一下已有大纲（可能是之前生成的）
       await loadOutline()
     }

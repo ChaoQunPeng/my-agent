@@ -28,7 +28,7 @@ export class UploadAndSplitDto {
   // 小说唯一识别码（与 NovelConfig.novelCode 对齐）
   novelCode!: string;
 
-  // 每个切片的原文总字数上限，默认 15000（包含前后上下文）
+  // 每个切片的原文总字数上限，默认 5000（包含前后上下文）
   @Type(() => Number)
   @IsInt()
   @Min(500)
@@ -43,6 +43,11 @@ export class UploadAndSplitDto {
   @Max(2000)
   @IsOptional()
   overlap?: number;
+
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
+  forceResplit?: boolean;
 }
 
 /**

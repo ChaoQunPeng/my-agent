@@ -7,7 +7,7 @@ export type NovelSplitJobDocument = NovelSplitJob & Document;
  * 任务状态
  * - splitting: 正在拆分源文件
  * - meta_generating: 正在生成 chunk meta
- * - split_done: 拆分和 meta 生成完成，待生成大纲
+ * - split_done: 拆分完成，可继续生成 meta 或大纲
  * - generating: 正在调用大模型生成大纲
  * - done: 全部完成
  * - failed: 任务失败
@@ -48,7 +48,7 @@ export class NovelSplitJob {
   totalChars!: number;
 
   // 拆分参数：每个切片原文总字数上限 & 前后上下文字数
-  @Prop({ default: 4700, comment: '每个切片的原文总字数上限' })
+  @Prop({ default: 5000, comment: '每个切片的原文总字数上限' })
   chunkSize!: number;
 
   @Prop({ default: 300, comment: '每个切片正文前后附带的上下文字数' })

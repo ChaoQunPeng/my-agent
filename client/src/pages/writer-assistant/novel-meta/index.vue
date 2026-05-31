@@ -3,12 +3,67 @@
     <div class="left-panel">
       <a-card size="small" class="left-panel-card">
         <a-tabs v-model:activeKey="activeLeftTab" class="left-panel-tabs">
-          <a-tab-pane key="start" tab="开始生成">
+          <a-tab-pane key="upload" tab="上传 TXT 并拆分">
+            <a-form layout="vertical">
+              <a-form-item label="小说编码 novelCode" required>
+                <a-input
+                  v-model:value="uploadForm.novelCode"
+                  placeholder="如 longzu2 或 龙族2"
+                />
+              </a-form-item>
+              <a-form-item label="每块原文总字数（chunkSize）">
+                <a-input-number
+                  v-model:value="uploadForm.chunkSize"
+                  :min="500"
+                  :max="20000"
+                  :step="500"
+                  style="width: 100%"
+                />
+              </a-form-item>
+              <a-form-item label="前后上下文字数（overlap）">
+                <a-input-number
+                  v-model:value="uploadForm.overlap"
+                  :min="0"
+                  :max="2000"
+                  :step="50"
+                  style="width: 100%"
+                />
+              </a-form-item>
+              <a-form-item label="TXT 文件" required>
+                <a-upload
+                  :file-list="fileList"
+                  :before-upload="onBeforeUpload"
+                  :max-count="1"
+                  accept=".txt"
+                  @remove="onRemoveFile"
+                >
+                  <a-button><UploadOutlined />选择 txt 文件</a-button>
+                </a-upload>
+              </a-form-item>
+              <a-alert
+                type="info"
+                show-icon
+                message="如果该 novelCode 已经拆分过，本次会提示直接复用已有 chunk 继续生成 Meta。"
+                class="tab-alert"
+              />
+              <a-button
+                type="primary"
+                block
+                :loading="uploading"
+                :disabled="!canUpload"
+                @click="handleUploadAndGenerate"
+              >
+                上传并生成 Meta
+              </a-button>
+            </a-form>
+          </a-tab-pane>
+
+          <a-tab-pane key="start" tab="使用已有 Chunk">
             <a-form layout="vertical">
               <a-form-item label="小说编码 novelCode" required>
                 <a-input-search
                   v-model:value="startForm.novelCode"
-                  placeholder="输入 novelCode 后可列出已有 chunk 任务"
+                  placeholder="输入 novelCode（支持中文）后可列出已有 chunk 任务"
                   enter-button="列出任务"
                   :loading="listingStartJobs"
                   @search="handleListStartJobs"
@@ -35,7 +90,7 @@
               <a-alert
                 type="info"
                 show-icon
-                message="此页面不再上传 TXT，直接使用本地已生成的 chunk 进行 Meta 生成。"
+                message="这里会直接复用本地已有 chunk，不重新拆分 TXT。"
                 class="tab-alert"
               />
               <a-button
@@ -55,7 +110,7 @@
               <a-form-item label="小说编码 novelCode">
                 <a-input-search
                   v-model:value="recoverForm.novelCode"
-                  placeholder="输入 novelCode 查询历史任务"
+                  placeholder="输入 novelCode（支持中文）查询历史任务"
                   enter-button="列出任务"
                   :loading="listingRecoverJobs"
                   @search="handleListRecoverJobs"
@@ -147,7 +202,7 @@
           <a-space>
             <a-input
               v-model:value="queryNovelCode"
-              placeholder="输入 novelCode"
+              placeholder="输入 novelCode（支持中文）"
               style="width: 220px"
             />
             <a-button size="small" @click="handleQueryMeta">查询</a-button>
@@ -335,7 +390,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { message as antMessage } from 'ant-design-vue'
-import type { TablePaginationConfig } from 'ant-design-vue'
+import { UploadOutlined } from '@ant-design/icons-vue'
+import type { TablePaginationConfig, UploadFile } from 'ant-design-vue'
 import {
   getOutlineJobStatus,
   listNovelMetas,
@@ -343,13 +399,20 @@ import {
   rebuildNovelMetaIndex,
   searchNovelMeta,
   startNovelMetaGenerate,
+  uploadAndSplitNovel,
   type NovelChunkMeta,
   type NovelChunkMetaSearchResult,
   type NovelOutlineJob,
 } from '@/api/novel-outline'
 
-const activeLeftTab = ref('start')
+const activeLeftTab = ref('upload')
 const activeRightTab = ref('list')
+
+const uploadForm = reactive({
+  novelCode: '',
+  chunkSize: 5000,
+  overlap: 300,
+})
 
 const startForm = reactive({
   novelCode: '',
@@ -363,10 +426,13 @@ const recoverForm = reactive({
 
 const currentJob = ref<NovelOutlineJob | null>(null)
 const queryNovelCode = ref('')
+const fileList = ref<UploadFile[]>([])
+const pickedFile = ref<File | null>(null)
 
 const startJobOptions = ref<Array<{ value: string; label: string; desc: string }>>([])
 const recoverJobOptions = ref<Array<{ value: string; label: string; desc: string }>>([])
 
+const uploading = ref(false)
 const listingStartJobs = ref(false)
 const listingRecoverJobs = ref(false)
 const starting = ref(false)
@@ -457,6 +523,10 @@ const metaColumns = [
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
+const canUpload = computed(
+  () => !!uploadForm.novelCode.trim() && !!pickedFile.value && !uploading.value,
+)
+
 const canRebuildIndex = computed(
   () =>
     !!currentJob.value &&
@@ -476,6 +546,10 @@ function isRunningStatus(status?: NovelOutlineJob['status']) {
   return status === 'splitting' || status === 'meta_generating' || status === 'generating'
 }
 
+function isMetaComplete(job?: NovelOutlineJob | null) {
+  return !!job && !!job.totalChunks && job.metaGeneratedChunks >= job.totalChunks
+}
+
 function statusColor(status: NovelOutlineJob['status']) {
   return (
     {
@@ -491,17 +565,63 @@ function statusColor(status: NovelOutlineJob['status']) {
 }
 
 function statusText(status: NovelOutlineJob['status']) {
+  if (status === 'split_done') {
+    return isMetaComplete(currentJob.value) ? 'Meta 已完成' : '拆分完成'
+  }
   return (
     {
       splitting: '拆分中',
       meta_generating: 'Meta 生成中',
-      split_done: 'Meta 已完成',
       generating: '大纲生成中',
       done: '全部完成',
       failed: '失败',
       aborted: '已中止',
     }[status] || status
   )
+}
+
+function applyCurrentJob(job: NovelOutlineJob) {
+  currentJob.value = job
+  queryNovelCode.value = job.novelCode
+  uploadForm.novelCode = job.novelCode
+  startForm.novelCode = job.novelCode
+  recoverForm.novelCode = job.novelCode
+}
+
+function onBeforeUpload(file: File) {
+  if (!file.name.toLowerCase().endsWith('.txt')) {
+    antMessage.error('仅支持 .txt 文件')
+    return false as any
+  }
+  pickedFile.value = file
+  fileList.value = [
+    {
+      uid: String(file.lastModified),
+      name: file.name,
+      status: 'done',
+    } as UploadFile,
+  ]
+  return false
+}
+
+function onRemoveFile() {
+  pickedFile.value = null
+  fileList.value = []
+  return true
+}
+
+async function startMetaGenerateTask(
+  params: { novelCode: string; jobId?: string },
+  successMessage = 'Meta 生成任务已启动',
+) {
+  const res = await startNovelMetaGenerate(params)
+  if (!res.data) {
+    return
+  }
+  applyCurrentJob(res.data)
+  startPolling()
+  await loadMetaList(1, true)
+  antMessage.success(successMessage)
 }
 
 async function fetchJobOptions(
@@ -571,6 +691,67 @@ async function handleListRecoverJobs() {
   }
 }
 
+async function handleUploadAndGenerate() {
+  const novelCode = uploadForm.novelCode.trim()
+  if (!novelCode) {
+    antMessage.warning('请先输入 novelCode')
+    return
+  }
+  if (!pickedFile.value) {
+    antMessage.warning('请先选择 TXT 文件')
+    return
+  }
+
+  uploading.value = true
+  try {
+    const jobsRes = await listOutlineJobs(novelCode)
+    const latestJob = jobsRes.data?.[0]
+
+    if (latestJob?.totalChunks) {
+      if (isRunningStatus(latestJob.status)) {
+        applyCurrentJob(latestJob)
+        startPolling()
+        antMessage.info('检测到同 novelCode 任务正在运行，已恢复当前任务进度')
+        return
+      }
+
+      const confirmed = window.confirm(
+        `novelCode ${novelCode} 已存在 chunk。\n点击“确定”将直接使用最新任务 ${latestJob.jobId} 生成 Meta；点击“取消”可更换 novelCode 后再拆分。`,
+      )
+      if (!confirmed) {
+        return
+      }
+      await startMetaGenerateTask(
+        { novelCode, jobId: latestJob.jobId },
+        '已复用现有 chunk，Meta 生成任务已启动',
+      )
+      return
+    }
+
+    const splitRes = await uploadAndSplitNovel({
+      novelCode,
+      chunkSize: uploadForm.chunkSize,
+      overlap: uploadForm.overlap,
+      file: pickedFile.value,
+    })
+
+    if (!splitRes.data) {
+      return
+    }
+
+    applyCurrentJob(splitRes.data)
+    antMessage.success(`拆分完成，共 ${splitRes.data.totalChunks} 块`)
+    await startMetaGenerateTask(
+      { novelCode: splitRes.data.novelCode, jobId: splitRes.data.jobId },
+      '拆分完成，Meta 生成任务已启动',
+    )
+  } catch (e: any) {
+    antMessage.error(e?.response?.data?.msg || e?.message || '处理失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
 async function handleStartMetaGenerate() {
   const novelCode = startForm.novelCode.trim()
   if (!novelCode) {
@@ -580,18 +761,10 @@ async function handleStartMetaGenerate() {
 
   starting.value = true
   try {
-    const res = await startNovelMetaGenerate({
+    await startMetaGenerateTask({
       novelCode,
       jobId: startForm.jobId,
     })
-    if (res.data) {
-      currentJob.value = res.data
-      queryNovelCode.value = res.data.novelCode
-      recoverForm.novelCode = res.data.novelCode
-      startPolling()
-      await loadMetaList(1, true)
-      antMessage.success('Meta 生成任务已启动')
-    }
   } catch (e: any) {
     antMessage.error(e?.response?.data?.msg || e?.message || '启动失败')
   } finally {
@@ -608,9 +781,7 @@ async function handleRecover() {
       antMessage.error('未查到该任务')
       return
     }
-    currentJob.value = res.data
-    queryNovelCode.value = res.data.novelCode
-    startForm.novelCode = res.data.novelCode
+    applyCurrentJob(res.data)
     metaPaginationState.current = 1
     await loadMetaList(1, true)
 
@@ -665,7 +836,7 @@ function startPolling() {
       const status = currentJob.value?.status
       if (!isRunningStatus(status)) {
         stopPolling()
-        if (status === 'split_done' || status === 'done') {
+        if ((status === 'split_done' || status === 'done') && isMetaComplete(currentJob.value)) {
           antMessage.success('Meta 生成完成')
         }
         if (status === 'failed') {
@@ -787,6 +958,15 @@ function formatTime(value?: string) {
   const pad = (num: number) => String(num).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
+
+watch(
+  () => uploadForm.novelCode,
+  (value) => {
+    if (value && !queryNovelCode.value) {
+      queryNovelCode.value = value
+    }
+  },
+)
 
 watch(
   () => startForm.novelCode,
