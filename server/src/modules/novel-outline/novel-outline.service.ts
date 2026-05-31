@@ -498,10 +498,27 @@ export class NovelOutlineService {
     }
 
     const chunkFiles = await this.scanChunkFiles(job.chunkDir);
-    const resumeState = await this.resolveMetaResumeState(
-      novelCode,
-      chunkFiles,
-    );
+    const resumeState = this.resolveMetaResumeState(job, chunkFiles);
+    const restoredStatus = this.resolveStatusAfterRebuild(job);
+    const restoredError =
+      job.status === 'failed' || job.status === 'aborted' ? job.lastError : '';
+
+    if (!resumeState.pendingChunkFiles.length) {
+      await this.jobModel.updateOne(
+        { _id: job._id },
+        {
+          $set: {
+            totalChunks: chunkFiles.length,
+            splittedChunks: chunkFiles.length,
+            metaGeneratedChunks: chunkFiles.length,
+            status: restoredStatus,
+            lastError: restoredError,
+          },
+        },
+      );
+      return (await this.jobModel.findOne({ _id: job._id }).exec())!;
+    }
+
     const controller = new AbortController();
     this.runningMetaJobs.set(job.jobId, controller);
 
@@ -1316,28 +1333,21 @@ export class NovelOutlineService {
     }
   }
 
-  private async resolveMetaResumeState(
-    novelCode: string,
+  private resolveMetaResumeState(
+    job: NovelSplitJobDocument,
     chunkFiles: ChunkFileEntry[],
-  ): Promise<{
+  ): {
     completedCount: number;
     pendingChunkFiles: ChunkFileEntry[];
-  }> {
-    const docs = await this.novelMetaModel
-      .find({ novelCode }, { chunkId: 1, _id: 0 })
-      .lean()
-      .exec();
-
-    const completedChunkIds = new Set(
-      docs.map((item) => normalize(String(item.chunkId || ''))).filter(Boolean),
-    );
-    const pendingChunkFiles = chunkFiles.filter(
-      (chunkFile) => !completedChunkIds.has(normalize(chunkFile.chunkId)),
+  } {
+    const completedCount = Math.max(
+      0,
+      Math.min(Number(job.metaGeneratedChunks) || 0, chunkFiles.length),
     );
 
     return {
-      completedCount: chunkFiles.length - pendingChunkFiles.length,
-      pendingChunkFiles,
+      completedCount,
+      pendingChunkFiles: chunkFiles.slice(completedCount),
     };
   }
 

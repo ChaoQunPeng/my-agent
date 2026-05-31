@@ -16,9 +16,7 @@
       <div class="novel-material-panel">
         <div class="novel-selector-card">
           <div class="novel-selector-card__title">小说对话</div>
-          <div class="novel-selector-card__subtitle">
-            输入或选择 `novelCode`，切换当前小说的会话和百科问答上下文。
-          </div>
+          <div class="novel-selector-card__subtitle">输入或选择 `novelCode`，切换当前小说的会话和百科问答上下文。</div>
 
           <div class="novel-selector-card__row">
             <a-auto-complete
@@ -30,51 +28,41 @@
               @select="handleNovelCodeSelect"
               @keyup.enter="handleNovelCodeSubmit()"
             />
-            <a-button type="primary" @click="handleNovelCodeSubmit()"
-              >切换</a-button
-            >
+            <a-button type="primary" @click="handleNovelCodeSubmit()">切换</a-button>
           </div>
 
-          <div class="novel-selector-card__current">
-            当前小说：{{ currentNovelCode || "未选择" }}
-          </div>
+          <div class="novel-selector-card__current">当前小说：{{ currentNovelCode || '未选择' }}</div>
         </div>
 
-        <WritingAssistant
-          v-if="currentSessionId && currentNovelCode"
-          :session-id="currentSessionId"
-          :novel-code="currentNovelCode"
-        />
+        <WritingAssistant v-if="currentSessionId && currentNovelCode" :session-id="currentSessionId" :novel-code="currentNovelCode" />
       </div>
     </template>
   </SessionChatWorkspace>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
-import { message as antMessage } from "ant-design-vue";
-import SessionChatWorkspace from "@/pages/dialog/index.vue";
-import WritingAssistant from "@/pages/dialog/components/writing-assistant.vue";
-import { chatStreamApi } from "@/composables/chat-stream";
-import { listOutlineJobs } from "@/api/novel-outline";
-import { useSessionManager } from "@/pages/dialog/composables/use-session-manager";
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { message as antMessage } from 'ant-design-vue'
+import SessionChatWorkspace from '@/pages/dialog/index.vue'
+import WritingAssistant from '@/pages/dialog/components/writing-assistant.vue'
+import { chatStreamApi } from '@/composables/chat-stream'
+import { listOutlineJobs } from '@/api/novel-outline'
+import { useSessionManager } from '@/pages/dialog/composables/use-session-manager'
 
-const SESSION_TYPE = "novel";
+const SESSION_TYPE = 'novel'
 
-const route = useRoute();
-const workspaceRef = ref<InstanceType<typeof SessionChatWorkspace> | null>(
-  null,
-);
-const currentNovelCode = ref("");
-const novelCodeDraft = ref("");
-const novelCodeOptions = ref<Array<{ value: string }>>([]);
+const route = useRoute()
+const workspaceRef = ref<InstanceType<typeof SessionChatWorkspace> | null>(null)
+const currentNovelCode = ref('')
+const novelCodeDraft = ref('')
+const novelCodeOptions = ref<Array<{ value: string }>>([])
 
-const createSessionDisabled = computed(() => !currentNovelCode.value.trim());
+const createSessionDisabled = computed(() => !currentNovelCode.value.trim())
 const chatApiParams = computed(() => ({
   type: SESSION_TYPE,
-  resourceId: currentNovelCode.value.trim(),
-}));
+  resourceId: currentNovelCode.value.trim()
+}))
 
 const {
   sessions,
@@ -84,110 +72,104 @@ const {
   handleCreateSession,
   handleDeleteSession,
   handleSelectSession,
-  handleUpdateSession,
+  handleUpdateSession
 } = useSessionManager({
   getSessionType: () => SESSION_TYPE,
   getResourceId: () => currentNovelCode.value.trim() || undefined,
   canCreateSession: () => !createSessionDisabled.value,
   shouldFetchSessions: () => Boolean(currentNovelCode.value.trim()),
-  getCreateBlockedMessage: () => "请先输入 novelCode",
+  getCreateBlockedMessage: () => '请先输入 novelCode',
   onSessionSelected: () => {
-    workspaceRef.value?.getMessages();
+    workspaceRef.value?.getMessages()
   },
   onCurrentSessionCleared: () => {
-    workspaceRef.value?.clearMessages();
-  },
-});
+    workspaceRef.value?.clearMessages()
+  }
+})
 
 const syncNovelCodeFromRoute = () => {
-  const nextCode = String(
-    route.meta?.resourceId || route.meta?.novelCode || "",
-  ).trim();
+  const nextCode = String(route.meta?.resourceId || route.meta?.novelCode || '').trim()
 
-  currentNovelCode.value = nextCode;
-  novelCodeDraft.value = nextCode;
-};
+  currentNovelCode.value = nextCode
+  novelCodeDraft.value = nextCode
+}
 
 const loadNovelCodeOptions = async () => {
   try {
-    const res = await listOutlineJobs();
-    const codes = Array.from(
-      new Set((res.data || []).map((job) => job.novelCode).filter(Boolean)),
-    ).sort((a, b) => a.localeCompare(b));
+    const res = await listOutlineJobs()
+    const codes = Array.from(new Set((res.data || []).map(job => job.novelCode).filter(Boolean))).sort((a, b) => a.localeCompare(b))
 
-    novelCodeOptions.value = codes.map((code) => ({
-      value: code,
-    }));
+    novelCodeOptions.value = codes.map(code => ({
+      value: code
+    }))
   } catch (error) {
-    console.error("加载 novelCode 列表失败", error);
+    console.error('加载 novelCode 列表失败', error)
   }
-};
+}
 
 const handleNovelCodeSubmit = async (selectedValue?: string) => {
-  const nextCode = (selectedValue || novelCodeDraft.value).trim();
-  novelCodeDraft.value = nextCode;
+  const nextCode = (selectedValue || novelCodeDraft.value).trim()
+  novelCodeDraft.value = nextCode
 
   if (!nextCode) {
-    currentNovelCode.value = "";
-    clearCurrentSession();
-    sessions.value = [];
-    antMessage.warning("请先输入 novelCode");
-    return;
+    currentNovelCode.value = ''
+    clearCurrentSession()
+    sessions.value = []
+    antMessage.warning('请先输入 novelCode')
+    return
   }
 
   if (nextCode === currentNovelCode.value.trim()) {
-    await fetchSessions();
-    return;
+    await fetchSessions()
+    return
   }
 
-  workspaceRef.value?.stopGeneration();
-  currentNovelCode.value = nextCode;
-  clearCurrentSession();
-  await fetchSessions();
-  antMessage.success(`已切换到小说 ${nextCode}`);
-};
+  workspaceRef.value?.stopGeneration()
+  currentNovelCode.value = nextCode
+  clearCurrentSession()
+  await fetchSessions()
+  antMessage.success(`已切换到小说 ${nextCode}`)
+}
 
-const handleNovelCodeSelect = (
-  value: string | number | { value?: string | number },
-) => {
-  const nextValue = typeof value === "object" ? value?.value : value;
-  void handleNovelCodeSubmit(nextValue == null ? "" : String(nextValue));
-};
+const handleNovelCodeSelect = (value: string | number | { value?: string | number }) => {
+  const nextValue = typeof value === 'object' ? value?.value : value
+  void handleNovelCodeSubmit(nextValue == null ? '' : String(nextValue))
+}
 
 const filterNovelCodeOption = (input: string, option: { value: string }) => {
-  return option.value.toLowerCase().includes(input.toLowerCase());
-};
+  return option.value.toLowerCase().includes(input.toLowerCase())
+}
 
 const handleCreate = async () => {
-  workspaceRef.value?.stopGeneration();
-  await handleCreateSession();
-};
+  workspaceRef.value?.stopGeneration()
+  await handleCreateSession()
+}
 
 const handleSelect = async (sessionId: string) => {
-  workspaceRef.value?.stopGeneration();
-  await handleSelectSession(sessionId);
-};
+  workspaceRef.value?.stopGeneration()
+  await handleSelectSession(sessionId)
+}
 
 watch(
   () => [route.meta?.resourceId, route.meta?.novelCode],
   async () => {
-    syncNovelCodeFromRoute();
-    clearCurrentSession();
-    await fetchSessions();
-  },
-);
+    syncNovelCodeFromRoute()
+    clearCurrentSession()
+    await fetchSessions()
+  }
+)
 
 onMounted(async () => {
-  syncNovelCodeFromRoute();
-  await Promise.all([fetchSessions(), loadNovelCodeOptions()]);
-});
+  syncNovelCodeFromRoute()
+  await Promise.all([fetchSessions(), loadNovelCodeOptions()])
+})
 </script>
 
 <style scoped lang="less">
 .novel-material-panel {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100%;
 }
 
 .novel-selector-card {

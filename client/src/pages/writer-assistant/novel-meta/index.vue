@@ -6,11 +6,7 @@
           <a-tab-pane key="entry" tab="任务入口">
             <a-form layout="vertical">
               <a-form-item label="小说编码 novelCode" required>
-                <a-input
-                  v-model:value="uploadForm.novelCode"
-                  placeholder="如 longzu2 或 龙族2"
-                  @blur="handleNovelCodeInputBlur"
-                />
+                <a-input v-model:value="uploadForm.novelCode" placeholder="如 longzu2 或 龙族2" @blur="handleNovelCodeInputBlur" />
               </a-form-item>
 
               <a-alert
@@ -21,10 +17,7 @@
                 class="tab-alert"
               />
 
-              <div
-                v-else-if="historyCheckStatus === 'checking'"
-                class="checking-state"
-              >
+              <div v-else-if="historyCheckStatus === 'checking'" class="checking-state">
                 <a-spin size="small" />
                 <span>正在检索历史任务...</span>
               </div>
@@ -53,60 +46,25 @@
                     </template>
                   </a-select>
                 </a-form-item>
-                <a-button
-                  type="primary"
-                  block
-                  :disabled="!selectedRecoverJobId"
-                  :loading="recovering"
-                  @click="handleRecover"
-                >
+                <a-button type="primary" block :disabled="!selectedRecoverJobId" :loading="recovering" @click="handleRecover">
                   恢复任务
                 </a-button>
               </template>
 
               <template v-else-if="historyCheckStatus === 'no-history'">
-                <a-alert
-                  type="success"
-                  show-icon
-                  message="未检索到历史任务，可以上传 TXT 并拆分。"
-                  class="tab-alert"
-                />
+                <a-alert type="success" show-icon message="未检索到历史任务，可以上传 TXT 并拆分。" class="tab-alert" />
                 <a-form-item label="每块原文总字数（chunkSize）">
-                  <a-input-number
-                    v-model:value="uploadForm.chunkSize"
-                    :min="500"
-                    :max="20000"
-                    :step="500"
-                    style="width: 100%"
-                  />
+                  <a-input-number v-model:value="uploadForm.chunkSize" :min="500" :max="20000" :step="500" style="width: 100%" />
                 </a-form-item>
                 <a-form-item label="前后上下文字数（overlap）">
-                  <a-input-number
-                    v-model:value="uploadForm.overlap"
-                    :min="0"
-                    :max="2000"
-                    :step="50"
-                    style="width: 100%"
-                  />
+                  <a-input-number v-model:value="uploadForm.overlap" :min="0" :max="2000" :step="50" style="width: 100%" />
                 </a-form-item>
                 <a-form-item label="TXT 文件" required>
-                  <a-upload
-                    :file-list="fileList"
-                    :before-upload="onBeforeUpload"
-                    :max-count="1"
-                    accept=".txt"
-                    @remove="onRemoveFile"
-                  >
+                  <a-upload :file-list="fileList" :before-upload="onBeforeUpload" :max-count="1" accept=".txt" @remove="onRemoveFile">
                     <a-button><UploadOutlined />选择 txt 文件</a-button>
                   </a-upload>
                 </a-form-item>
-                <a-button
-                  type="primary"
-                  block
-                  :loading="uploading"
-                  :disabled="!canUpload"
-                  @click="handleUploadAndGenerate"
-                >
+                <a-button type="primary" block :loading="uploading" :disabled="!canUpload" @click="handleUploadAndGenerate">
                   上传 TXT 并拆分
                 </a-button>
               </template>
@@ -114,7 +72,7 @@
           </a-tab-pane>
 
           <a-tab-pane v-if="showCurrentTaskTab" key="current" tab="当前任务">
-            <a-descriptions v-if="currentJob" :column="1" size="small" bordered>
+            <a-descriptions v-if="currentJob" :column="1" size="small" bordered :label-style="{ width: '100px' }">
               <a-descriptions-item label="jobId">
                 {{ currentJob.jobId }}
               </a-descriptions-item>
@@ -129,22 +87,16 @@
                   {{ statusText(currentJob.status) }}
                 </a-tag>
               </a-descriptions-item>
-              <a-descriptions-item label="Chunk 总数">
+              <a-descriptions-item label="片段总数">
                 {{ currentJob.totalChunks }}
               </a-descriptions-item>
-              <a-descriptions-item label="Meta 进度">
-                <a-progress
-                  :percent="metaPercent"
-                  :status="
-                    currentJob.status === 'failed' ? 'exception' : undefined
-                  "
-                  size="small"
-                />
-                <span class="fs-12">
+              <a-descriptions-item label="拆分进度">
+                <a-progress :percent="metaPercent" :status="currentJob.status === 'failed' ? 'exception' : undefined" size="small" />
+                <!-- <span class="fs-12">
                   {{ currentJob.metaGeneratedChunks }} /
                   {{ currentJob.totalChunks }}
                   块
-                </span>
+                </span> -->
               </a-descriptions-item>
               <a-descriptions-item v-if="currentJob.lastError" label="错误信息">
                 <span class="error-text">{{ currentJob.lastError }}</span>
@@ -153,12 +105,7 @@
 
             <div class="action-row">
               <a-button @click="handleRefresh">刷新</a-button>
-              <a-button
-                :loading="rebuildingIndex"
-                :disabled="!canRebuildIndex"
-                @click="handleRebuildIndex"
-                >同步重建</a-button
-              >
+              <a-button :loading="rebuildingIndex" :disabled="!canRebuildIndex" @click="handleRebuildIndex">同步重建</a-button>
             </div>
           </a-tab-pane>
         </a-tabs>
@@ -169,11 +116,7 @@
       <a-card title="Meta 数据结果" size="small">
         <template #extra>
           <a-space>
-            <a-input
-              v-model:value="queryNovelCode"
-              placeholder="输入 novelCode（支持中文）"
-              style="width: 220px"
-            />
+            <a-input v-model:value="queryNovelCode" placeholder="输入 novelCode（支持中文）" style="width: 220px" />
             <a-button size="small" @click="handleQueryMeta">查询</a-button>
           </a-space>
         </template>
@@ -189,16 +132,12 @@
                 enter-button="筛选"
                 @search="handleMetaFilter"
               />
-              <a-button :loading="metaLoading" @click="loadMetaList(1)">
-                刷新列表
-              </a-button>
+              <a-button :loading="metaLoading" @click="loadMetaList(1)"> 刷新列表 </a-button>
             </div>
 
             <a-empty
               v-if="!metaLoading && !metaList.length"
-              :description="
-                queryNovelCode ? '暂无 meta 数据' : '先输入或恢复一个 novelCode'
-              "
+              :description="queryNovelCode ? '暂无 meta 数据' : '先输入或恢复一个 novelCode'"
             />
 
             <a-table
@@ -218,17 +157,14 @@
                   <span class="chunk-id">{{ text }}</span>
                 </template>
                 <template v-else-if="column.dataIndex === 'summary'">
-                  <div class="summary-cell">{{ text || "-" }}</div>
+                  <div class="summary-cell">{{ text || '-' }}</div>
                 </template>
                 <template v-else-if="column.dataIndex === 'createdAt'">
                   {{ formatTime(text) }}
                 </template>
                 <template v-else>
                   <a-space v-if="Array.isArray(text) && text.length" wrap>
-                    <a-tag
-                      v-for="item in text"
-                      :key="`${record.chunkId}-${column.dataIndex}-${item}`"
-                    >
+                    <a-tag v-for="item in text" block :key="`${record.chunkId}-${column.dataIndex}-${item}`">
                       {{ item }}
                     </a-tag>
                   </a-space>
@@ -251,13 +187,7 @@
               </a-form-item>
               <div class="search-settings">
                 <a-form-item label="返回条数">
-                  <a-input-number
-                    v-model:value="searchForm.topN"
-                    :min="1"
-                    :max="20"
-                    :step="1"
-                    style="width: 120px"
-                  />
+                  <a-input-number v-model:value="searchForm.topN" :min="1" :max="20" :step="1" style="width: 120px" />
                 </a-form-item>
                 <a-form-item label="附带原文片段">
                   <a-switch v-model:checked="searchForm.includeChunks" />
@@ -267,32 +197,19 @@
 
             <a-empty
               v-if="!searching && !searchResult"
-              :description="
-                queryNovelCode
-                  ? '输入问题后开始检索'
-                  : '先输入或恢复一个 novelCode'
-              "
+              :description="queryNovelCode ? '输入问题后开始检索' : '先输入或恢复一个 novelCode'"
             />
 
             <template v-else-if="searchResult">
               <div class="search-result-meta">
                 <span>命中 {{ searchResult.total }} 条</span>
-                <span v-if="searchResult.queryWords.length">
-                  分词：{{ searchResult.queryWords.join(" / ") }}
-                </span>
+                <span v-if="searchResult.queryWords.length"> 分词：{{ searchResult.queryWords.join(' / ') }} </span>
               </div>
 
-              <a-empty
-                v-if="!searchResult.hits.length"
-                description="没有匹配到相关 meta"
-              />
+              <a-empty v-if="!searchResult.hits.length" description="没有匹配到相关 meta" />
 
               <a-collapse v-else accordion>
-                <a-collapse-panel
-                  v-for="hit in searchResult.hits"
-                  :key="hit.id"
-                  :header="`${hit.id} · score ${hit.score}`"
-                >
+                <a-collapse-panel v-for="hit in searchResult.hits" :key="hit.id" :header="`${hit.id} · score ${hit.score}`">
                   <a-descriptions :column="1" size="small" bordered>
                     <a-descriptions-item label="摘要">
                       <div class="summary-cell">{{ hit.summary }}</div>
@@ -360,10 +277,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
-import { message as antMessage } from "ant-design-vue";
-import { UploadOutlined } from "@ant-design/icons-vue";
-import type { TablePaginationConfig, UploadFile } from "ant-design-vue";
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { message as antMessage } from 'ant-design-vue'
+import { UploadOutlined } from '@ant-design/icons-vue'
+import type { TablePaginationConfig, UploadFile } from 'ant-design-vue'
 import {
   getOutlineJobStatus,
   listNovelMetas,
@@ -374,554 +291,597 @@ import {
   uploadAndSplitNovel,
   type NovelChunkMeta,
   type NovelChunkMetaSearchResult,
-  type NovelOutlineJob,
-} from "@/api/novel-outline";
+  type NovelOutlineJob
+} from '@/api/novel-outline'
 
-type HistoryCheckStatus = "idle" | "checking" | "has-history" | "no-history";
+type HistoryCheckStatus = 'idle' | 'checking' | 'has-history' | 'no-history'
+const NOVEL_META_CURRENT_JOB_STORAGE_KEY = 'writer-assistant:novel-meta:current-job'
 
-const activeLeftTab = ref("entry");
-const activeRightTab = ref("list");
+const activeLeftTab = ref('entry')
+const activeRightTab = ref('list')
 
 const uploadForm = reactive({
-  novelCode: "",
+  novelCode: '',
   chunkSize: 5000,
-  overlap: 300,
-});
+  overlap: 300
+})
 
-const currentJob = ref<NovelOutlineJob | null>(null);
-const queryNovelCode = ref("");
-const fileList = ref<UploadFile[]>([]);
-const pickedFile = ref<File | null>(null);
+const currentJob = ref<NovelOutlineJob | null>(null)
+const queryNovelCode = ref('')
+const fileList = ref<UploadFile[]>([])
+const pickedFile = ref<File | null>(null)
 
-const recoverJobOptions = ref<
-  Array<{ value: string; label: string; desc: string }>
->([]);
-const selectedRecoverJobId = ref("");
-const historyCheckStatus = ref<HistoryCheckStatus>("idle");
-const checkedNovelCode = ref("");
+const recoverJobOptions = ref<Array<{ value: string; label: string; desc: string }>>([])
+const selectedRecoverJobId = ref('')
+const historyCheckStatus = ref<HistoryCheckStatus>('idle')
+const checkedNovelCode = ref('')
 
-const uploading = ref(false);
-const recovering = ref(false);
-const rebuildingIndex = ref(false);
-const metaLoading = ref(false);
-const searching = ref(false);
+const uploading = ref(false)
+const recovering = ref(false)
+const rebuildingIndex = ref(false)
+const metaLoading = ref(false)
+const searching = ref(false)
 
-const metaList = ref<NovelChunkMeta[]>([]);
-const metaKeyword = ref("");
+const metaList = ref<NovelChunkMeta[]>([])
+const metaKeyword = ref('')
 const metaPaginationState = reactive({
   current: 1,
   pageSize: 20,
-  total: 0,
-});
+  total: 0
+})
 const metaPagination = computed<TablePaginationConfig>(() => ({
   current: metaPaginationState.current,
   pageSize: metaPaginationState.pageSize,
   total: metaPaginationState.total,
   showSizeChanger: true,
-  showTotal: (total) => `共 ${total} 条`,
-}));
+  showTotal: total => `共 ${total} 条`
+}))
 
 const searchForm = reactive({
-  query: "",
+  query: '',
   topN: 5,
-  includeChunks: false,
-});
-const searchResult = ref<NovelChunkMetaSearchResult | null>(null);
+  includeChunks: false
+})
+const searchResult = ref<NovelChunkMetaSearchResult | null>(null)
 
 const metaColumns = [
   {
-    title: "Chunk",
-    dataIndex: "chunkId",
-    key: "chunkId",
+    title: 'Chunk',
+    dataIndex: 'chunkId',
+    key: 'chunkId',
     width: 100,
-    fixed: "left" as const,
+    fixed: 'left' as const
   },
   {
-    title: "摘要",
-    dataIndex: "summary",
-    key: "summary",
-    width: 360,
+    title: '摘要',
+    dataIndex: 'summary',
+    key: 'summary',
+    width: 360
   },
   {
-    title: "关键词",
-    dataIndex: "keywords",
-    key: "keywords",
-    width: 240,
+    title: '关键词',
+    dataIndex: 'keywords',
+    key: 'keywords',
+    width: 240
   },
   {
-    title: "人物",
-    dataIndex: "characters",
-    key: "characters",
-    width: 200,
+    title: '人物',
+    dataIndex: 'characters',
+    key: 'characters',
+    width: 200
   },
   {
-    title: "地点",
-    dataIndex: "locations",
-    key: "locations",
-    width: 200,
+    title: '地点',
+    dataIndex: 'locations',
+    key: 'locations',
+    width: 200
   },
   {
-    title: "组织",
-    dataIndex: "organizations",
-    key: "organizations",
-    width: 200,
+    title: '组织',
+    dataIndex: 'organizations',
+    key: 'organizations',
+    width: 200
   },
   {
-    title: "概念",
-    dataIndex: "concepts",
-    key: "concepts",
-    width: 200,
+    title: '概念',
+    dataIndex: 'concepts',
+    key: 'concepts',
+    width: 200
   },
   {
-    title: "事件",
-    dataIndex: "events",
-    key: "events",
-    width: 240,
+    title: '事件',
+    dataIndex: 'events',
+    key: 'events',
+    width: 240
   },
   {
-    title: "创建时间",
-    dataIndex: "createdAt",
-    key: "createdAt",
-    width: 170,
-  },
-];
-
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+    title: '创建时间',
+    dataIndex: 'createdAt',
+    key: 'createdAt',
+    width: 170
+  }
+]
 
 const canUpload = computed(
-  () =>
-    historyCheckStatus.value === "no-history" &&
-    !!uploadForm.novelCode.trim() &&
-    !!pickedFile.value &&
-    !uploading.value,
-);
-const showCurrentTaskTab = computed(() => !!currentJob.value);
+  () => historyCheckStatus.value === 'no-history' && !!uploadForm.novelCode.trim() && !!pickedFile.value && !uploading.value
+)
+const showCurrentTaskTab = computed(() => !!currentJob.value)
 
 const canRebuildIndex = computed(
   () =>
     !!currentJob.value &&
-    currentJob.value.status !== "splitting" &&
-    currentJob.value.status !== "meta_generating" &&
-    currentJob.value.status !== "generating",
-);
+    currentJob.value.status !== 'splitting' &&
+    currentJob.value.status !== 'meta_generating' &&
+    currentJob.value.status !== 'generating'
+)
 
 const metaPercent = computed(() => {
-  if (!currentJob.value || !currentJob.value.totalChunks) return 0;
-  return Math.floor(
-    (currentJob.value.metaGeneratedChunks / currentJob.value.totalChunks) * 100,
-  );
-});
+  if (!currentJob.value || !currentJob.value.totalChunks) return 0
+  return Math.floor((currentJob.value.metaGeneratedChunks / currentJob.value.totalChunks) * 100)
+})
 
-function isRunningStatus(status?: NovelOutlineJob["status"]) {
-  return (
-    status === "splitting" ||
-    status === "meta_generating" ||
-    status === "generating"
-  );
+function isRunningJob(job?: NovelOutlineJob | null) {
+  return !!job && ['splitting', 'meta_generating', 'generating'].includes(job.status)
 }
 
 function isMetaComplete(job?: NovelOutlineJob | null) {
-  return (
-    !!job && !!job.totalChunks && job.metaGeneratedChunks >= job.totalChunks
-  );
+  return !!job && !!job.totalChunks && job.metaGeneratedChunks >= job.totalChunks
 }
 
-function statusColor(status: NovelOutlineJob["status"]) {
+function statusColor(status: NovelOutlineJob['status']) {
   return (
     {
-      splitting: "processing",
-      meta_generating: "processing",
-      split_done: "blue",
-      generating: "processing",
-      done: "success",
-      failed: "error",
-      aborted: "default",
-    }[status] || "default"
-  );
+      splitting: 'processing',
+      meta_generating: 'processing',
+      split_done: 'blue',
+      generating: 'processing',
+      done: 'success',
+      failed: 'error',
+      aborted: 'default'
+    }[status] || 'default'
+  )
 }
 
-function statusText(status: NovelOutlineJob["status"]) {
-  if (status === "split_done") {
-    return isMetaComplete(currentJob.value) ? "Meta 已完成" : "拆分完成";
+function statusText(status: NovelOutlineJob['status']) {
+  if (status === 'split_done') {
+    return isMetaComplete(currentJob.value) ? 'Meta 已完成' : '拆分完成'
   }
   return (
     {
-      splitting: "拆分中",
-      meta_generating: "Meta 生成中",
-      generating: "大纲生成中",
-      done: "全部完成",
-      failed: "失败",
-      aborted: "已中止",
+      splitting: '拆分中',
+      meta_generating: 'Meta 生成中',
+      generating: '大纲生成中',
+      done: '全部完成',
+      failed: '失败',
+      aborted: '已中止'
     }[status] || status
-  );
+  )
 }
 
 function applyCurrentJob(job: NovelOutlineJob) {
-  currentJob.value = job;
-  queryNovelCode.value = job.novelCode;
-  checkedNovelCode.value = job.novelCode;
-  uploadForm.novelCode = job.novelCode;
-  activeLeftTab.value = "current";
+  currentJob.value = job
+  queryNovelCode.value = job.novelCode
+  checkedNovelCode.value = job.novelCode
+  uploadForm.novelCode = job.novelCode
+  activeLeftTab.value = 'current'
+  persistCurrentJob(job)
+}
+
+function persistCurrentJob(job: NovelOutlineJob) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(
+    NOVEL_META_CURRENT_JOB_STORAGE_KEY,
+    JSON.stringify({
+      jobId: job.jobId,
+      novelCode: job.novelCode
+    })
+  )
+}
+
+function clearPersistedCurrentJob() {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(NOVEL_META_CURRENT_JOB_STORAGE_KEY)
+}
+
+async function restorePersistedCurrentJob() {
+  if (typeof window === 'undefined') return
+  const raw = window.localStorage.getItem(NOVEL_META_CURRENT_JOB_STORAGE_KEY)
+  if (!raw) return
+
+  try {
+    const parsed = JSON.parse(raw) as { jobId?: string; novelCode?: string }
+    if (!parsed.jobId) {
+      clearPersistedCurrentJob()
+      return
+    }
+
+    const res = await getOutlineJobStatus(parsed.jobId)
+    if (res.data) {
+      applyCurrentJob(res.data)
+      metaPaginationState.current = 1
+      await loadMetaList(1, true)
+      return
+    }
+
+    if (!parsed.novelCode) {
+      clearPersistedCurrentJob()
+      return
+    }
+
+    const fallbackRes = await listOutlineJobs(parsed.novelCode)
+    const jobs = fallbackRes.data || []
+    const fallbackJob =
+      jobs.find(job => ['splitting', 'meta_generating', 'generating'].includes(job.status)) ||
+      jobs.find(job => !isMetaComplete(job)) ||
+      jobs[0]
+
+    if (!fallbackJob) {
+      clearPersistedCurrentJob()
+      return
+    }
+
+    applyCurrentJob(fallbackJob)
+    metaPaginationState.current = 1
+    await loadMetaList(1, true)
+  } catch (error) {
+    console.warn('恢复本地任务失败', error)
+    clearPersistedCurrentJob()
+  }
+}
+
+function pickAutoCurrentJob(jobs: NovelOutlineJob[]) {
+  return jobs.find(job => isRunningJob(job)) || jobs.find(job => !isMetaComplete(job)) || null
+}
+
+async function restoreCurrentJobFromJobList() {
+  try {
+    const res = await listOutlineJobs()
+    const jobs = res.data || []
+    const nextJob = pickAutoCurrentJob(jobs)
+    if (!nextJob) return
+    applyCurrentJob(nextJob)
+    metaPaginationState.current = 1
+    await loadMetaList(1, true)
+  } catch (error) {
+    console.warn('自动发现当前任务失败', error)
+  }
+}
+
+async function initializeCurrentJob() {
+  await restorePersistedCurrentJob()
+  if (currentJob.value) return
+  await restoreCurrentJobFromJobList()
 }
 
 function onBeforeUpload(file: File) {
-  if (!file.name.toLowerCase().endsWith(".txt")) {
-    antMessage.error("仅支持 .txt 文件");
-    return false as any;
+  if (!file.name.toLowerCase().endsWith('.txt')) {
+    antMessage.error('仅支持 .txt 文件')
+    return false as any
   }
-  pickedFile.value = file;
+  pickedFile.value = file
   fileList.value = [
     {
       uid: String(file.lastModified),
       name: file.name,
-      status: "done",
-    } as UploadFile,
-  ];
-  return false;
+      status: 'done'
+    } as UploadFile
+  ]
+  return false
 }
 
 function onRemoveFile() {
-  pickedFile.value = null;
-  fileList.value = [];
-  return true;
+  pickedFile.value = null
+  fileList.value = []
+  return true
 }
 
 async function startMetaGenerateTask(
   params: { novelCode: string; jobId?: string },
-  successMessage = "Meta 生成任务已启动",
+  successMessage = 'Meta 生成任务已启动，请手动刷新查看进度'
 ) {
-  const res = await startNovelMetaGenerate(params);
+  const res = await startNovelMetaGenerate(params)
   if (!res.data) {
-    return;
+    return
   }
-  applyCurrentJob(res.data);
-  startPolling();
-  await loadMetaList(1, true);
-  antMessage.success(successMessage);
+  applyCurrentJob(res.data)
+  await loadMetaList(1, true)
+  antMessage.success(successMessage)
 }
 
 function resetHistoryLookup() {
-  checkedNovelCode.value = "";
-  historyCheckStatus.value = "idle";
-  selectedRecoverJobId.value = "";
-  recoverJobOptions.value = [];
+  checkedNovelCode.value = ''
+  historyCheckStatus.value = 'idle'
+  selectedRecoverJobId.value = ''
+  recoverJobOptions.value = []
 }
 
 async function handleNovelCodeBlur(force = false) {
-  const novelCode = uploadForm.novelCode.trim();
+  const novelCode = uploadForm.novelCode.trim()
   if (!novelCode) {
-    resetHistoryLookup();
-    return;
+    resetHistoryLookup()
+    return
   }
-  if (
-    !force &&
-    checkedNovelCode.value === novelCode &&
-    historyCheckStatus.value !== "idle"
-  ) {
-    return;
+  if (!force && checkedNovelCode.value === novelCode && historyCheckStatus.value !== 'idle') {
+    return
   }
 
-  historyCheckStatus.value = "checking";
+  historyCheckStatus.value = 'checking'
   try {
-    const res = await listOutlineJobs(novelCode);
-    const jobs = res.data || [];
-    recoverJobOptions.value = jobs.map((job) => ({
+    const res = await listOutlineJobs(novelCode)
+    const jobs = res.data || []
+    recoverJobOptions.value = jobs.map(job => ({
       value: job.jobId,
       label: `${job.jobId}  [${job.status}]  ${job.metaGeneratedChunks}/${job.totalChunks}`,
-      desc: `原文：${job.sourceFileName}  · 创建：${formatTime(job.createdAt)}`,
-    }));
-    selectedRecoverJobId.value = jobs[0]?.jobId || "";
-    checkedNovelCode.value = novelCode;
-    historyCheckStatus.value = jobs.length ? "has-history" : "no-history";
+      desc: `原文：${job.sourceFileName}  · 创建：${formatTime(job.createdAt)}`
+    }))
+    selectedRecoverJobId.value = jobs[0]?.jobId || ''
+    checkedNovelCode.value = novelCode
+    historyCheckStatus.value = jobs.length ? 'has-history' : 'no-history'
   } catch (e: any) {
-    resetHistoryLookup();
-    antMessage.error(e?.response?.data?.msg || e?.message || "查询失败");
+    resetHistoryLookup()
+    antMessage.error(e?.response?.data?.msg || e?.message || '查询失败')
   }
 }
 
 function handleNovelCodeInputBlur() {
-  return handleNovelCodeBlur();
+  return handleNovelCodeBlur()
 }
 
 async function handleUploadAndGenerate() {
-  const novelCode = uploadForm.novelCode.trim();
+  const novelCode = uploadForm.novelCode.trim()
   if (!novelCode) {
-    antMessage.warning("请先输入 novelCode");
-    return;
+    antMessage.warning('请先输入 novelCode')
+    return
   }
   if (!pickedFile.value) {
-    antMessage.warning("请先选择 TXT 文件");
-    return;
+    antMessage.warning('请先选择 TXT 文件')
+    return
   }
 
-  if (
-    checkedNovelCode.value !== novelCode ||
-    historyCheckStatus.value === "idle"
-  ) {
-    await handleNovelCodeBlur(true);
+  if (checkedNovelCode.value !== novelCode || historyCheckStatus.value === 'idle') {
+    await handleNovelCodeBlur(true)
   }
-  if (historyCheckStatus.value === "has-history") {
-    antMessage.warning("该 novelCode 已有历史任务，请直接选择 jobId 恢复");
-    return;
+  if (historyCheckStatus.value === 'has-history') {
+    antMessage.warning('该 novelCode 已有历史任务，请直接选择 jobId 恢复')
+    return
   }
-  if (historyCheckStatus.value !== "no-history") {
-    return;
+  if (historyCheckStatus.value !== 'no-history') {
+    return
   }
 
-  uploading.value = true;
+  uploading.value = true
   try {
     const splitRes = await uploadAndSplitNovel({
       novelCode,
       chunkSize: uploadForm.chunkSize,
       overlap: uploadForm.overlap,
-      file: pickedFile.value,
-    });
+      file: pickedFile.value
+    })
 
     if (!splitRes.data) {
-      return;
+      return
     }
 
-    applyCurrentJob(splitRes.data);
-    antMessage.success(`拆分完成，共 ${splitRes.data.totalChunks} 块`);
+    applyCurrentJob(splitRes.data)
+    antMessage.success(`拆分完成，共 ${splitRes.data.totalChunks} 块`)
     await startMetaGenerateTask(
       { novelCode: splitRes.data.novelCode, jobId: splitRes.data.jobId },
-      "拆分完成，Meta 生成任务已启动",
-    );
+      '拆分完成，Meta 生成任务已启动，请手动刷新查看进度'
+    )
   } catch (e: any) {
-    antMessage.error(e?.response?.data?.msg || e?.message || "处理失败");
+    antMessage.error(e?.response?.data?.msg || e?.message || '处理失败')
   } finally {
-    uploading.value = false;
+    uploading.value = false
   }
 }
 
 async function handleRecover() {
-  if (!selectedRecoverJobId.value) return;
-  recovering.value = true;
+  if (!selectedRecoverJobId.value) return
+  recovering.value = true
   try {
-    const res = await getOutlineJobStatus(selectedRecoverJobId.value);
+    const res = await getOutlineJobStatus(selectedRecoverJobId.value)
     if (!res.data) {
-      antMessage.error("未查到该任务");
-      return;
+      antMessage.error('未查到该任务')
+      return
     }
-    applyCurrentJob(res.data);
-    metaPaginationState.current = 1;
-    await loadMetaList(1, true);
+    applyCurrentJob(res.data)
+    metaPaginationState.current = 1
+    await loadMetaList(1, true)
 
-    if (isRunningStatus(res.data.status)) {
-      startPolling();
-      antMessage.info("任务运行中，已恢复进度轮询");
-    } else {
-      stopPolling();
-      antMessage.success("任务已恢复");
+    if (res.data.status === 'splitting') {
+      antMessage.info('任务仍在拆分中，请手动刷新查看最新进度')
+      return
     }
+
+    const shouldResumeMeta = !isMetaComplete(res.data) && res.data.status !== 'generating'
+
+    if (shouldResumeMeta) {
+      await startMetaGenerateTask(
+        {
+          novelCode: res.data.novelCode,
+          jobId: res.data.jobId
+        },
+        '任务已恢复，Meta 生成已继续，请手动刷新查看进度'
+      )
+      return
+    }
+
+    if (res.data.status === 'generating') {
+      antMessage.info('任务已恢复，当前正在生成大纲，请手动刷新查看进度')
+      return
+    }
+
+    antMessage.success('任务已恢复')
   } catch (e: any) {
-    antMessage.error(e?.response?.data?.msg || e?.message || "恢复失败");
+    antMessage.error(e?.response?.data?.msg || e?.message || '恢复失败')
   } finally {
-    recovering.value = false;
+    recovering.value = false
   }
 }
 
 async function handleRebuildIndex() {
-  if (!currentJob.value) return;
-  rebuildingIndex.value = true;
+  if (!currentJob.value) return
+  rebuildingIndex.value = true
   try {
     const res = await rebuildNovelMetaIndex({
       novelCode: currentJob.value.novelCode,
-      jobId: currentJob.value.jobId,
-    });
+      jobId: currentJob.value.jobId
+    })
     if (res.data) {
-      currentJob.value = res.data;
+      applyCurrentJob(res.data)
     }
-    await loadMetaList(metaPaginationState.current, true);
-    antMessage.success("Meta 索引重建完成");
+    await loadMetaList(metaPaginationState.current, true)
+    antMessage.success('Meta 索引重建完成')
   } catch (e: any) {
-    antMessage.error(e?.response?.data?.msg || e?.message || "重建失败");
+    antMessage.error(e?.response?.data?.msg || e?.message || '重建失败')
   } finally {
-    rebuildingIndex.value = false;
-  }
-}
-
-function startPolling() {
-  stopPolling();
-  pollTimer = setInterval(async () => {
-    if (!currentJob.value) return;
-    try {
-      const res = await getOutlineJobStatus(currentJob.value.jobId);
-      if (res.data) {
-        currentJob.value = res.data;
-      }
-
-      if (
-        queryNovelCode.value &&
-        currentJob.value?.novelCode === queryNovelCode.value
-      ) {
-        await loadMetaList(metaPaginationState.current, true);
-      }
-
-      const status = currentJob.value?.status;
-      if (!isRunningStatus(status)) {
-        stopPolling();
-        if (
-          (status === "split_done" || status === "done") &&
-          isMetaComplete(currentJob.value)
-        ) {
-          antMessage.success("Meta 生成完成");
-        }
-        if (status === "failed") {
-          antMessage.error(
-            `任务失败：${currentJob.value?.lastError || "未知错误"}`,
-          );
-        }
-      }
-    } catch (error) {
-      console.warn("轮询失败", error);
-    }
-  }, 3000);
-}
-
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
+    rebuildingIndex.value = false
   }
 }
 
 async function handleRefresh() {
-  if (!currentJob.value) return;
-  const res = await getOutlineJobStatus(currentJob.value.jobId);
+  if (!currentJob.value) return
+  const res = await getOutlineJobStatus(currentJob.value.jobId)
   if (res.data) {
-    currentJob.value = res.data;
+    applyCurrentJob(res.data)
+  } else {
+    currentJob.value = null
+    clearPersistedCurrentJob()
   }
-  await loadMetaList(metaPaginationState.current, true);
+  await loadMetaList(metaPaginationState.current, true)
 }
 
-async function loadMetaList(
-  page = metaPaginationState.current,
-  silent = false,
-) {
-  const novelCode = queryNovelCode.value || currentJob.value?.novelCode;
+async function loadMetaList(page = metaPaginationState.current, silent = false) {
+  const novelCode = queryNovelCode.value || currentJob.value?.novelCode
   if (!novelCode) {
-    metaList.value = [];
-    metaPaginationState.total = 0;
-    return;
+    metaList.value = []
+    metaPaginationState.total = 0
+    return
   }
 
-  metaLoading.value = true;
+  metaLoading.value = true
   try {
     const res = await listNovelMetas({
       novelCode,
       current: page,
       pageSize: metaPaginationState.pageSize,
-      keyword: metaKeyword.value.trim() || undefined,
-    });
-    metaList.value = res.data?.list || [];
-    metaPaginationState.current = res.data?.current || page;
-    metaPaginationState.pageSize =
-      res.data?.pageSize || metaPaginationState.pageSize;
-    metaPaginationState.total = res.data?.total || 0;
+      keyword: metaKeyword.value.trim() || undefined
+    })
+    metaList.value = res.data?.list || []
+    metaPaginationState.current = res.data?.current || page
+    metaPaginationState.pageSize = res.data?.pageSize || metaPaginationState.pageSize
+    metaPaginationState.total = res.data?.total || 0
   } catch (e: any) {
     if (!silent) {
-      antMessage.error(e?.response?.data?.msg || e?.message || "加载失败");
+      antMessage.error(e?.response?.data?.msg || e?.message || '加载失败')
     }
   } finally {
-    metaLoading.value = false;
+    metaLoading.value = false
   }
 }
 
 async function handleMetaFilter() {
-  metaPaginationState.current = 1;
-  await loadMetaList(1);
+  metaPaginationState.current = 1
+  await loadMetaList(1)
 }
 
 async function handleMetaTableChange(pagination: TablePaginationConfig) {
-  const nextPage = pagination.current || 1;
-  const nextPageSize = pagination.pageSize || metaPaginationState.pageSize;
-  const pageSizeChanged = nextPageSize !== metaPaginationState.pageSize;
-  metaPaginationState.pageSize = nextPageSize;
-  metaPaginationState.current = pageSizeChanged ? 1 : nextPage;
-  await loadMetaList(metaPaginationState.current);
+  const nextPage = pagination.current || 1
+  const nextPageSize = pagination.pageSize || metaPaginationState.pageSize
+  const pageSizeChanged = nextPageSize !== metaPaginationState.pageSize
+  metaPaginationState.pageSize = nextPageSize
+  metaPaginationState.current = pageSizeChanged ? 1 : nextPage
+  await loadMetaList(metaPaginationState.current)
 }
 
 async function handleQueryMeta() {
-  const novelCode = queryNovelCode.value || currentJob.value?.novelCode;
+  const novelCode = queryNovelCode.value || currentJob.value?.novelCode
   if (!novelCode) {
-    antMessage.warning("请先输入 novelCode");
-    return;
+    antMessage.warning('请先输入 novelCode')
+    return
   }
-  queryNovelCode.value = novelCode;
-  metaPaginationState.current = 1;
-  searchResult.value = null;
-  await loadMetaList(1);
+  queryNovelCode.value = novelCode
+  metaPaginationState.current = 1
+  searchResult.value = null
+  await loadMetaList(1)
 }
 
 async function handleSearchMeta() {
-  const novelCode = queryNovelCode.value || currentJob.value?.novelCode;
+  const novelCode = queryNovelCode.value || currentJob.value?.novelCode
   if (!novelCode) {
-    antMessage.warning("请先输入 novelCode");
-    return;
+    antMessage.warning('请先输入 novelCode')
+    return
   }
   if (!searchForm.query.trim()) {
-    antMessage.warning("请输入检索内容");
-    return;
+    antMessage.warning('请输入检索内容')
+    return
   }
 
-  searching.value = true;
+  searching.value = true
   try {
     const res = await searchNovelMeta({
       novelCode,
       query: searchForm.query.trim(),
       topN: searchForm.topN,
-      includeChunks: searchForm.includeChunks,
-    });
-    searchResult.value = res.data ?? null;
-    activeRightTab.value = "search";
+      includeChunks: searchForm.includeChunks
+    })
+    searchResult.value = res.data ?? null
+    activeRightTab.value = 'search'
   } catch (e: any) {
-    antMessage.error(e?.response?.data?.msg || e?.message || "检索失败");
+    antMessage.error(e?.response?.data?.msg || e?.message || '检索失败')
   } finally {
-    searching.value = false;
+    searching.value = false
   }
 }
 
 function formatTime(value?: string) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const pad = (num: number) => String(num).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (num: number) => String(num).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 watch(
   () => uploadForm.novelCode,
-  (value) => {
-    const trimmedValue = value.trim();
+  value => {
+    const trimmedValue = value.trim()
     if (trimmedValue !== checkedNovelCode.value) {
-      historyCheckStatus.value = "idle";
-      selectedRecoverJobId.value = "";
-      recoverJobOptions.value = [];
+      historyCheckStatus.value = 'idle'
+      selectedRecoverJobId.value = ''
+      recoverJobOptions.value = []
     }
     if (value && !queryNovelCode.value) {
-      queryNovelCode.value = value;
+      queryNovelCode.value = value
     }
-  },
-);
+  }
+)
 
-watch(queryNovelCode, (value) => {
+watch(queryNovelCode, value => {
   if (!value) {
-    metaList.value = [];
-    metaPaginationState.total = 0;
-    searchResult.value = null;
+    metaList.value = []
+    metaPaginationState.total = 0
+    searchResult.value = null
   }
-});
+})
 
-watch(showCurrentTaskTab, (value) => {
-  if (!value && activeLeftTab.value === "current") {
-    activeLeftTab.value = "entry";
+watch(showCurrentTaskTab, value => {
+  if (!value && activeLeftTab.value === 'current') {
+    activeLeftTab.value = 'entry'
   }
-});
+})
 
-onBeforeUnmount(() => {
-  stopPolling();
-});
+watch(currentJob, value => {
+  if (value) {
+    persistCurrentJob(value)
+  } else {
+    clearPersistedCurrentJob()
+  }
+})
+
+onMounted(() => {
+  void initializeCurrentJob()
+})
 </script>
 
 <style lang="less" scoped>
@@ -934,7 +894,7 @@ onBeforeUnmount(() => {
 }
 
 .left-panel {
-  width: 380px;
+  width: 360px;
   flex-shrink: 0;
   overflow-y: auto;
 }
