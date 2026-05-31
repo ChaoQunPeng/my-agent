@@ -16,19 +16,18 @@
       <div class="novel-material-panel">
         <div class="novel-selector-card">
           <div class="novel-selector-card__title">小说对话</div>
-          <div class="novel-selector-card__subtitle">输入或选择 `novelCode`，切换当前小说的会话和百科问答上下文。</div>
+          <div class="novel-selector-card__subtitle">选择 `novelCode`，切换当前小说的会话和百科问答上下文。</div>
 
           <div class="novel-selector-card__row">
-            <a-auto-complete
+            <a-select
               v-model:value="novelCodeDraft"
+              show-search
               :options="novelCodeOptions"
-              :filter-option="filterNovelCodeOption"
-              placeholder="输入或选择 novelCode，如 longzu 或 龙族"
+              option-filter-prop="value"
+              placeholder="选择 novelCode"
               class="novel-selector-card__input"
-              @select="handleNovelCodeSelect"
-              @keyup.enter="handleNovelCodeSubmit()"
+              @change="handleNovelCodeSelect"
             />
-            <a-button type="primary" @click="handleNovelCodeSubmit()">切换</a-button>
           </div>
 
           <div class="novel-selector-card__current">当前小说：{{ currentNovelCode || '未选择' }}</div>
@@ -45,7 +44,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message as antMessage } from 'ant-design-vue'
 import SessionChatWorkspace from '@/pages/dialog/index.vue'
-import WritingAssistant from '@/pages/dialog/components/writing-assistant.vue'
 import { chatStreamApi } from '@/composables/chat-stream'
 import { listOutlineJobs } from '@/api/novel-outline'
 import { useSessionManager } from '@/pages/dialog/composables/use-session-manager'
@@ -78,7 +76,7 @@ const {
   getResourceId: () => currentNovelCode.value.trim() || undefined,
   canCreateSession: () => !createSessionDisabled.value,
   shouldFetchSessions: () => Boolean(currentNovelCode.value.trim()),
-  getCreateBlockedMessage: () => '请先输入 novelCode',
+  getCreateBlockedMessage: () => '请先选择 novelCode',
   onSessionSelected: () => {
     workspaceRef.value?.getMessages()
   },
@@ -87,17 +85,33 @@ const {
   }
 })
 
+const syncNovelCodeOption = (code: string) => {
+  const nextCode = code.trim()
+
+  if (!nextCode || novelCodeOptions.value.some(option => option.value === nextCode)) {
+    return
+  }
+
+  novelCodeOptions.value = [...novelCodeOptions.value, { value: nextCode }].sort((a, b) => a.value.localeCompare(b.value))
+}
+
 const syncNovelCodeFromRoute = () => {
   const nextCode = String(route.meta?.resourceId || route.meta?.novelCode || '').trim()
 
   currentNovelCode.value = nextCode
   novelCodeDraft.value = nextCode
+  syncNovelCodeOption(nextCode)
 }
 
 const loadNovelCodeOptions = async () => {
   try {
     const res = await listOutlineJobs()
-    const codes = Array.from(new Set((res.data || []).map(job => job.novelCode).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+    const codes = Array.from(
+      new Set([
+        ...(res.data || []).map(job => job.novelCode).filter(Boolean),
+        currentNovelCode.value.trim()
+      ].filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b))
 
     novelCodeOptions.value = codes.map(code => ({
       value: code
@@ -115,7 +129,7 @@ const handleNovelCodeSubmit = async (selectedValue?: string) => {
     currentNovelCode.value = ''
     clearCurrentSession()
     sessions.value = []
-    antMessage.warning('请先输入 novelCode')
+    antMessage.warning('请先选择 novelCode')
     return
   }
 
@@ -126,18 +140,25 @@ const handleNovelCodeSubmit = async (selectedValue?: string) => {
 
   workspaceRef.value?.stopGeneration()
   currentNovelCode.value = nextCode
+  syncNovelCodeOption(nextCode)
   clearCurrentSession()
   await fetchSessions()
   antMessage.success(`已切换到小说 ${nextCode}`)
 }
 
-const handleNovelCodeSelect = (value: string | number | { value?: string | number }) => {
-  const nextValue = typeof value === 'object' ? value?.value : value
-  void handleNovelCodeSubmit(nextValue == null ? '' : String(nextValue))
-}
+const handleNovelCodeSelect = (value: unknown) => {
+  if (typeof value === 'string' || typeof value === 'number') {
+    void handleNovelCodeSubmit(String(value))
+    return
+  }
 
-const filterNovelCodeOption = (input: string, option: { value: string }) => {
-  return option.value.toLowerCase().includes(input.toLowerCase())
+  if (value && typeof value === 'object' && 'value' in value) {
+    const nextValue = value.value
+    void handleNovelCodeSubmit(nextValue == null ? '' : String(nextValue))
+    return
+  }
+
+  void handleNovelCodeSubmit('')
 }
 
 const handleCreate = async () => {
