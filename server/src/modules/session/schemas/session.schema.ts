@@ -5,7 +5,7 @@ export type SessionDocument = Session & Document;
 
 /**
  * 会话数据模型
- * 用于存储聊天会话的基本信息和关联的资源
+ * 用于存储聊天会话的基本信息和模块归属
  */
 @Schema({ timestamps: true })
 export class Session {
@@ -21,13 +21,9 @@ export class Session {
   @Prop({ default: '' })
   summary!: string;
 
-  // 资源类型，例如 'character'（角色）
+  // 模块标识，用于隔离不同模块的会话
   @Prop({ default: '' })
-  type!: string;
-
-  // 资源ID：对应 type 类型的资源ID
-  @Prop({ default: '' })
-  resourceId!: string;
+  moduleKey!: string;
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);

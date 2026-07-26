@@ -37,7 +37,8 @@ import { chatStreamApi } from "@/composables/chat-stream";
 import { getCharacterBySessionId } from "@/api/character";
 import { useSessionManager } from "@/pages/dialog/composables/use-session-manager";
 
-const SESSION_TYPE = "character";
+const MODULE_KEY = "npc";
+const RESOURCE_TYPE = "character";
 
 const workspaceRef = ref<InstanceType<typeof SessionChatWorkspace> | null>(
   null,
@@ -46,7 +47,7 @@ const currentCharacterId = ref("");
 const selectedCharacterId = ref("");
 
 const chatApiParams = computed(() => ({
-  type: SESSION_TYPE,
+  type: RESOURCE_TYPE,
   resourceId: currentCharacterId.value,
 }));
 
@@ -59,7 +60,7 @@ const {
   handleSelectSession,
   handleUpdateSession,
 } = useSessionManager({
-  getSessionType: () => SESSION_TYPE,
+  getModuleKey: () => MODULE_KEY,
   onSessionSelected: async (sessionId) => {
     await fetchCurrentCharacterId(sessionId);
     workspaceRef.value?.getMessages();

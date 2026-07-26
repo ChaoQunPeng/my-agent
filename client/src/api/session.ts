@@ -7,8 +7,7 @@ export interface Session {
   sessionId: string
   title: string
   summary: string
-  type?: string // 资源类型，例如 'character'（角色）
-  resourceId?: string // 资源ID：对应type类型的资源ID
+  moduleKey?: string // 模块标识，用于隔离不同模块的会话
   createdAt: string
   updatedAt: string
 }
@@ -28,27 +27,22 @@ export interface Message {
 
 /**
  * 获取所有会话列表
- * @param category 可选的分类筛选条件
- * @param type 可选的资源类型筛选条件
- * @param resourceId 可选的资源ID筛选条件
+ * @param moduleKey 可选的模块标识筛选条件
  */
-export function getSessions(type?: string, resourceId?: string) {
+export function getSessions(moduleKey?: string) {
   const params: any = {}
 
-  if (type) {
-    params.type = type
-  }
-  if (resourceId) {
-    params.resourceId = resourceId
+  if (moduleKey) {
+    params.moduleKey = moduleKey
   }
   return request.post<Session[]>('/sessions/list', params)
 }
 
 /**
  * 创建新会话
- * @param data 会话数据，包含标题、摘要、分类、资源类型和资源ID
+ * @param data 会话数据，包含标题、摘要、分类和模块标识
  */
-export function createSession(data?: { title?: string; summary?: string; category?: string; type?: string; resourceId?: string }) {
+export function createSession(data?: { title?: string; summary?: string; category?: string; moduleKey?: string }) {
   return request.post<Session>('/sessions/create', data || {})
 }
 
@@ -67,7 +61,7 @@ export function getSessionDetail(sessionId: string) {
  */
 export function updateSession(
   sessionId: string,
-  data: { title?: string; summary?: string; category?: string; type?: string; resourceId?: string }
+  data: { title?: string; summary?: string; category?: string; moduleKey?: string }
 ) {
   return request.post<Session>('/sessions/update', { id: sessionId, ...data })
 }

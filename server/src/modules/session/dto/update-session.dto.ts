@@ -19,13 +19,8 @@ export class UpdateSessionDto {
   @IsString()
   category?: string;
 
-  // 资源类型（可选）
+  // 模块标识（可选）
   @IsOptional()
   @IsString()
-  type?: string;
-
-  // 资源ID：对应type类型的资源ID（可选）
-  @IsOptional()
-  @IsString()
-  resourceId?: string;
+  moduleKey?: string;
 }

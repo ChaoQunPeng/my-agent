@@ -9,8 +9,7 @@ import {
 } from "@/api/session";
 
 interface UseSessionManagerOptions {
-  getSessionType: () => string;
-  getResourceId?: () => string | undefined;
+  getModuleKey: () => string;
   canCreateSession?: () => boolean;
   shouldFetchSessions?: () => boolean;
   getCreateBlockedMessage?: () => string;
@@ -34,10 +33,7 @@ export function useSessionManager(options: UseSessionManagerOptions) {
         return;
       }
 
-      const res = await getSessions(
-        options.getSessionType(),
-        options.getResourceId?.(),
-      );
+      const res = await getSessions(options.getModuleKey());
       sessions.value = res.data || [];
     } catch (error) {
       antMessage.error("获取会话列表失败");
@@ -60,8 +56,7 @@ export function useSessionManager(options: UseSessionManagerOptions) {
 
     try {
       const res = await createSession({
-        type: options.getSessionType(),
-        resourceId: options.getResourceId?.(),
+        moduleKey: options.getModuleKey(),
       });
       const newSession = res.data;
       sessions.value.unshift(newSession);
