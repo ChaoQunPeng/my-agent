@@ -14,6 +14,8 @@ import { OpenaiModule } from './shared/openai/openai.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { SessionModule } from './modules/session/session.module';
 import { CharacterModule } from './modules/character/character.module';
+import { NovelCharacterModule } from './modules/novel-character/novel-character.module';
+import { NovelOrganizationModule } from './modules/novel-organization/novel-organization.module';
 // import { TaskModule } from './modules/task/task.module';
 
 @Module({
@@ -32,6 +34,8 @@ import { CharacterModule } from './modules/character/character.module';
     ChatModule,
     SessionModule,
     CharacterModule, // 注册人物模块
+    NovelCharacterModule,
+    NovelOrganizationModule,
     // UserModule,
     // TaskModule,
   ],
