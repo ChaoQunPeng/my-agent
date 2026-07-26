@@ -23,6 +23,28 @@ export default [
       sessionType: 'character'
     }
   },
+  {
+    path: '/novel-assistant',
+    redirect: '/novel-assistant/inspiration-chat',
+    name: 'NovelAssistant',
+    component: basicRouteMap.RouteView,
+    meta: {
+      title: '小说助手',
+      icon: 'BookOutlined'
+    },
+    children: [
+      {
+        path: '/novel-assistant/inspiration-chat',
+        name: 'NovelInspirationChat',
+        component: () => import('~/pages/novel-assistant/inspiration-chat/index.vue'),
+        meta: {
+          title: '灵感对话',
+          icon: 'BulbOutlined',
+          sessionType: 'novel'
+        }
+      }
+    ]
+  },
   // {
   //   path: '/dialog/diary',
   //   name: 'diary',

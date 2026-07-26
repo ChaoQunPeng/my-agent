@@ -7,6 +7,10 @@ export class CreateNovelOrganizationDto {
 
   @IsString()
   @Matches(/\S/)
+  novelId!: string;
+
+  @IsString()
+  @Matches(/\S/)
   name!: string;
 
   @IsArray()

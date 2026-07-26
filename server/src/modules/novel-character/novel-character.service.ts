@@ -20,8 +20,10 @@ export class NovelCharacterService {
     return new this.characterModel({ ...data, id }).save();
   }
 
-  async findAll(): Promise<NovelCharacter[]> {
-    return this.characterModel.find().sort({ createdAt: -1 }).exec();
+  async findAll(novelId?: string): Promise<NovelCharacter[]> {
+    // 传入小说 ID 时只返回该小说下的人物。
+    const query = novelId ? { novelId } : {};
+    return this.characterModel.find(query).sort({ createdAt: -1 }).exec();
   }
 
   async findOne(id: string): Promise<NovelCharacter> {

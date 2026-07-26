@@ -20,6 +20,11 @@ export class UpdateNovelCharacterDto {
   @IsString()
   @Matches(/\S/)
   @IsOptional()
+  novelId?: string;
+
+  @IsString()
+  @Matches(/\S/)
+  @IsOptional()
   name?: string;
 
   @IsArray()

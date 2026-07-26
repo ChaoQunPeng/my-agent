@@ -1,6 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 import { CreateNovelOrganizationDto } from './dto/create-novel-organization.dto';
+import { ListNovelOrganizationsDto } from './dto/list-novel-organizations.dto';
 import { NovelOrganizationIdDto } from './dto/novel-organization-id.dto';
 import { UpdateNovelOrganizationDto } from './dto/update-novel-organization.dto';
 import { NovelOrganizationService } from './novel-organization.service';
@@ -12,8 +13,10 @@ export class NovelOrganizationController {
   ) {}
 
   @Post('get-novel-organizations')
-  async findAll() {
-    const organizations = await this.novelOrganizationService.findAll();
+  async findAll(@Body() data?: ListNovelOrganizationsDto) {
+    const organizations = await this.novelOrganizationService.findAll(
+      data?.novelId,
+    );
     return ApiResponseDto.success(organizations);
   }
 

@@ -42,6 +42,9 @@ export class NovelCharacter {
   @Prop({ required: true, unique: true, index: true })
   id!: string;
 
+  @Prop({ required: true, index: true })
+  novelId!: string;
+
   @Prop({ required: true, trim: true, index: true })
   name!: string;
 

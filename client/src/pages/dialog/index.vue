@@ -23,7 +23,13 @@
     </div>
 
     <div class="session-chat-page__chat">
-      <ChatPanel ref="chatPanelRef" :session-id="sessionId" :api-func="apiFunc" :api-params="apiParams" />
+      <ChatPanel
+        ref="chatPanelRef"
+        :session-id="sessionId"
+        :api-func="apiFunc"
+        :api-params="apiParams"
+        :ensure-session="ensureSession"
+      />
     </div>
 
     <div v-if="hasMaterial" class="session-chat-page__material">
@@ -55,6 +61,7 @@ const props = withDefaults(
     sessionId?: string
     apiFunc: (params: any) => Promise<any>
     apiParams?: Record<string, unknown>
+    ensureSession?: () => Promise<string | undefined>
     createSessionDisabled?: boolean
   }>(),
   {
@@ -133,7 +140,7 @@ const clearMessages = () => {
 }
 
 const getMessages = () => {
-  chatPanelRef.value?.getMessages()
+  return chatPanelRef.value?.getMessages()
 }
 
 defineExpose({

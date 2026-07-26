@@ -1,6 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 import { CreateNovelCharacterDto } from './dto/create-novel-character.dto';
+import { ListNovelCharactersDto } from './dto/list-novel-characters.dto';
 import { NovelCharacterIdDto } from './dto/novel-character-id.dto';
 import { UpdateNovelCharacterDto } from './dto/update-novel-character.dto';
 import { NovelCharacterService } from './novel-character.service';
@@ -10,8 +11,8 @@ export class NovelCharacterController {
   constructor(private readonly novelCharacterService: NovelCharacterService) {}
 
   @Post('get-novel-characters')
-  async findAll() {
-    const characters = await this.novelCharacterService.findAll();
+  async findAll(@Body() data?: ListNovelCharactersDto) {
+    const characters = await this.novelCharacterService.findAll(data?.novelId);
     return ApiResponseDto.success(characters);
   }
 

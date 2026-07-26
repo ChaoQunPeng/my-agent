@@ -20,8 +20,10 @@ export class NovelOrganizationService {
     return new this.organizationModel({ ...data, id }).save();
   }
 
-  async findAll(): Promise<NovelOrganization[]> {
-    return this.organizationModel.find().sort({ createdAt: -1 }).exec();
+  async findAll(novelId?: string): Promise<NovelOrganization[]> {
+    // 传入小说 ID 时只返回该小说下的组织。
+    const query = novelId ? { novelId } : {};
+    return this.organizationModel.find(query).sort({ createdAt: -1 }).exec();
   }
 
   async findOne(id: string): Promise<NovelOrganization> {

@@ -1,7 +1,8 @@
 <template>
   <div class="chat-panel">
     <div class="chat-messages" ref="messagesContainer">
-      <MessageList ref="messageListRef" :messages="messages" :outputting="outputting" @copy="copyMessage" @regenerate="regenerateMessage" />
+      <MessageList ref="messageListRef" :messages="messages" :outputting="outputting" @copy="copyMessage"
+        @regenerate="regenerateMessage" />
     </div>
 
     <div>
@@ -30,6 +31,7 @@ const props = withDefaults(
     sessionId?: string
     apiFunc: (params: any) => Promise<any>
     apiParams?: object // 将 apiParams 设为可选参数
+    ensureSession?: () => Promise<string | undefined>
   }>(),
   {
     // 设置 apiParams 的默认值为空对象,使用箭头函数确保每次创建新的对象实例
@@ -77,9 +79,13 @@ const handleSend = async (text: string) => {
     await new Promise(resolve => setTimeout(resolve, 100))
   }
 
+  // 业务页面可在真正发送前校验条件，并按需创建会话。
+  debugger
+  const sessionId = props.ensureSession ? await props.ensureSession() : props.sessionId
+  if (!sessionId) return
+
   try {
-    if (!props.sessionId) return
-    await addMessage(props.sessionId, 'user', text)
+    await addMessage(sessionId, 'user', text)
   } catch (error) {
     console.error('保存用户消息失败', error)
   }
@@ -108,7 +114,7 @@ const handleSend = async (text: string) => {
     await props.apiFunc({
       message: text,
       ...props.apiParams,
-      sessionId: props.sessionId,
+      sessionId,
       signal: abortController.value.signal,
 
       onChunk: async (content: string) => {

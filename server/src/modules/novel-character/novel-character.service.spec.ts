@@ -15,6 +15,7 @@ describe('NovelCharacterService', () => {
     const service = new NovelCharacterService(characterModel as never);
 
     const result = await service.create({
+      novelId: 'novel_1',
       name: '林默',
       alias: [],
       gender: '男',
@@ -33,6 +34,7 @@ describe('NovelCharacterService', () => {
     expect(characterModel).toHaveBeenCalledWith(
       expect.objectContaining({
         id: expect.stringMatching(/^novel_character_/),
+        novelId: 'novel_1',
         name: '林默',
       }),
     );
@@ -51,5 +53,16 @@ describe('NovelCharacterService', () => {
     await expect(service.findOne('missing')).rejects.toThrow(
       'Novel character missing not found',
     );
+  });
+
+  it('lists only characters that belong to the selected novel', async () => {
+    const exec = jest.fn().mockResolvedValue([]);
+    const sort = jest.fn().mockReturnValue({ exec });
+    const find = jest.fn().mockReturnValue({ sort });
+    const service = new NovelCharacterService({ find } as never);
+
+    await service.findAll('novel_1');
+
+    expect(find).toHaveBeenCalledWith({ novelId: 'novel_1' });
   });
 });
