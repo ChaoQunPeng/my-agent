@@ -18,7 +18,6 @@ import { NovelOrganizationService } from '../novel-organization/novel-organizati
 import { getCharacterContextTool } from './character.tools';
 import { buildInspirationChatPrompt } from 'src/common/prompts/inspiration-chat';
 
-
 export interface Session {
   id: string;
   history: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
@@ -44,7 +43,7 @@ export class ChatService {
     private readonly novelService: NovelService,
     private readonly novelCharacterService: NovelCharacterService,
     private readonly novelOrganizationService: NovelOrganizationService,
-  ) { }
+  ) {}
 
   /**
    * 动态 System Prompt 构建
@@ -67,7 +66,11 @@ export class ChatService {
       // 小说助手-灵感对话
       else if (type === 'inspiration-chat') {
         const novel = await this.novelService.findOne(resourceId!);
-        systemPrompt = buildInspirationChatPrompt(novel.content);
+        systemPrompt = buildInspirationChatPrompt(`
+          小说名：《 ${novel.name}》
+
+          ${novel.content}
+        `);
       }
     } catch (error) {
       console.error(`获取角色信息失败:`, error);
@@ -188,6 +191,9 @@ export class ChatService {
       ...customHistory,
       { role: 'user', content: currentMessage },
     ];
+
+    console.log(`这是消息体`);
+    console.log(messages);
 
     // 调用 OpenAI API
     const stream = await this.openaiService.client.chat.completions.create({

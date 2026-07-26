@@ -9,12 +9,15 @@ import { CharacterModule } from '../character/character.module';
 import { FileReaderModule } from '../../shared/file-reader/file-reader.module';
 import { NovelCharacterModule } from '../novel-character/novel-character.module';
 import { NovelOrganizationModule } from '../novel-organization/novel-organization.module';
+// 导入 NovelModule 以使用 NovelService
+import { NovelModule } from '../novel/novel.module';
 
 @Module({
   imports: [
     SessionModule,
     CharacterModule,
     FileReaderModule,
+    NovelModule,
     NovelCharacterModule,
     NovelOrganizationModule,
   ],
