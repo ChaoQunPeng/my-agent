@@ -61,7 +61,7 @@ export function useSessionManager(options: UseSessionManagerOptions) {
       const newSession = res.data;
       sessions.value.unshift(newSession);
       await handleSelectSession(newSession.sessionId);
-      antMessage.success("会话创建成功");
+      // antMessage.success("会话创建成功");
     } catch (error) {
       antMessage.error("创建会话失败");
     }

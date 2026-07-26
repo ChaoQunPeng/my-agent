@@ -1,16 +1,8 @@
 <template>
-  <SessionChatWorkspace
-    ref="workspaceRef"
-    :sessions="sessions"
-    :current-session-id="currentSessionId"
-    :session-id="currentSessionId"
-    :api-func="chatStreamApi"
-    :ensure-session="handleEnsureSession"
-    @create-session="handleCreate"
-    @select-session="handleSelect"
-    @delete-session="handleDeleteSession"
-    @save-session-title="handleUpdateSession"
-  >
+  <SessionChatWorkspace ref="workspaceRef" :sessions="sessions" :current-session-id="currentSessionId"
+    :session-id="currentSessionId" :api-func="chatStreamApi" :ensure-session="handleEnsureSession"
+    @create-session="handleCreate" @select-session="handleSelect" @delete-session="handleDeleteSession"
+    @save-session-title="handleUpdateSession">
     <template #material>
       <NovelOperationPanel />
     </template>
@@ -22,6 +14,8 @@ import { chatStreamApi } from '@/composables/chat-stream'
 import SessionChatWorkspace from '@/pages/dialog/index.vue'
 import { useSessionManager } from '@/pages/dialog/composables/use-session-manager'
 import NovelOperationPanel from './components/novel-operation-panel.vue'
+// import { useNovelAssistantStore } from '@/stores/novel-assistant'
+// const store = useNovelAssistantStore()
 
 const MODULE_KEY = 'inspiration-chat'
 

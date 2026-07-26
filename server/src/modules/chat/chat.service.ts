@@ -8,6 +8,7 @@ import { CharacterService } from '../character/character.service';
 import { SessionService } from '../session/session.service';
 import { FileReaderService } from '../../shared/file-reader/file-reader.service';
 import { buildNpcPrompt } from 'src/common/prompts/character';
+import { ChatCompletionTool } from 'openai/resources';
 
 export interface Session {
   id: string;
@@ -31,7 +32,7 @@ export class ChatService {
     private readonly characterService: CharacterService,
     private readonly sessionService: SessionService,
     private readonly fileReaderService: FileReaderService,
-  ) {}
+  ) { }
 
   /**
    * 动态 System Prompt 构建
@@ -45,17 +46,26 @@ export class ChatService {
   ): Promise<string> {
     let systemPrompt = '';
 
-    // 如果是角色类型，获取角色信息
-    if (type === 'character' && resourceId) {
-      try {
+    try {
+      // npc
+      if (type === 'character' && resourceId) {
         const character = await this.characterService.findOne(resourceId);
         systemPrompt = buildNpcPrompt(character);
-      } catch (error) {
-        console.error(`获取角色信息失败:`, error);
       }
+      // 小说助手-灵感对话
+      else if (type === 'inspiration-chat') {
+        const character = await this.characterService.findOne('');
+        systemPrompt = buildNpcPrompt(character);
+      }
+    } catch (error) {
+      console.error(`获取角色信息失败:`, error);
     }
 
     return systemPrompt;
+  }
+
+  private getTools(): ChatCompletionTool[] {
+    return [];
   }
 
   /**
@@ -71,8 +81,8 @@ export class ChatService {
     type?: string,
     resourceId?: string,
   ): AsyncGenerator<string> {
-    const cleanMessage = userMessage?.trim();
-    if (!cleanMessage) throw new Error('Message content cannot be empty');
+    const currentMessage = userMessage?.trim();
+    if (!currentMessage) throw new Error('Message content cannot be empty');
 
     // 构建系统提示词
     const systemPrompt = await this.buildDynamicSystemPrompt(type, resourceId);
@@ -91,7 +101,7 @@ export class ChatService {
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       ...systemMessages,
       ...customHistory,
-      { role: 'user', content: cleanMessage },
+      { role: 'user', content: currentMessage },
     ];
 
     // 调用 OpenAI API
@@ -102,6 +112,7 @@ export class ChatService {
       temperature: 0.9,
       frequency_penalty: 0.3,
       presence_penalty: 0.3,
+      tools: this.getTools(),
     });
 
     // 流式返回响应

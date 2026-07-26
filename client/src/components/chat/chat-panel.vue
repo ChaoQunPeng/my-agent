@@ -80,7 +80,6 @@ const handleSend = async (text: string) => {
   }
 
   // 业务页面可在真正发送前校验条件，并按需创建会话。
-  debugger
   const sessionId = props.ensureSession ? await props.ensureSession() : props.sessionId
   if (!sessionId) return
 
