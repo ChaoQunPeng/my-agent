@@ -40,7 +40,7 @@ export default [
         meta: {
           title: '灵感对话',
           icon: 'BulbOutlined',
-          sessionType: 'novel'
+          sessionType: 'inspiration-chat'
         }
       }
     ]
