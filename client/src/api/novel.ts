@@ -9,7 +9,7 @@ export interface Novel {
 }
 
 export interface NovelRelation {
-  targetId: string
+  targetId: string | null
   relation: string
   description: string
 }
@@ -53,6 +53,10 @@ export type CreateNovelCharacterPayload = Omit<NovelCharacter, '_id' | 'id' | 'c
 
 export type CreateNovelOrganizationPayload = Omit<NovelOrganization, '_id' | 'id' | 'createdAt' | 'updatedAt'>
 
+export type UpdateNovelCharacterPayload = Partial<CreateNovelCharacterPayload> & Pick<NovelCharacter, 'id'>
+
+export type UpdateNovelOrganizationPayload = Partial<CreateNovelOrganizationPayload> & Pick<NovelOrganization, 'id'>
+
 export function getNovels() {
   return request.post<Novel[]>('/novels/get-novels')
 }
@@ -69,10 +73,26 @@ export function createNovelCharacter(data: CreateNovelCharacterPayload) {
   return request.post<NovelCharacter>('/novel-characters/create-novel-character', data)
 }
 
+export function updateNovelCharacter(data: UpdateNovelCharacterPayload) {
+  return request.post<NovelCharacter>('/novel-characters/update-novel-character', data)
+}
+
+export function deleteNovelCharacter(id: string) {
+  return request.post<null>('/novel-characters/delete-novel-character', { id })
+}
+
 export function getNovelOrganizations(novelId: string) {
   return request.post<NovelOrganization[]>('/novel-organizations/get-novel-organizations', { novelId })
 }
 
 export function createNovelOrganization(data: CreateNovelOrganizationPayload) {
   return request.post<NovelOrganization>('/novel-organizations/create-novel-organization', data)
+}
+
+export function updateNovelOrganization(data: UpdateNovelOrganizationPayload) {
+  return request.post<NovelOrganization>('/novel-organizations/update-novel-organization', data)
+}
+
+export function deleteNovelOrganization(id: string) {
+  return request.post<null>('/novel-organizations/delete-novel-organization', { id })
 }

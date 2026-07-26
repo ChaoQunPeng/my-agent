@@ -1,14 +1,5 @@
 <template>
-  <a-modal
-    :open="open"
-    title="新建组织"
-    width="720px"
-    :confirm-loading="saving"
-    ok-text="创建"
-    cancel-text="取消"
-    @ok="handleSubmit"
-    @cancel="handleClose"
-  >
+  <a-drawer :open="open" :title="isEditing ? '编辑组织' : '新建组织'" width="min(720px, 100vw)" @close="handleClose">
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" class="organization-form">
       <a-form-item label="组织名称" name="name">
         <a-input v-model:value="form.name" placeholder="组织名称" />
@@ -44,16 +35,27 @@
         <a-textarea v-model:value="form.remark" :rows="2" />
       </a-form-item>
     </a-form>
-  </a-modal>
+    <template #footer>
+      <div class="drawer-footer">
+        <a-button @click="handleClose">取消</a-button>
+        <a-button type="primary" :loading="saving" @click="handleSubmit">
+          {{ isEditing ? '保存' : '创建' }}
+        </a-button>
+      </div>
+    </template>
+  </a-drawer>
 </template>
 
 <script setup lang="ts">
 import type { FormInstance } from 'ant-design-vue'
-import type { CreateNovelOrganizationPayload } from '@/api/novel'
+import type { CreateNovelOrganizationPayload, NovelOrganization } from '@/api/novel'
 import { message as antMessage } from 'ant-design-vue'
 import { useNovelAssistantStore } from '@/stores/novel-assistant'
 
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{
+  open: boolean
+  organization?: NovelOrganization | null
+}>()
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -65,6 +67,7 @@ const store = useNovelAssistantStore()
 const { selectedNovelId } = storeToRefs(store)
 const formRef = ref<FormInstance>()
 const saving = ref(false)
+const isEditing = computed(() => Boolean(props.organization))
 
 const createDefaultForm = (): OrganizationFormState => ({
   name: '',
@@ -92,17 +95,29 @@ const handleSubmit = async () => {
     }
 
     saving.value = true
-    await store.addOrganization({
+    // 新建和编辑共用同一份清理后的表单数据。
+    const normalizedForm: OrganizationFormState = {
       ...form,
-      novelId: selectedNovelId.value,
       name: form.name.trim(),
       alias: normalizeTags(form.alias),
       motivation: normalizeTags(form.motivation)
-    })
-    antMessage.success('组织创建成功')
+    }
+
+    if (props.organization) {
+      await store.updateOrganization({
+        id: props.organization.id,
+        ...normalizedForm
+      })
+    } else {
+      await store.addOrganization({
+        ...normalizedForm,
+        novelId: selectedNovelId.value
+      })
+    }
+    antMessage.success(isEditing.value ? '组织更新成功' : '组织创建成功')
     emit('update:open', false)
   } catch (error: any) {
-    if (!error?.errorFields) antMessage.error('组织创建失败')
+    if (!error?.errorFields) antMessage.error(isEditing.value ? '组织更新失败' : '组织创建失败')
   } finally {
     saving.value = false
   }
@@ -114,7 +129,21 @@ watch(
   () => props.open,
   (value) => {
     if (!value) return
-    Object.assign(form, createDefaultForm())
+    const organization = props.organization
+    // 编辑时复制数组，避免表单输入直接改动列表数据。
+    Object.assign(
+      form,
+      createDefaultForm(),
+      organization && {
+        name: organization.name,
+        alias: [...organization.alias],
+        description: organization.description,
+        background: organization.background,
+        motivation: [...organization.motivation],
+        belief: organization.belief,
+        remark: organization.remark
+      }
+    )
     formRef.value?.clearValidate()
   }
 )
@@ -122,8 +151,12 @@ watch(
 
 <style scoped lang="less">
 .organization-form {
-  max-height: 68vh;
-  overflow-y: auto;
-  padding-right: 12px;
+  padding-right: 4px;
+}
+
+.drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

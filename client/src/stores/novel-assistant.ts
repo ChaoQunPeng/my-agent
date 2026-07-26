@@ -3,15 +3,21 @@ import type {
   CreateNovelOrganizationPayload,
   Novel,
   NovelCharacter,
-  NovelOrganization
+  NovelOrganization,
+  UpdateNovelCharacterPayload,
+  UpdateNovelOrganizationPayload
 } from '@/api/novel'
 import {
   createNovel,
   createNovelCharacter,
   createNovelOrganization,
+  deleteNovelCharacter,
+  deleteNovelOrganization,
   getNovelCharacters,
   getNovelOrganizations,
-  getNovels
+  getNovels,
+  updateNovelCharacter,
+  updateNovelOrganization
 } from '@/api/novel'
 
 export const useNovelAssistantStore = defineStore('novel-assistant', () => {
@@ -85,11 +91,47 @@ export const useNovelAssistantStore = defineStore('novel-assistant', () => {
     return res.data
   }
 
+  const updateCharacter = async (data: UpdateNovelCharacterPayload) => {
+    const res = await updateNovelCharacter(data)
+    if (!res.data) throw new Error('人物更新失败')
+
+    // 用接口返回的最新人物替换列表记录，避免再次请求整个素材列表。
+    const index = characters.value.findIndex((item) => item.id === res.data?.id)
+    if (index !== -1) characters.value.splice(index, 1, res.data)
+    return res.data
+  }
+
+  const removeCharacter = async (id: string) => {
+    await deleteNovelCharacter(id)
+
+    // 接口成功后再移除本地记录，避免删除失败时列表状态失真。
+    const index = characters.value.findIndex((item) => item.id === id)
+    if (index !== -1) characters.value.splice(index, 1)
+  }
+
   const addOrganization = async (data: CreateNovelOrganizationPayload) => {
     const res = await createNovelOrganization(data)
     if (!res.data) throw new Error('组织创建失败')
     organizations.value.unshift(res.data)
     return res.data
+  }
+
+  const updateOrganization = async (data: UpdateNovelOrganizationPayload) => {
+    const res = await updateNovelOrganization(data)
+    if (!res.data) throw new Error('组织更新失败')
+
+    // 用接口返回的最新组织替换列表记录，保持当前排序不变。
+    const index = organizations.value.findIndex((item) => item.id === res.data?.id)
+    if (index !== -1) organizations.value.splice(index, 1, res.data)
+    return res.data
+  }
+
+  const removeOrganization = async (id: string) => {
+    await deleteNovelOrganization(id)
+
+    // 接口成功后再移除本地记录，避免删除失败时列表状态失真。
+    const index = organizations.value.findIndex((item) => item.id === id)
+    if (index !== -1) organizations.value.splice(index, 1)
   }
 
   return {
@@ -104,6 +146,10 @@ export const useNovelAssistantStore = defineStore('novel-assistant', () => {
     selectNovel,
     addNovel,
     addCharacter,
-    addOrganization
+    updateCharacter,
+    removeCharacter,
+    addOrganization,
+    updateOrganization,
+    removeOrganization
   }
 })

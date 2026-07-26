@@ -32,15 +32,40 @@
           >
           <div class="material-toolbar">
             <span class="material-toolbar__title">人物</span>
-            <a-button type="primary" size="small" @click="characterModalOpen = true"> <PlusOutlined />新建 </a-button>
+            <a-button type="primary" size="small" @click="handleCreateCharacter"> <PlusOutlined />新建 </a-button>
           </div>
           <div class="material-list">
             <div v-for="character in characters" :key="character.id" class="material-item">
-              <div class="material-item__main">
-                <div class="material-item__name">{{ character.name }}</div>
-                <div class="material-item__description">
-                  {{ character.description || character.background || '暂无简介' }}
+              <div class="material-item__header">
+                <div class="material-item__main">
+                  <button type="button" class="material-item__name" @click="handleEditCharacter(character)">
+                    {{ character.name }}
+                  </button>
+                  <div class="material-item__description">
+                    {{ character.description || character.background || '暂无简介' }}
+                  </div>
                 </div>
+                <a-popconfirm
+                  :title="`确认删除人物“${character.name}”吗？`"
+                  description="删除后无法恢复。"
+                  ok-text="删除"
+                  cancel-text="取消"
+                  ok-type="danger"
+                  placement="left"
+                  @confirm="handleDeleteCharacter(character)"
+                >
+                  <a-tooltip title="删除人物">
+                    <a-button
+                      type="text"
+                      danger
+                      size="small"
+                      aria-label="删除人物"
+                      :loading="deletingMaterialKey === `character:${character.id}`"
+                    >
+                      <DeleteOutlined />
+                    </a-button>
+                  </a-tooltip>
+                </a-popconfirm>
               </div>
               <div class="material-item__meta">
                 <a-tag>{{ character.gender }}</a-tag>
@@ -57,17 +82,40 @@
           >
           <div class="material-toolbar">
             <span class="material-toolbar__title">组织</span>
-            <a-button type="primary" size="small" @click="organizationModalOpen = true">
-              <PlusOutlined />新建
-            </a-button>
+            <a-button type="primary" size="small" @click="handleCreateOrganization"> <PlusOutlined />新建 </a-button>
           </div>
           <div class="material-list">
             <div v-for="organization in organizations" :key="organization.id" class="material-item">
-              <div class="material-item__main">
-                <div class="material-item__name">{{ organization.name }}</div>
-                <div class="material-item__description">
-                  {{ organization.description || organization.background || '暂无简介' }}
+              <div class="material-item__header">
+                <div class="material-item__main">
+                  <button type="button" class="material-item__name" @click="handleEditOrganization(organization)">
+                    {{ organization.name }}
+                  </button>
+                  <div class="material-item__description">
+                    {{ organization.description || organization.background || '暂无简介' }}
+                  </div>
                 </div>
+                <a-popconfirm
+                  :title="`确认删除组织“${organization.name}”吗？`"
+                  description="删除后无法恢复。"
+                  ok-text="删除"
+                  cancel-text="取消"
+                  ok-type="danger"
+                  placement="left"
+                  @confirm="handleDeleteOrganization(organization)"
+                >
+                  <a-tooltip title="删除组织">
+                    <a-button
+                      type="text"
+                      danger
+                      size="small"
+                      aria-label="删除组织"
+                      :loading="deletingMaterialKey === `organization:${organization.id}`"
+                    >
+                      <DeleteOutlined />
+                    </a-button>
+                  </a-tooltip>
+                </a-popconfirm>
               </div>
               <div v-if="organization.alias.length" class="material-item__aliases">
                 {{ organization.alias.join(' / ') }}
@@ -98,14 +146,15 @@
       </a-form>
     </a-modal>
 
-    <CharacterCreateModal v-model:open="characterModalOpen" />
-    <OrganizationCreateModal v-model:open="organizationModalOpen" />
+    <CharacterCreateModal v-model:open="characterModalOpen" :character="selectedCharacter" />
+    <OrganizationCreateModal v-model:open="organizationModalOpen" :organization="selectedOrganization" />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { FormInstance } from 'ant-design-vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import type { NovelCharacter, NovelOrganization } from '@/api/novel'
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { Empty, message as antMessage } from 'ant-design-vue'
 import { useNovelAssistantStore } from '@/stores/novel-assistant'
 import CharacterCreateModal from './character-create-modal.vue'
@@ -118,12 +167,61 @@ const activeTab = ref('characters')
 const novelModalOpen = ref(false)
 const characterModalOpen = ref(false)
 const organizationModalOpen = ref(false)
+const selectedCharacter = ref<NovelCharacter | null>(null)
+const selectedOrganization = ref<NovelOrganization | null>(null)
 const creatingNovel = ref(false)
+const deletingMaterialKey = ref('')
 const novelFormRef = ref<FormInstance>()
 const novelForm = reactive({ name: '' })
 const simpleImage = Empty.PRESENTED_IMAGE_SIMPLE
 const novelRules = {
   name: [{ required: true, whitespace: true, message: '请输入小说名称' }]
+}
+
+const handleCreateCharacter = () => {
+  selectedCharacter.value = null
+  characterModalOpen.value = true
+}
+
+const handleEditCharacter = (character: NovelCharacter) => {
+  selectedCharacter.value = character
+  characterModalOpen.value = true
+}
+
+const handleCreateOrganization = () => {
+  selectedOrganization.value = null
+  organizationModalOpen.value = true
+}
+
+const handleEditOrganization = (organization: NovelOrganization) => {
+  selectedOrganization.value = organization
+  organizationModalOpen.value = true
+}
+
+const handleDeleteCharacter = async (character: NovelCharacter) => {
+  const materialKey = `character:${character.id}`
+  deletingMaterialKey.value = materialKey
+  try {
+    await store.removeCharacter(character.id)
+    antMessage.success('人物删除成功')
+  } catch (error) {
+    antMessage.error('人物删除失败')
+  } finally {
+    if (deletingMaterialKey.value === materialKey) deletingMaterialKey.value = ''
+  }
+}
+
+const handleDeleteOrganization = async (organization: NovelOrganization) => {
+  const materialKey = `organization:${organization.id}`
+  deletingMaterialKey.value = materialKey
+  try {
+    await store.removeOrganization(organization.id)
+    antMessage.success('组织删除成功')
+  } catch (error) {
+    antMessage.error('组织删除失败')
+  } finally {
+    if (deletingMaterialKey.value === materialKey) deletingMaterialKey.value = ''
+  }
 }
 
 const handleNovelChange = async (value: unknown) => {
@@ -224,13 +322,30 @@ onMounted(async () => {
   border-bottom: 1px solid #f0f0f0;
 }
 
+.material-item__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 .material-item__main {
+  flex: 1;
   min-width: 0;
 }
 
 .material-item__name {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font-weight: 600;
   color: #1f2937;
+  cursor: pointer;
+  text-align: left;
+}
+
+.material-item__name:hover {
+  color: #1677ff;
 }
 
 .material-item__description {

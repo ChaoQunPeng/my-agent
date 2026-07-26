@@ -14,6 +14,7 @@ import {
 } from 'openai/resources';
 import { NovelCharacterService } from '../novel-character/novel-character.service';
 import { NovelOrganizationService } from '../novel-organization/novel-organization.service';
+import { getCharacterContextTool } from './character.tools';
 
 export interface Session {
   id: string;
@@ -72,62 +73,38 @@ export class ChatService {
   }
 
   private getTools(): ChatCompletionTool[] {
-    return [
-      {
-        type: 'function',
-        function: {
-          name: 'get_character_context',
-          description:
-            '当用户询问某个人物的基础资料、人物设定、人物关系或所属组织/势力时，调用此工具；当需要创作、续写或分析涉及某个人物的剧情，并需要了解该人物的完整上下文时，也应调用此工具。传入人物姓名，获取人物完整资料、关联人物以及所属组织信息。',
-          strict: true,
-          parameters: {
-            type: 'object',
-            properties: {
-              name: {
-                type: 'string',
-                description: '人物姓名',
-              },
-            },
-            required: ['name'],
-            additionalProperties: false,
-          },
-        },
-      },
-    ];
+    return [getCharacterContextTool];
   }
 
-  private async getCharacterContext(name: string) {
-    const character = await this.novelCharacterService.findOneByName(name);
+  private async getCharacterContext(characterId: string) {
+    const character = await this.novelCharacterService.findOne(characterId);
 
-    // 并行补全人物关系和组织关系中的目标名称。
-    const [relations, organizationRelations] = await Promise.all([
-      Promise.all(
-        character.relations.map(async (relation) => {
-          const target = await this.novelCharacterService.findOne(
-            relation.targetId,
-          );
-          return {
-            targetId: relation.targetId,
-            targetName: target.name,
-            relation: relation.relation,
-            description: relation.description,
-          };
-        }),
-      ),
-      Promise.all(
-        character.organizationRelations.map(async (relation) => {
-          const organization = await this.novelOrganizationService.findOne(
-            relation.targetId,
-          );
-          return {
-            targetId: relation.targetId,
-            organizationName: organization.name,
-            relation: relation.relation,
-            description: relation.description,
-          };
-        }),
-      ),
-    ]);
+    // 并行查询关系目标，并转换为适合大模型阅读的自然语言。
+    const [characterRelationships, organizationRelationships] =
+      await Promise.all([
+        Promise.all(
+          character.relations.map(async (relation) => {
+            const target = await this.novelCharacterService.findOne(
+              relation.targetId,
+            );
+            const description = relation.description
+              ? `，${relation.description}`
+              : '';
+            return `${character.name}与${target.name}存在${relation.relation}关系${description}。`;
+          }),
+        ),
+        Promise.all(
+          character.organizationRelations.map(async (relation) => {
+            const organization = await this.novelOrganizationService.findOne(
+              relation.targetId,
+            );
+            const description = relation.description
+              ? `，${relation.description}`
+              : '';
+            return `${character.name}与${organization.name}存在${relation.relation}关系${description}。`;
+          }),
+        ),
+      ]);
 
     return {
       id: character.id,
@@ -141,8 +118,7 @@ export class ChatService {
       background: character.background,
       motivation: character.motivation,
       remark: character.remark,
-      relations,
-      organizationRelations,
+      relationships: [...characterRelationships, ...organizationRelationships],
     };
   }
 
@@ -153,13 +129,16 @@ export class ChatService {
       }
 
       const args = JSON.parse(toolCall.function.arguments) as {
-        name?: unknown;
+        characterId?: unknown;
       };
-      if (typeof args.name !== 'string' || args.name.trim() === '') {
-        return { error: 'name must be a non-empty string' };
+      if (
+        typeof args.characterId !== 'string' ||
+        args.characterId.trim() === ''
+      ) {
+        return { error: 'characterId must be a non-empty string' };
       }
 
-      return await this.getCharacterContext(args.name);
+      return await this.getCharacterContext(args.characterId);
     } catch (error) {
       return {
         error:
