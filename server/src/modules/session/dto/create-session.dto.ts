@@ -19,7 +19,7 @@ export class CreateSessionDto {
   @IsString()
   category?: string;
 
-  // 资源类型：'character'（角色）| 'novel'（小说）（可选）
+  // 资源类型（可选）
   @IsOptional()
   @IsString()
   type?: string;

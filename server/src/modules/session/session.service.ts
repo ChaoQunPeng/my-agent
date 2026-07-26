@@ -169,7 +169,7 @@ export class SessionService {
   /**
    * 获取会话列表
    * @param category 可选的分类筛选条件
-   * @param type 可选的资源类型筛选条件（'character' | 'novel'）
+   * @param type 可选的资源类型筛选条件
    * @param resourceId 可选的资源ID筛选条件
    */
   async findAll(type?: string, resourceId?: string): Promise<Session[]> {

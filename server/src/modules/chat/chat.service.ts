@@ -8,7 +8,6 @@ import { CharacterService } from '../character/character.service';
 import { SessionService } from '../session/session.service';
 import { FileReaderService } from '../../shared/file-reader/file-reader.service';
 import { buildNpcPrompt } from 'src/common/prompts/character';
-import { NovelOutlineService } from '../novel-outline/novel-outline.service';
 
 export interface Session {
   id: string;
@@ -32,13 +31,12 @@ export class ChatService {
     private readonly characterService: CharacterService,
     private readonly sessionService: SessionService,
     private readonly fileReaderService: FileReaderService,
-    private readonly novelOutlineService: NovelOutlineService,
   ) {}
 
   /**
    * 动态 System Prompt 构建
    * 根据资源类型和资源ID获取对应的资源信息，构建系统提示词
-   * @param type 资源类型（'character' | 'novel'）
+   * @param type 资源类型
    * @param resourceId 资源ID
    */
   private async buildDynamicSystemPrompt(
@@ -57,15 +55,6 @@ export class ChatService {
       }
     }
 
-    // TODO: 未来可以扩展小说类型的处理逻辑
-    if (type === 'novel' && resourceId) {
-      systemPrompt = [
-        '你是小说写作与设定助手。',
-        '回答小说设定问题时，应优先依据系统提供的小说资料。',
-        '如果资料不足，需要明确说明，不要编造。',
-      ].join('\n');
-    }
-
     return systemPrompt;
   }
 
@@ -73,7 +62,7 @@ export class ChatService {
    * 标准流式对话 - 存数据库
    * @param userMessage 用户消息
    * @param sessionId 会话ID（可选）
-   * @param type 资源类型（'character' | 'novel'）（可选）
+   * @param type 资源类型（可选）
    * @param resourceId 资源ID（可选）
    */
   async *chatWithHistoryStream(
@@ -91,25 +80,6 @@ export class ChatService {
       [];
     if (systemPrompt) {
       systemMessages.push({ role: 'system', content: systemPrompt });
-    }
-
-    if (type === 'novel' && resourceId) {
-      try {
-        const context = await this.novelOutlineService.buildNovelQuestionContext(
-          {
-            novelCode: resourceId,
-            question: cleanMessage,
-          },
-        );
-        if (context.systemPrompt) {
-          systemMessages.push({
-            role: 'system',
-            content: context.systemPrompt,
-          });
-        }
-      } catch (error) {
-        console.error('构建小说检索上下文失败:', error);
-      }
     }
 
     // 获取历史消息

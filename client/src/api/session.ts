@@ -7,7 +7,7 @@ export interface Session {
   sessionId: string
   title: string
   summary: string
-  type?: string // 资源类型：'character'（角色）| 'novel'（小说）
+  type?: string // 资源类型，例如 'character'（角色）
   resourceId?: string // 资源ID：对应type类型的资源ID
   createdAt: string
   updatedAt: string
@@ -29,7 +29,7 @@ export interface Message {
 /**
  * 获取所有会话列表
  * @param category 可选的分类筛选条件
- * @param type 可选的资源类型筛选条件（'character' | 'novel'）
+ * @param type 可选的资源类型筛选条件
  * @param resourceId 可选的资源ID筛选条件
  */
 export function getSessions(type?: string, resourceId?: string) {

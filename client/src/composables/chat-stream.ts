@@ -8,7 +8,7 @@ const BASE_PREFIX = import.meta.env.VITE_APP_BASE_API_DEV ?? ''
 export interface ChatStreamOptions {
   message: string // 用户消息
   sessionId?: string // 可选的会话ID
-  type?: string // 可选的资源类型（'character' | 'novel'），用于动态构建 System Prompt
+  type?: string // 可选的资源类型，用于动态构建 System Prompt
   resourceId?: string // 可选的资源ID，对应type类型的资源ID
   onChunk: (content: string) => void | Promise<void> // 接收每个数据块的回调函数
   onError?: (error: Error) => void // 错误处理回调函数
@@ -22,7 +22,7 @@ export interface ChatStreamOptions {
  * @param options.message 用户消息
  * @param options.sessionId 可选的会话ID
  * @param options.scene 可选的场景标识（如 "digital"、"writing"）
- * @param options.type 可选的资源类型（'character' | 'novel'），用于动态构建 System Prompt
+ * @param options.type 可选的资源类型，用于动态构建 System Prompt
  * @param options.resourceId 可选的资源ID，对应type类型的资源ID
  * @param options.onChunk 接收每个数据块的回调函数
  * @param options.onError 错误处理回调函数

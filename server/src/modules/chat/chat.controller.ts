@@ -23,7 +23,7 @@ export class ChatController {
    * 前端使用 @microsoft/fetch-event-source 进行消费
    * @param body.message 用户消息内容
    * @param body.sessionId 可选的会话ID
-   * @param body.type 资源类型（'character' | 'novel'），用于动态构建 System Prompt
+   * @param body.type 资源类型，用于动态构建 System Prompt
    * @param body.resourceId 资源ID，对应type类型的资源ID
    */
   @Post('stream-message')

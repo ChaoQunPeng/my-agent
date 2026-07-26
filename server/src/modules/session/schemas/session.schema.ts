@@ -21,11 +21,11 @@ export class Session {
   @Prop({ default: '' })
   summary!: string;
 
-  // 资源类型：'character'（角色）| 'novel'（小说）
+  // 资源类型，例如 'character'（角色）
   @Prop({ default: '' })
   type!: string;
 
-  // 资源ID：对应type类型的资源ID（如角色ID或小说编码）
+  // 资源ID：对应 type 类型的资源ID
   @Prop({ default: '' })
   resourceId!: string;
 }

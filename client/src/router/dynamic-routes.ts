@@ -23,61 +23,6 @@ export default [
       sessionType: 'character'
     }
   },
-  {
-    path: '/dialog',
-    name: 'WriterAssistant',
-    redirect: '/writer-assistant/writer-assistan',
-    meta: {
-      title: '写作助手',
-      icon: 'EditOutlined'
-    },
-    component: basicRouteMap.RouteView,
-    children: [
-      // {
-      //   path: '/writer-assistant/yiquanpotian',
-      //   name: 'yiquanpotian',
-      //   component: () => import('~/pages/dialog/index.vue'),
-      //   meta: {
-      //     title: '一拳破天',
-      //     sessionType: 'novel',
-      //     sessionCategory: 'writing',
-      //     novelCode: 'yi_quan_po_tian',
-      //     resourceId: 'yi_quan_po_tian'
-      //   }
-      // },
-      // 小说大纲生成：上传 txt → 拆分 → 调用大模型增量生成大纲
-      // {
-      //   path: "/writer-assistant/novel-outline",
-      //   name: "WriterAssistantNovelOutline",
-      //   component: () =>
-      //     import("~/pages/writer-assistant/novel-outline/index.vue"),
-      //   meta: {
-      //     title: "大纲生成",
-      //     icon: "FileTextOutlined",
-      //   },
-      // },
-      {
-        path: '/writer-assistant/novel-meta',
-        name: 'WriterAssistantNovelMeta',
-        component: () => import('~/pages/writer-assistant/novel-meta/index.vue'),
-        meta: {
-          title: '小说提炼',
-          icon: 'DatabaseOutlined'
-        }
-      },
-      {
-        path: '/writer-assistant/novel-dialog',
-        name: 'WriterAssistantNovelDialog',
-        component: () => import('~/pages/writer-assistant/novel-dialog/index.vue'),
-        meta: {
-          title: '百科问答',
-          icon: 'CommentOutlined',
-          sessionType: 'novel',
-          sessionCategory: 'writing'
-        }
-      }
-    ]
-  },
   // {
   //   path: '/dialog/diary',
   //   name: 'diary',
