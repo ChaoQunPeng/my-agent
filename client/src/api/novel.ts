@@ -27,7 +27,6 @@ export interface NovelCharacter {
   personality: string[]
   background: string
   motivation: string[]
-  belief: string
   relations: NovelRelation[]
   organizationRelations: NovelRelation[]
   remark: string

@@ -140,7 +140,6 @@ export class ChatService {
       personality: character.personality,
       background: character.background,
       motivation: character.motivation,
-      belief: character.belief,
       remark: character.remark,
       relations,
       organizationRelations,

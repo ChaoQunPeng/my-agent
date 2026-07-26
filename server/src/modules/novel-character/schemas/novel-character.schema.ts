@@ -72,9 +72,6 @@ export class NovelCharacter {
   @Prop({ type: [String], default: [] })
   motivation!: string[];
 
-  @Prop({ trim: true })
-  belief!: string;
-
   @Prop({ type: [CharacterRelationSchema], default: [] })
   relations!: CharacterRelation[];
 
@@ -87,3 +84,11 @@ export class NovelCharacter {
 
 export const NovelCharacterSchema =
   SchemaFactory.createForClass(NovelCharacter);
+
+NovelCharacterSchema.set('toJSON', {
+  transform: (_document, result) => {
+    // 过滤历史文档中的废弃字段，避免人物接口继续返回该数据。
+    Reflect.deleteProperty(result, 'belief');
+    return result;
+  },
+});

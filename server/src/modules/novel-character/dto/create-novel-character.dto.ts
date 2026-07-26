@@ -67,9 +67,6 @@ export class CreateNovelCharacterDto {
   @IsString({ each: true })
   motivation!: string[];
 
-  @IsString()
-  belief!: string;
-
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => NovelCharacterRelationDto)

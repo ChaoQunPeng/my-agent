@@ -65,10 +65,6 @@ export class UpdateNovelCharacterDto {
   @IsOptional()
   motivation?: string[];
 
-  @IsString()
-  @IsOptional()
-  belief?: string;
-
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => NovelCharacterRelationDto)

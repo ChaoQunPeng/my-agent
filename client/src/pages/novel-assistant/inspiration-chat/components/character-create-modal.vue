@@ -81,9 +81,6 @@
             placeholder="输入后按回车"
           />
         </a-form-item>
-        <a-form-item label="核心信念">
-          <a-textarea v-model:value="form.belief" :rows="2" />
-        </a-form-item>
       </div>
 
       <div class="form-section">
@@ -178,7 +175,6 @@ const createDefaultForm = (): CharacterFormState => ({
   personality: [],
   background: '',
   motivation: [],
-  belief: '',
   relations: [],
   organizationRelations: [],
   remark: ''

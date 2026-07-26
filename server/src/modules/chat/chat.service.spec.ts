@@ -54,6 +54,7 @@ describe('ChatService', () => {
     };
     const novelCharacterService = {
       findOneByName: jest.fn().mockResolvedValue({
+        // 模拟历史人物数据，确保废弃字段不再进入聊天上下文。
         id: 'char_001',
         name: '林默',
         alias: ['阿默'],
@@ -149,7 +150,6 @@ describe('ChatService', () => {
       personality: ['冷静'],
       background: '曾经失去记忆',
       motivation: ['寻找真相'],
-      belief: '事实不会消失',
       remark: '主角',
       relations: [
         {

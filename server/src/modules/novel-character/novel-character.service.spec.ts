@@ -25,7 +25,6 @@ describe('NovelCharacterService', () => {
       personality: [],
       background: '',
       motivation: [],
-      belief: '',
       relations: [],
       organizationRelations: [],
       remark: '',
