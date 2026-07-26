@@ -7,8 +7,13 @@ import { OpenaiService } from '../../shared/openai/openai.service';
 import { CharacterService } from '../character/character.service';
 import { SessionService } from '../session/session.service';
 import { FileReaderService } from '../../shared/file-reader/file-reader.service';
-import { buildNpcPrompt } from 'src/common/prompts/character';
-import { ChatCompletionTool } from 'openai/resources';
+import { buildNpcPrompt } from '../../common/prompts/character';
+import {
+  ChatCompletionMessageFunctionToolCall,
+  ChatCompletionTool,
+} from 'openai/resources';
+import { NovelCharacterService } from '../novel-character/novel-character.service';
+import { NovelOrganizationService } from '../novel-organization/novel-organization.service';
 
 export interface Session {
   id: string;
@@ -32,7 +37,9 @@ export class ChatService {
     private readonly characterService: CharacterService,
     private readonly sessionService: SessionService,
     private readonly fileReaderService: FileReaderService,
-  ) { }
+    private readonly novelCharacterService: NovelCharacterService,
+    private readonly novelOrganizationService: NovelOrganizationService,
+  ) {}
 
   /**
    * 动态 System Prompt 构建
@@ -65,7 +72,103 @@ export class ChatService {
   }
 
   private getTools(): ChatCompletionTool[] {
-    return [];
+    return [
+      {
+        type: 'function',
+        function: {
+          name: 'get_character_context',
+          description:
+            '当用户询问某个人物的基础资料、人物设定、人物关系或所属组织/势力时，调用此工具；当需要创作、续写或分析涉及某个人物的剧情，并需要了解该人物的完整上下文时，也应调用此工具。传入人物姓名，获取人物完整资料、关联人物以及所属组织信息。',
+          strict: true,
+          parameters: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: '人物姓名',
+              },
+            },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+      },
+    ];
+  }
+
+  private async getCharacterContext(name: string) {
+    const character = await this.novelCharacterService.findOneByName(name);
+
+    // 并行补全人物关系和组织关系中的目标名称。
+    const [relations, organizationRelations] = await Promise.all([
+      Promise.all(
+        character.relations.map(async (relation) => {
+          const target = await this.novelCharacterService.findOne(
+            relation.targetId,
+          );
+          return {
+            targetId: relation.targetId,
+            targetName: target.name,
+            relation: relation.relation,
+            description: relation.description,
+          };
+        }),
+      ),
+      Promise.all(
+        character.organizationRelations.map(async (relation) => {
+          const organization = await this.novelOrganizationService.findOne(
+            relation.targetId,
+          );
+          return {
+            targetId: relation.targetId,
+            organizationName: organization.name,
+            relation: relation.relation,
+            description: relation.description,
+          };
+        }),
+      ),
+    ]);
+
+    return {
+      id: character.id,
+      name: character.name,
+      alias: character.alias,
+      gender: character.gender,
+      age: character.age,
+      description: character.description,
+      appearance: character.appearance,
+      personality: character.personality,
+      background: character.background,
+      motivation: character.motivation,
+      belief: character.belief,
+      remark: character.remark,
+      relations,
+      organizationRelations,
+    };
+  }
+
+  private async executeTool(toolCall: ChatCompletionMessageFunctionToolCall) {
+    try {
+      if (toolCall.function.name !== 'get_character_context') {
+        return { error: `Unsupported tool: ${toolCall.function.name}` };
+      }
+
+      const args = JSON.parse(toolCall.function.arguments) as {
+        name?: unknown;
+      };
+      if (typeof args.name !== 'string' || args.name.trim() === '') {
+        return { error: 'name must be a non-empty string' };
+      }
+
+      return await this.getCharacterContext(args.name);
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to get character context',
+      };
+    }
   }
 
   /**
@@ -109,19 +212,69 @@ export class ChatService {
       model: this.openaiService.model,
       messages,
       stream: true,
-      temperature: 0.9,
+      temperature: 0.5,
       frequency_penalty: 0.3,
       presence_penalty: 0.3,
       tools: this.getTools(),
     });
 
-    // 流式返回响应
+    // Tool Call 参数可能分散在多个流式片段中，需要按 index 合并。
+    const toolCalls: ChatCompletionMessageFunctionToolCall[] = [];
     let fullReply = '';
     for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || '';
+      const delta = chunk.choices[0]?.delta;
+      const content = delta?.content || '';
       if (content) {
         fullReply += content;
         yield content;
+      }
+
+      for (const toolCallDelta of delta?.tool_calls ?? []) {
+        const current = toolCalls[toolCallDelta.index] ?? {
+          id: '',
+          type: 'function' as const,
+          function: { name: '', arguments: '' },
+        };
+        current.id = toolCallDelta.id ?? current.id;
+        current.function.name += toolCallDelta.function?.name ?? '';
+        current.function.arguments += toolCallDelta.function?.arguments ?? '';
+        toolCalls[toolCallDelta.index] = current;
+      }
+    }
+
+    if (toolCalls.length > 0) {
+      messages.push({
+        role: 'assistant',
+        content: null,
+        tool_calls: toolCalls,
+      });
+
+      for (const toolCall of toolCalls) {
+        const result = await this.executeTool(toolCall);
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(result),
+        });
+      }
+
+      // 将 Tool 结果交还模型，生成最终的自然语言回答。
+      const finalStream =
+        await this.openaiService.client.chat.completions.create({
+          model: this.openaiService.model,
+          messages,
+          stream: true,
+          temperature: 0.5,
+          frequency_penalty: 0.3,
+          presence_penalty: 0.3,
+        });
+
+      for await (const chunk of finalStream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          fullReply += content;
+          yield content;
+        }
       }
     }
 

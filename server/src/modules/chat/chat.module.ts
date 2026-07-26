@@ -7,9 +7,17 @@ import { SessionModule } from '../session/session.module';
 import { CharacterModule } from '../character/character.module';
 // 导入 FileReaderModule 以使用 FileReaderService
 import { FileReaderModule } from '../../shared/file-reader/file-reader.module';
+import { NovelCharacterModule } from '../novel-character/novel-character.module';
+import { NovelOrganizationModule } from '../novel-organization/novel-organization.module';
 
 @Module({
-  imports: [SessionModule, CharacterModule, FileReaderModule],
+  imports: [
+    SessionModule,
+    CharacterModule,
+    FileReaderModule,
+    NovelCharacterModule,
+    NovelOrganizationModule,
+  ],
   controllers: [ChatController],
   providers: [ChatService, ChatRepository],
 })
