@@ -12,9 +12,12 @@ import {
   ChatCompletionMessageFunctionToolCall,
   ChatCompletionTool,
 } from 'openai/resources';
+import { NovelService } from '../novel/novel.service';
 import { NovelCharacterService } from '../novel-character/novel-character.service';
 import { NovelOrganizationService } from '../novel-organization/novel-organization.service';
 import { getCharacterContextTool } from './character.tools';
+import { buildInspirationChatPrompt } from 'src/common/prompts/inspiration-chat';
+
 
 export interface Session {
   id: string;
@@ -38,9 +41,10 @@ export class ChatService {
     private readonly characterService: CharacterService,
     private readonly sessionService: SessionService,
     private readonly fileReaderService: FileReaderService,
+    private readonly novelService: NovelService,
     private readonly novelCharacterService: NovelCharacterService,
     private readonly novelOrganizationService: NovelOrganizationService,
-  ) {}
+  ) { }
 
   /**
    * 动态 System Prompt 构建
@@ -62,8 +66,8 @@ export class ChatService {
       }
       // 小说助手-灵感对话
       else if (type === 'inspiration-chat') {
-        const character = await this.characterService.findOne('');
-        systemPrompt = buildNpcPrompt(character);
+        const novel = await this.novelService.findOne(resourceId!);
+        systemPrompt = buildInspirationChatPrompt(novel.content);
       }
     } catch (error) {
       console.error(`获取角色信息失败:`, error);

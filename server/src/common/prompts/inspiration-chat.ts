@@ -1,4 +1,4 @@
-export const buildInspirationChatPrompt = (): string => {
+export const buildInspirationChatPrompt = (content: string): string => {
   return `
     你是一个小说创作助手。
 
@@ -17,6 +17,6 @@ export const buildInspirationChatPrompt = (): string => {
 4. 如果信息不足，优先询问
     
 
-
+${content}
 `;
 };

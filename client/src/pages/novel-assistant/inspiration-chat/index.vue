@@ -1,9 +1,8 @@
 <template>
   <SessionChatWorkspace ref="workspaceRef" :sessions="visibleSessions" :current-session-id="currentSessionId"
     :session-id="currentSessionId" :api-func="chatStreamApi" :ensure-session="handleEnsureSession"
-    :create-session-disabled="!selectedNovelId"
-    @create-session="handleCreate" @select-session="handleSelect" @delete-session="handleDeleteSession"
-    @save-session-title="handleUpdateSession">
+    :api-params="chatApiParams" :create-session-disabled="!selectedNovelId" @create-session="handleCreate"
+    @select-session="handleSelect" @delete-session="handleDeleteSession" @save-session-title="handleUpdateSession">
     <template #material>
       <NovelOperationPanel />
     </template>
@@ -24,6 +23,12 @@ const store = useNovelAssistantStore()
 const { selectedNovelId } = storeToRefs(store)
 const workspaceRef = ref<InstanceType<typeof SessionChatWorkspace> | null>(null)
 let sessionLoadVersion = 0
+
+// 将当前小说作为灵感对话的提示词资源传给后端。
+const chatApiParams = computed(() => ({
+  type: MODULE_KEY,
+  resourceId: selectedNovelId.value
+}))
 
 const {
   sessions,
