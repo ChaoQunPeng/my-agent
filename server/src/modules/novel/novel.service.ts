@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateNovelDto } from './dto/create-novel.dto';
+import { UpdateNovelDto } from './dto/update-novel.dto';
 import { Novel, NovelDocument } from './schemas/novel.schema';
 
 @Injectable()
@@ -29,9 +30,12 @@ export class NovelService {
     return novel;
   }
 
-  async update(id: string, name: string): Promise<Novel> {
+  async update(
+    id: string,
+    data: Pick<UpdateNovelDto, 'name' | 'content'>,
+  ): Promise<Novel> {
     const novel = await this.novelModel
-      .findOneAndUpdate({ id }, { $set: { name } }, { new: true })
+      .findOneAndUpdate({ id }, { $set: data }, { new: true })
       .exec();
     if (!novel) {
       throw new NotFoundException(`Novel ${id} not found`);

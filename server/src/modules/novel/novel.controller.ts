@@ -29,7 +29,8 @@ export class NovelController {
 
   @Post('update-novel')
   async update(@Body() data: UpdateNovelDto) {
-    const novel = await this.novelService.update(data.id, data.name);
+    const { id, ...updateData } = data;
+    const novel = await this.novelService.update(id, updateData);
     return ApiResponseDto.success(novel, '小说更新成功');
   }
 

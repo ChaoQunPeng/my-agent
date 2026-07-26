@@ -1,6 +1,7 @@
 <template>
-  <SessionChatWorkspace ref="workspaceRef" :sessions="sessions" :current-session-id="currentSessionId"
+  <SessionChatWorkspace ref="workspaceRef" :sessions="visibleSessions" :current-session-id="currentSessionId"
     :session-id="currentSessionId" :api-func="chatStreamApi" :ensure-session="handleEnsureSession"
+    :create-session-disabled="!selectedNovelId"
     @create-session="handleCreate" @select-session="handleSelect" @delete-session="handleDeleteSession"
     @save-session-title="handleUpdateSession">
     <template #material>
@@ -13,17 +14,21 @@
 import { chatStreamApi } from '@/composables/chat-stream'
 import SessionChatWorkspace from '@/pages/dialog/index.vue'
 import { useSessionManager } from '@/pages/dialog/composables/use-session-manager'
+import { useNovelAssistantStore } from '@/stores/novel-assistant'
+import { message as antMessage } from 'ant-design-vue'
 import NovelOperationPanel from './components/novel-operation-panel.vue'
-// import { useNovelAssistantStore } from '@/stores/novel-assistant'
-// const store = useNovelAssistantStore()
 
 const MODULE_KEY = 'inspiration-chat'
 
+const store = useNovelAssistantStore()
+const { selectedNovelId } = storeToRefs(store)
 const workspaceRef = ref<InstanceType<typeof SessionChatWorkspace> | null>(null)
+let sessionLoadVersion = 0
 
 const {
   sessions,
   currentSessionId,
+  clearCurrentSession,
   fetchSessions,
   handleCreateSession,
   handleDeleteSession,
@@ -31,9 +36,13 @@ const {
   handleUpdateSession
 } = useSessionManager({
   getModuleKey: () => MODULE_KEY,
+  canCreateSession: () => Boolean(selectedNovelId.value),
+  shouldFetchSessions: () => Boolean(selectedNovelId.value),
+  getCreateBlockedMessage: () => '请先选择小说',
   onSessionSelected: () => workspaceRef.value?.getMessages(),
   onCurrentSessionCleared: () => workspaceRef.value?.clearMessages()
 })
+const visibleSessions = computed(() => (selectedNovelId.value ? sessions.value : []))
 
 const handleCreate = async () => {
   workspaceRef.value?.stopGeneration()
@@ -46,7 +55,12 @@ const handleSelect = async (sessionId: string) => {
 }
 
 const handleEnsureSession = async () => {
-  // 模块没有当前会话时，在发送前自动创建。
+  if (!selectedNovelId.value) {
+    antMessage.warning('请先选择小说')
+    return
+  }
+
+  // 选择小说后没有当前会话时，在发送前自动创建。
   if (!currentSessionId.value) {
     await handleCreateSession()
   }
@@ -54,10 +68,21 @@ const handleEnsureSession = async () => {
   return currentSessionId.value || undefined
 }
 
-onMounted(async () => {
+watch(selectedNovelId, async (novelId) => {
+  const loadVersion = ++sessionLoadVersion
+
+  // 小说为空或发生切换时，立即清理上一轮会话数据。
+  workspaceRef.value?.stopGeneration()
+  clearCurrentSession()
+  sessions.value = []
+
+  if (!novelId) return
+
   await fetchSessions()
+  if (loadVersion !== sessionLoadVersion || selectedNovelId.value !== novelId) return
+
   if (sessions.value[0]) {
     await handleSelectSession(sessions.value[0].sessionId)
   }
-})
+}, { immediate: true })
 </script>

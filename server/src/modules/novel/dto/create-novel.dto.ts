@@ -1,7 +1,11 @@
-import { IsString, Matches } from 'class-validator';
+import { IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateNovelDto {
   @IsString()
   @Matches(/\S/)
   name!: string;
+
+  @IsOptional()
+  @IsString()
+  content?: string;
 }

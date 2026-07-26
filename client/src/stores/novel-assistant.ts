@@ -1,9 +1,11 @@
 import type {
+  CreateNovelPayload,
   CreateNovelCharacterPayload,
   CreateNovelOrganizationPayload,
   Novel,
   NovelCharacter,
   NovelOrganization,
+  UpdateNovelPayload,
   UpdateNovelCharacterPayload,
   UpdateNovelOrganizationPayload
 } from '@/api/novel'
@@ -16,6 +18,7 @@ import {
   getNovelCharacters,
   getNovelOrganizations,
   getNovels,
+  updateNovel,
   updateNovelCharacter,
   updateNovelOrganization
 } from '@/api/novel'
@@ -76,11 +79,21 @@ export const useNovelAssistantStore = defineStore('novel-assistant', () => {
     await fetchMaterials(novelId)
   }
 
-  const addNovel = async (name: string) => {
-    const res = await createNovel(name)
+  const addNovel = async (data: CreateNovelPayload) => {
+    const res = await createNovel(data)
     if (!res.data) throw new Error('小说创建失败')
     novels.value.unshift(res.data)
     await selectNovel(res.data.id)
+    return res.data
+  }
+
+  const editNovel = async (data: UpdateNovelPayload) => {
+    const res = await updateNovel(data)
+    if (!res.data) throw new Error('小说更新失败')
+
+    // 直接替换当前列表记录，避免编辑后重新加载全部小说。
+    const index = novels.value.findIndex((item) => item.id === res.data?.id)
+    if (index !== -1) novels.value.splice(index, 1, res.data)
     return res.data
   }
 
@@ -145,6 +158,7 @@ export const useNovelAssistantStore = defineStore('novel-assistant', () => {
     fetchNovels,
     selectNovel,
     addNovel,
+    editNovel,
     addCharacter,
     updateCharacter,
     removeCharacter,

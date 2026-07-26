@@ -17,8 +17,13 @@
           </a-select-option>
         </a-select>
         <a-tooltip title="新建小说">
-          <a-button type="primary" aria-label="新建小说" @click="novelModalOpen = true">
+          <a-button type="primary" aria-label="新建小说" @click="handleOpenCreateNovel">
             <PlusOutlined />
+          </a-button>
+        </a-tooltip>
+        <a-tooltip title="编辑小说">
+          <a-button aria-label="编辑小说" :disabled="!selectedNovel" @click="handleOpenEditNovel">
+            <EditOutlined />
           </a-button>
         </a-tooltip>
       </div>
@@ -133,15 +138,19 @@
 
     <a-modal
       v-model:open="novelModalOpen"
-      title="新建小说"
-      ok-text="创建"
+      :title="editingNovel ? '编辑小说' : '新建小说'"
+      :ok-text="editingNovel ? '保存' : '创建'"
       cancel-text="取消"
-      :confirm-loading="creatingNovel"
-      @ok="handleCreateNovel"
+      :confirm-loading="savingNovel"
+      :body-style="{ maxHeight: '70vh', overflowY: 'auto' }"
+      @ok="handleSaveNovel"
     >
       <a-form ref="novelFormRef" :model="novelForm" :rules="novelRules" layout="vertical">
         <a-form-item label="小说名称" name="name">
-          <a-input v-model:value="novelForm.name" placeholder="小说名称" @press-enter="handleCreateNovel" />
+          <a-input v-model:value="novelForm.name" placeholder="小说名称" @press-enter="handleSaveNovel" />
+        </a-form-item>
+        <a-form-item v-for="section in novelContentSections" :key="section.key" :label="section.label" :name="section.key">
+          <a-textarea v-model:value="novelForm[section.key]" :placeholder="`请输入${section.label}`" :rows="3" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -154,28 +163,109 @@
 <script setup lang="ts">
 import type { FormInstance } from 'ant-design-vue'
 import type { NovelCharacter, NovelOrganization } from '@/api/novel'
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { Empty, message as antMessage } from 'ant-design-vue'
 import { useNovelAssistantStore } from '@/stores/novel-assistant'
 import CharacterCreateModal from './character-create-modal.vue'
 import OrganizationCreateModal from './organization-create-modal.vue'
 
 const store = useNovelAssistantStore()
-const { novels, characters, organizations, selectedNovelId, loadingNovels, loadingMaterials } = storeToRefs(store)
+const { novels, characters, organizations, selectedNovelId, selectedNovel, loadingNovels, loadingMaterials } =
+  storeToRefs(store)
 
 const activeTab = ref('characters')
 const novelModalOpen = ref(false)
+const editingNovel = ref(false)
 const characterModalOpen = ref(false)
 const organizationModalOpen = ref(false)
 const selectedCharacter = ref<NovelCharacter | null>(null)
 const selectedOrganization = ref<NovelOrganization | null>(null)
-const creatingNovel = ref(false)
+const savingNovel = ref(false)
 const deletingMaterialKey = ref('')
 const novelFormRef = ref<FormInstance>()
-const novelForm = reactive({ name: '' })
+// 界面分项编辑，保存时统一组装为 Markdown content。
+const novelContentSections = [
+  { key: 'targetAudience', label: '目标读者' },
+  { key: 'storyBackground', label: '故事背景' },
+  { key: 'worldSetting', label: '世界观' },
+  { key: 'characterSetting', label: '人物设定' },
+  { key: 'objectSetting', label: '事物设定' },
+  { key: 'storyOutline', label: '故事大纲' },
+  { key: 'inspirationLibrary', label: '灵感库' },
+  { key: 'emotionalPoints', label: '情绪点' },
+  { key: 'storyMetaphor', label: '故事隐喻' },
+] as const
+type NovelContentSectionKey = (typeof novelContentSections)[number]['key']
+
+const createEmptyNovelContent = () =>
+  Object.fromEntries(novelContentSections.map((section) => [section.key, ''])) as Record<NovelContentSectionKey, string>
+
+const sectionKeyByHeading = new Map<string, NovelContentSectionKey>(
+  novelContentSections.map((section) => [`## ${section.label}`, section.key] as const),
+)
+const novelForm = reactive({ name: '', ...createEmptyNovelContent() })
 const simpleImage = Empty.PRESENTED_IMAGE_SIMPLE
 const novelRules = {
-  name: [{ required: true, whitespace: true, message: '请输入小说名称' }]
+  name: [{ required: true, whitespace: true, message: '请输入小说名称' }],
+}
+
+const serializeNovelContent = () =>
+  novelContentSections
+    .map((section) => {
+      const value = novelForm[section.key].trim()
+      return value ? `## ${section.label}\n\n${value}` : ''
+    })
+    .filter(Boolean)
+    .join('\n\n')
+
+const parseNovelContent = (content: string) => {
+  const parsed = createEmptyNovelContent()
+  const legacyLines: string[] = []
+  let activeKey: NovelContentSectionKey | null = null
+
+  for (const line of content.split(/\r?\n/)) {
+    const sectionKey = sectionKeyByHeading.get(line.trim())
+    if (sectionKey) {
+      activeKey = sectionKey
+      continue
+    }
+
+    if (activeKey) {
+      parsed[activeKey] += `${parsed[activeKey] ? '\n' : ''}${line}`
+    } else {
+      legacyLines.push(line)
+    }
+  }
+
+  novelContentSections.forEach((section) => {
+    parsed[section.key] = parsed[section.key].trim()
+  })
+
+  // 旧格式没有分段标题，放入故事大纲避免编辑时丢失。
+  const legacyContent = legacyLines.join('\n').trim()
+  if (legacyContent) {
+    parsed.storyOutline = [legacyContent, parsed.storyOutline].filter(Boolean).join('\n\n')
+  }
+
+  return parsed
+}
+
+const handleOpenCreateNovel = () => {
+  editingNovel.value = false
+  Object.assign(novelForm, { name: '', ...createEmptyNovelContent() })
+  novelModalOpen.value = true
+}
+
+const handleOpenEditNovel = () => {
+  if (!selectedNovel.value) return
+
+  // 打开编辑弹窗时复制当前小说，取消编辑不会直接改变列表数据。
+  editingNovel.value = true
+  Object.assign(novelForm, {
+    name: selectedNovel.value.name,
+    ...parseNovelContent(selectedNovel.value.content || ''),
+  })
+  novelModalOpen.value = true
 }
 
 const handleCreateCharacter = () => {
@@ -233,18 +323,27 @@ const handleNovelChange = async (value: unknown) => {
   }
 }
 
-const handleCreateNovel = async () => {
+const handleSaveNovel = async () => {
   try {
     await novelFormRef.value?.validate()
-    creatingNovel.value = true
-    await store.addNovel(novelForm.name.trim())
-    novelForm.name = ''
+    savingNovel.value = true
+    const novelData = {
+      name: novelForm.name.trim(),
+      content: serializeNovelContent(),
+    }
+
+    if (editingNovel.value && selectedNovel.value) {
+      await store.editNovel({ id: selectedNovel.value.id, ...novelData })
+    } else {
+      await store.addNovel(novelData)
+    }
+
     novelModalOpen.value = false
-    antMessage.success('小说创建成功')
+    antMessage.success(editingNovel.value ? '小说更新成功' : '小说创建成功')
   } catch (error: any) {
-    if (!error?.errorFields) antMessage.error('小说创建失败')
+    if (!error?.errorFields) antMessage.error(editingNovel.value ? '小说更新失败' : '小说创建失败')
   } finally {
-    creatingNovel.value = false
+    savingNovel.value = false
   }
 }
 

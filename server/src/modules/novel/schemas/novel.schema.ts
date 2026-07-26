@@ -14,6 +14,10 @@ export class Novel {
 
   @Prop({ required: true, trim: true, index: true })
   name!: string;
+
+  // 旧数据没有正文时统一返回空字符串。
+  @Prop({ default: '', trim: true })
+  content!: string;
 }
 
 export const NovelSchema = SchemaFactory.createForClass(Novel);

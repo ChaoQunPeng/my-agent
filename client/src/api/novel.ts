@@ -4,6 +4,7 @@ export interface Novel {
   _id: string
   id: string
   name: string
+  content: string
   createdAt: string
   updatedAt: string
 }
@@ -53,6 +54,10 @@ export type CreateNovelCharacterPayload = Omit<NovelCharacter, '_id' | 'id' | 'c
 
 export type CreateNovelOrganizationPayload = Omit<NovelOrganization, '_id' | 'id' | 'createdAt' | 'updatedAt'>
 
+export type CreateNovelPayload = Pick<Novel, 'name'> & Partial<Pick<Novel, 'content'>>
+
+export type UpdateNovelPayload = CreateNovelPayload & Pick<Novel, 'id'>
+
 export type UpdateNovelCharacterPayload = Partial<CreateNovelCharacterPayload> & Pick<NovelCharacter, 'id'>
 
 export type UpdateNovelOrganizationPayload = Partial<CreateNovelOrganizationPayload> & Pick<NovelOrganization, 'id'>
@@ -61,8 +66,12 @@ export function getNovels() {
   return request.post<Novel[]>('/novels/get-novels')
 }
 
-export function createNovel(name: string) {
-  return request.post<Novel>('/novels/create-novel', { name })
+export function createNovel(data: CreateNovelPayload) {
+  return request.post<Novel>('/novels/create-novel', data)
+}
+
+export function updateNovel(data: UpdateNovelPayload) {
+  return request.post<Novel>('/novels/update-novel', data)
 }
 
 export function getNovelCharacters(novelId: string) {
