@@ -34,9 +34,10 @@ export class NovelCharacterService {
     return character;
   }
 
-  async findOneByName(name: string): Promise<NovelCharacter> {
-    // Tool 使用人物姓名作为入口，按 name 精确匹配现有记录。
-    const character = await this.characterModel.findOne({ name }).exec();
+  async findOneByName(name: string, novelId: string): Promise<NovelCharacter> {
+    const character = await this.characterModel
+      .findOne({ name, novelId })
+      .exec();
     if (!character) {
       throw new NotFoundException(`Novel character ${name} not found`);
     }

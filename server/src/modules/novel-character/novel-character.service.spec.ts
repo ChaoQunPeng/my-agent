@@ -54,15 +54,15 @@ describe('NovelCharacterService', () => {
     );
   });
 
-  it('finds a novel character by exact name', async () => {
+  it('finds a novel character by exact name within the selected novel', async () => {
     const character = { id: 'char_001', name: '林默' };
     const exec = jest.fn().mockResolvedValue(character);
     const findOne = jest.fn().mockReturnValue({ exec });
     const service = new NovelCharacterService({ findOne } as never);
 
-    const result = await service.findOneByName('林默');
+    const result = await service.findOneByName('林默', 'novel_1');
 
-    expect(findOne).toHaveBeenCalledWith({ name: '林默' });
+    expect(findOne).toHaveBeenCalledWith({ name: '林默', novelId: 'novel_1' });
     expect(result).toBe(character);
   });
 

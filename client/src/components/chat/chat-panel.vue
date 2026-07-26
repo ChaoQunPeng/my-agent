@@ -16,7 +16,7 @@
 import InputArea from '@/components/chat/input-area.vue'
 import MessageList from '@/components/chat/message-list.vue'
 import { message as antMessage } from 'ant-design-vue'
-import { addMessage, getSessionDetail } from '~@/api/session'
+import { getSessionDetail } from '~@/api/session'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -83,16 +83,10 @@ const handleSend = async (text: string) => {
   const sessionId = props.ensureSession ? await props.ensureSession() : props.sessionId
   if (!sessionId) return
 
-  try {
-    await addMessage(sessionId, 'user', text)
-  } catch (error) {
-    console.error('保存用户消息失败', error)
-  }
-
   sending.value = true
   abortController.value = new AbortController()
 
-  // 添加用户消息（仅显示，不保存到后端）
+  // 立即显示用户消息，持久化由后端聊天服务统一处理。
   messages.value.push({ role: 'user', content: text })
 
   // 添加 AI 回复占位(带加载状态)

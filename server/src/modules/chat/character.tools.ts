@@ -6,17 +6,17 @@ export const getCharacterContextTool: ChatCompletionTool = {
   function: {
     name: 'get_character_context',
     description:
-      '当用户查询某个人物的基础资料、人物设定、人物关系或所属组织/势力时，调用此工具；当需要创作、续写或分析涉及某个人物的剧情，并需要了解该人物的完整上下文时，也应调用此工具。传入人物ID，获取适合大模型理解的人物完整上下文。',
+      '当用户查询某个人物的基础资料、人物设定、人物关系或所属组织/势力时，调用此工具；当需要创作、续写或分析涉及某个人物的剧情，并需要了解该人物的完整上下文时，也应调用此工具。传入人物姓名，获取适合大模型理解的人物完整上下文。',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
-        characterId: {
+        name: {
           type: 'string',
-          description: '人物ID',
+          description: '人物姓名',
         },
       },
-      required: ['characterId'],
+      required: ['name'],
       additionalProperties: false,
     },
   },

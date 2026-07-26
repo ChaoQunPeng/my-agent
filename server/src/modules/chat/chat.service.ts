@@ -16,7 +16,7 @@ import { NovelService } from '../novel/novel.service';
 import { NovelCharacterService } from '../novel-character/novel-character.service';
 import { NovelOrganizationService } from '../novel-organization/novel-organization.service';
 import { getCharacterContextTool } from './character.tools';
-import { buildInspirationChatPrompt } from 'src/common/prompts/inspiration-chat';
+import { buildInspirationChatPrompt } from '../../common/prompts/inspiration-chat';
 
 export interface Session {
   id: string;
@@ -83,8 +83,11 @@ export class ChatService {
     return [getCharacterContextTool];
   }
 
-  private async getCharacterContext(characterId: string) {
-    const character = await this.novelCharacterService.findOne(characterId);
+  private async getCharacterContext(name: string, novelId: string) {
+    const character = await this.novelCharacterService.findOneByName(
+      name,
+      novelId,
+    );
 
     // 并行查询关系目标，并转换为适合大模型阅读的自然语言。
     const [characterRelationships, organizationRelationships] =
@@ -129,23 +132,23 @@ export class ChatService {
     };
   }
 
-  private async executeTool(toolCall: ChatCompletionMessageFunctionToolCall) {
+  private async executeTool(
+    toolCall: ChatCompletionMessageFunctionToolCall,
+    novelId: string,
+  ) {
     try {
       if (toolCall.function.name !== 'get_character_context') {
         return { error: `Unsupported tool: ${toolCall.function.name}` };
       }
 
       const args = JSON.parse(toolCall.function.arguments) as {
-        characterId?: unknown;
+        name?: unknown;
       };
-      if (
-        typeof args.characterId !== 'string' ||
-        args.characterId.trim() === ''
-      ) {
-        return { error: 'characterId must be a non-empty string' };
+      if (typeof args.name !== 'string' || args.name.trim() === '') {
+        return { error: 'name must be a non-empty string' };
       }
 
-      return await this.getCharacterContext(args.characterId);
+      return await this.getCharacterContext(args.name, novelId);
     } catch (error) {
       return {
         error:
@@ -182,7 +185,7 @@ export class ChatService {
 
     // 获取历史消息
     const customHistory = sessionId
-      ? await this.sessionService.getMessageHistory(sessionId)
+      ? [...(await this.sessionService.getMessageHistory(sessionId))]
       : [];
 
     // 组装消息列表
@@ -191,6 +194,11 @@ export class ChatService {
       ...customHistory,
       { role: 'user', content: currentMessage },
     ];
+
+    if (sessionId) {
+      // 统一由聊天服务保存当前消息，避免前后端各写入一次。
+      await this.sessionService.addMessage(sessionId, 'user', currentMessage);
+    }
 
     console.log(`这是消息体`);
     console.log(messages);
@@ -238,7 +246,9 @@ export class ChatService {
       });
 
       for (const toolCall of toolCalls) {
-        const result = await this.executeTool(toolCall);
+        // TODO: 这里要优化写法
+        // const novelId = type === 'inspiration-chat' ? resourceId : undefined;
+        const result = await this.executeTool(toolCall, resourceId!);
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
