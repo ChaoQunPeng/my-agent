@@ -44,6 +44,26 @@ export class NovelCharacterService {
     return character;
   }
 
+  /**
+   * 根据人物定位关键词查询当前小说的人物。
+   * 业务场景：用户询问“谁是主角”等未提供姓名的问题时，从人物描述和备注中识别匹配人物。
+   */
+  async findAllByDescriptionOrRemark(
+    keyword: string,
+    novelId: string,
+  ): Promise<NovelCharacter[]> {
+    return this.characterModel
+      .find({
+        novelId,
+        $or: [
+          { description: { $regex: keyword, $options: 'i' } },
+          { remark: { $regex: keyword, $options: 'i' } },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
   async update(
     id: string,
     data: Partial<CreateNovelCharacterDto>,

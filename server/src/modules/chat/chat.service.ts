@@ -15,7 +15,10 @@ import {
 import { NovelService } from '../novel/novel.service';
 import { NovelCharacterService } from '../novel-character/novel-character.service';
 import { NovelOrganizationService } from '../novel-organization/novel-organization.service';
-import { getCharacterContextTool } from './character.tools';
+import {
+  getCharacterContextTool,
+  getCharactersByRoleTool,
+} from './character.tools';
 import { buildInspirationChatPrompt } from '../../common/prompts/inspiration-chat';
 
 export interface Session {
@@ -80,7 +83,7 @@ export class ChatService {
   }
 
   private getTools(): ChatCompletionTool[] {
-    return [getCharacterContextTool];
+    return [getCharacterContextTool, getCharactersByRoleTool];
   }
 
   private async getCharacterContext(name: string, novelId: string) {
@@ -132,23 +135,51 @@ export class ChatService {
     };
   }
 
+  /**
+   * 根据人物定位关键词获取当前小说的人物概要。
+   * 业务场景：回答“谁是主角”这类没有明确人物姓名的问题。
+   */
+  private async getCharactersByRole(keyword: string, novelId: string) {
+    const characters =
+      await this.novelCharacterService.findAllByDescriptionOrRemark(
+        keyword,
+        novelId,
+      );
+
+    // 主角识别只需要人物定位字段，避免为列表中的每个人物额外查询关系数据。
+    return characters.map((character) => ({
+      id: character.id,
+      name: character.name,
+      alias: character.alias,
+      description: character.description,
+      remark: character.remark,
+    }));
+  }
+
   private async executeTool(
     toolCall: ChatCompletionMessageFunctionToolCall,
     novelId: string,
   ) {
     try {
-      if (toolCall.function.name !== 'get_character_context') {
-        return { error: `Unsupported tool: ${toolCall.function.name}` };
+      if (toolCall.function.name === 'get_character_context') {
+        const args = JSON.parse(toolCall.function.arguments) as {
+          name?: unknown;
+        };
+        if (typeof args.name !== 'string' || args.name.trim() === '') {
+          return { error: 'name must be a non-empty string' };
+        }
+
+        return await this.getCharacterContext(args.name, novelId);
       }
 
-      const args = JSON.parse(toolCall.function.arguments) as {
-        name?: unknown;
-      };
-      if (typeof args.name !== 'string' || args.name.trim() === '') {
-        return { error: 'name must be a non-empty string' };
+      if (toolCall.function.name === 'get_characters_by_role') {
+        const args = JSON.parse(toolCall.function.arguments) as {
+          keyword: string;
+        };
+        return await this.getCharactersByRole(args.keyword, novelId);
       }
 
-      return await this.getCharacterContext(args.name, novelId);
+      return { error: `Unsupported tool: ${toolCall.function.name}` };
     } catch (error) {
       return {
         error:

@@ -123,25 +123,27 @@ describe('ChatService', () => {
       '林默',
       'novel_1',
     );
-    expect(create.mock.calls[0][0].tools).toEqual([
-      expect.objectContaining({
-        type: 'function',
-        function: expect.objectContaining({
-          name: 'get_character_context',
-          parameters: {
-            type: 'object',
-            properties: {
-              name: {
-                type: 'string',
-                description: '人物姓名',
+    expect(create.mock.calls[0][0].tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'function',
+          function: expect.objectContaining({
+            name: 'get_character_context',
+            parameters: {
+              type: 'object',
+              properties: {
+                name: {
+                  type: 'string',
+                  description: '人物姓名',
+                },
               },
+              required: ['name'],
+              additionalProperties: false,
             },
-            required: ['name'],
-            additionalProperties: false,
-          },
+          }),
         }),
-      }),
-    ]);
+      ]),
+    );
 
     const finalMessages = create.mock.calls[1][0].messages as Array<{
       role: string;
@@ -172,6 +174,103 @@ describe('ChatService', () => {
       'assistant',
       '人物上下文已获取',
     );
+  });
+
+  it('recognizes 女主 as a role keyword and returns the matched character', async () => {
+    const create = jest
+      .fn()
+      .mockResolvedValueOnce(
+        asAsyncStream([
+          {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: 'call_characters_by_role',
+                      type: 'function',
+                      function: {
+                        name: 'get_characters_by_role',
+                        arguments: '{"keyword":"女主"}',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        asAsyncStream([
+          {
+            choices: [{ delta: { content: '女主是马雪英' } }],
+          },
+        ]),
+      );
+    const novelCharacterService = {
+      findAllByDescriptionOrRemark: jest.fn().mockResolvedValue([
+        {
+          id: 'char_001',
+          name: '马雪英',
+          alias: ['雪英'],
+          description: '女主角，富商之女',
+          remark: '',
+        },
+      ]),
+    };
+    const service = new ChatService(
+      {
+        model: 'test-model',
+        client: { chat: { completions: { create } } },
+      } as never,
+      {} as never,
+      {
+        getMessageHistory: jest.fn().mockResolvedValue([]),
+        addMessage: jest.fn().mockResolvedValue(undefined),
+      } as never,
+      {} as never,
+      {
+        findOne: jest.fn().mockResolvedValue({
+          name: '一拳破天',
+          content: '',
+        }),
+      } as never,
+      novelCharacterService as never,
+      {} as never,
+    );
+
+    const chunks: string[] = [];
+    for await (const chunk of service.chatWithHistoryStream(
+      '那女主呢？',
+      'session_1',
+      'inspiration-chat',
+      'novel_1',
+    )) {
+      chunks.push(chunk);
+    }
+
+    expect(
+      novelCharacterService.findAllByDescriptionOrRemark,
+    ).toHaveBeenCalledWith('女主', 'novel_1');
+    const finalMessages = create.mock.calls[1][0].messages as Array<{
+      role: string;
+      content: string;
+    }>;
+    const toolMessage = finalMessages.find(
+      (message) => message.role === 'tool',
+    );
+    expect(JSON.parse(toolMessage?.content ?? '[]')).toEqual([
+      {
+        id: 'char_001',
+        name: '马雪英',
+        alias: ['雪英'],
+        description: '女主角，富商之女',
+        remark: '',
+      },
+    ]);
+    expect(chunks.join('')).toBe('女主是马雪英');
   });
 
   it('returns character lookup errors to the model as tool results', async () => {

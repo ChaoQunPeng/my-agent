@@ -66,6 +66,23 @@ describe('NovelCharacterService', () => {
     expect(result).toBe(character);
   });
 
+  it('finds role keywords only in description and remark', async () => {
+    const exec = jest.fn().mockResolvedValue([]);
+    const sort = jest.fn().mockReturnValue({ exec });
+    const find = jest.fn().mockReturnValue({ sort });
+    const service = new NovelCharacterService({ find } as never);
+
+    await service.findAllByDescriptionOrRemark('主角', 'novel_1');
+
+    expect(find).toHaveBeenCalledWith({
+      novelId: 'novel_1',
+      $or: [
+        { description: { $regex: '主角', $options: 'i' } },
+        { remark: { $regex: '主角', $options: 'i' } },
+      ],
+    });
+  });
+
   it('lists only characters that belong to the selected novel', async () => {
     const exec = jest.fn().mockResolvedValue([]);
     const sort = jest.fn().mockReturnValue({ exec });
