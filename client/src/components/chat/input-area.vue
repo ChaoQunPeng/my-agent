@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref } from 'vue'
 import { ArrowUpOutlined, StopOutlined } from '@ant-design/icons-vue'
 
 interface Props {
@@ -89,9 +89,8 @@ const handleSend = () => {
   if (props.sending || !inputMessage.value.trim()) return
 
   emits('send', inputMessage.value)
-  nextTick(() => {
-    inputMessage.value = ''
-  })
+  // 消息交给聊天面板发送后，立即清空输入框，方便用户继续输入下一条消息。
+  inputMessage.value = ''
 }
 </script>
 
