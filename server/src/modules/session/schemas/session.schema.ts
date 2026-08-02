@@ -24,6 +24,10 @@ export class Session {
   // 模块标识，用于隔离不同模块的会话
   @Prop({ default: '' })
   moduleKey!: string;
+
+  // 资源标识（如小说ID），用于隔离同一模块下不同资源的会话
+  @Prop({ default: '' })
+  resourceId!: string;
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);

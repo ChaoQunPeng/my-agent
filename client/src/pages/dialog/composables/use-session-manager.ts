@@ -10,6 +10,7 @@ import {
 
 interface UseSessionManagerOptions {
   getModuleKey: () => string;
+  getResourceId?: () => string; // 可选的资源标识（如小说ID），用于隔离同一模块下不同资源的会话
   canCreateSession?: () => boolean;
   shouldFetchSessions?: () => boolean;
   getCreateBlockedMessage?: () => string;
@@ -33,7 +34,10 @@ export function useSessionManager(options: UseSessionManagerOptions) {
         return;
       }
 
-      const res = await getSessions(options.getModuleKey());
+      const res = await getSessions(
+        options.getModuleKey(),
+        options.getResourceId?.(),
+      );
       sessions.value = res.data || [];
     } catch (error) {
       antMessage.error("获取会话列表失败");
@@ -57,6 +61,7 @@ export function useSessionManager(options: UseSessionManagerOptions) {
     try {
       const res = await createSession({
         moduleKey: options.getModuleKey(),
+        resourceId: options.getResourceId?.(),
       });
       const newSession = res.data;
       sessions.value.unshift(newSession);

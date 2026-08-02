@@ -8,6 +8,7 @@ export interface Session {
   title: string
   summary: string
   moduleKey?: string // 模块标识，用于隔离不同模块的会话
+  resourceId?: string // 资源标识（如小说ID），用于隔离同一模块下不同资源的会话
   createdAt: string
   updatedAt: string
 }
@@ -28,21 +29,25 @@ export interface Message {
 /**
  * 获取所有会话列表
  * @param moduleKey 可选的模块标识筛选条件
+ * @param resourceId 可选的资源标识筛选条件（如小说ID）
  */
-export function getSessions(moduleKey?: string) {
+export function getSessions(moduleKey?: string, resourceId?: string) {
   const params: any = {}
 
   if (moduleKey) {
     params.moduleKey = moduleKey
+  }
+  if (resourceId) {
+    params.resourceId = resourceId
   }
   return request.post<Session[]>('/sessions/list', params)
 }
 
 /**
  * 创建新会话
- * @param data 会话数据，包含标题、摘要、分类和模块标识
+ * @param data 会话数据，包含标题、摘要、分类、模块标识和资源标识
  */
-export function createSession(data?: { title?: string; summary?: string; category?: string; moduleKey?: string }) {
+export function createSession(data?: { title?: string; summary?: string; category?: string; moduleKey?: string; resourceId?: string }) {
   return request.post<Session>('/sessions/create', data || {})
 }
 

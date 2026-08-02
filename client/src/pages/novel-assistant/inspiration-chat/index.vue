@@ -54,6 +54,8 @@ const {
   handleUpdateSession,
 } = useSessionManager({
   getModuleKey: () => MODULE_KEY,
+  // 按当前选中的小说隔离会话，切换小说时只展示该小说的对话。
+  getResourceId: () => selectedNovelId.value,
   canCreateSession: () => Boolean(selectedNovelId.value),
   shouldFetchSessions: () => Boolean(selectedNovelId.value),
   getCreateBlockedMessage: () => "请先选择小说",

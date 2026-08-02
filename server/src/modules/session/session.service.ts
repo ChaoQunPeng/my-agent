@@ -112,6 +112,7 @@ export class SessionService {
       summary: createSessionDto.summary || '',
       category: createSessionDto.category || '',
       moduleKey: createSessionDto.moduleKey || '',
+      resourceId: createSessionDto.resourceId || '',
     });
 
     console.log(`createdSession`, createdSession);
@@ -168,11 +169,13 @@ export class SessionService {
   /**
    * 获取会话列表
    * @param moduleKey 可选的模块标识筛选条件
+   * @param resourceId 可选的资源标识筛选条件（如小说ID）
    */
-  async findAll(moduleKey?: string): Promise<Session[]> {
+  async findAll(moduleKey?: string, resourceId?: string): Promise<Session[]> {
     // 构建查询条件
     const query: Record<string, string> = {};
     if (moduleKey) query.moduleKey = moduleKey;
+    if (resourceId) query.resourceId = resourceId;
 
     // 按更新时间倒序返回
     return this.sessionModel.find(query).sort({ updatedAt: -1 }).exec();

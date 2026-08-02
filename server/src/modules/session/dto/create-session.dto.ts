@@ -23,4 +23,9 @@ export class CreateSessionDto {
   @IsOptional()
   @IsString()
   moduleKey?: string;
+
+  // 资源标识（可选，如小说ID）
+  @IsOptional()
+  @IsString()
+  resourceId?: string;
 }
