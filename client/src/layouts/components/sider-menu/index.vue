@@ -5,7 +5,7 @@
       width: collapsed ? `${collapsedWidth}px` : `${siderWidth}px`,
       maxWidth: collapsed ? `${collapsedWidth}px` : `${siderWidth}px`,
       minWidth: collapsed ? `${collapsedWidth}px` : `${siderWidth}px`,
-      ...siderStyle
+      ...siderStyle,
     }"
   />
   <a-layout-sider
@@ -26,22 +26,30 @@
       </a>
     </div>
     <div class="flex-1 of-x-hidden of-y-auto scrollbar">
-      <div class="menu-list">
-        <div class="menu-item" :class="resolveMenuCls('/account/center')" @click="goViews('/account/center')">
+      <!-- <div class="menu-list">
+        <div
+          class="menu-item"
+          :class="resolveMenuCls('/account/center')"
+          @click="goViews('/account/center')"
+        >
           <RobotOutlined class="mr-4" />
           <span>个人中心</span>
         </div>
-        <div class="menu-item" :class="resolveMenuCls('/account/settings')" @click="goViews('/account/settings')">
+        <div
+          class="menu-item"
+          :class="resolveMenuCls('/account/settings')"
+          @click="goViews('/account/settings')"
+        >
           <SettingOutlined class="mr-4" />
           <span>设置</span>
         </div>
         <div class="mt-12 px-5">
           <a-button type="primary" block> 新建对话 </a-button>
         </div>
-      </div>
-      <div class="px-5">
+      </div> -->
+      <!-- <div class="px-5">
         <a-divider style="margin: 24px 0 18px 0"></a-divider>
-      </div>
+      </div> -->
       <Menu />
       <div class="pb-5"></div>
     </div>
@@ -62,16 +70,16 @@
 </template>
 
 <script setup lang="ts">
-import type { CSSProperties } from 'vue'
+import type { CSSProperties } from "vue";
 // import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue';
-import { useLayoutState } from '../../basic-layout/context'
-import Menu from '../menu/index.vue'
-import { RobotOutlined, SettingOutlined } from '@ant-design/icons-vue'
-const router = useRouter()
+import { useLayoutState } from "../../basic-layout/context";
+import Menu from "../menu/index.vue";
+import { RobotOutlined, SettingOutlined } from "@ant-design/icons-vue";
+const router = useRouter();
 
-const { currentRoute } = useCurrentRoute()
+const { currentRoute } = useCurrentRoute();
 
-const currentRoutePath = ref(currentRoute.value.path)
+const currentRoutePath = ref(currentRoute.value.path);
 
 const {
   collapsed,
@@ -88,61 +96,63 @@ const {
   headerHeight,
   fixedSider,
   isMobile,
-  header
-} = useLayoutState()
+  header,
+} = useLayoutState();
 
-const prefixCls = shallowRef('ant-pro-sider')
+const prefixCls = shallowRef("ant-pro-sider");
 
 const siderStyle = computed<CSSProperties>(() => {
   const style: CSSProperties = {
-    paddingTop: `${layout.value !== 'side' && !isMobile.value ? headerHeight.value : 0}px`,
-    transition: 'background-color 0.3s ease 0s, min-width 0.3s ease 0s, max-width 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) 0s',
-    overflow: 'hidden'
-  }
+    paddingTop: `${layout.value !== "side" && !isMobile.value ? headerHeight.value : 0}px`,
+    transition:
+      "background-color 0.3s ease 0s, min-width 0.3s ease 0s, max-width 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) 0s",
+    overflow: "hidden",
+  };
 
   // bugfix https://github.com/antdv-pro/antdv-pro/issues/173
-  if (layout.value === 'mix' && header.value === false) style.paddingTop = '0px'
+  if (layout.value === "mix" && header.value === false)
+    style.paddingTop = "0px";
 
-  return style
-})
+  return style;
+});
 
 const cls = computed(() => ({
   [prefixCls.value]: true,
   [`${prefixCls.value}-fixed`]: fixedSider.value,
-  [`${prefixCls.value}-layout-${layout.value}`]: !!layout.value
-}))
+  [`${prefixCls.value}-layout-${layout.value}`]: !!layout.value,
+}));
 
 // const showLogo = computed(() => {
 //   return (layout.value === 'side' || isMobile.value) && layout.value !== 'mix';
 // });
 
 const logoCls = computed(() => {
-  return {}
+  return {};
   // return {
   //   'ant-pro-sider-collapsed': collapsed.value && !isMobile.value,
   //   'ant-pro-sider-logo-dark': theme.value === 'inverted',
   // };
-})
+});
 
 const resolveMenuCls = computed(() => (path: string) => {
   return {
-    active: currentRoutePath.value === path
-  }
-})
+    active: currentRoutePath.value === path,
+  };
+});
 
 const goViews = (path: string) => {
   router.push({
-    path: path
-  })
-}
+    path: path,
+  });
+};
 
-watch(currentRoute, data => {
-  currentRoutePath.value = data.path
-})
+watch(currentRoute, (data) => {
+  currentRoutePath.value = data.path;
+});
 </script>
 
 <style lang="less">
-@import './index.less';
+@import "./index.less";
 
 .menu-list {
   padding: 4px;
