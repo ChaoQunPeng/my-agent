@@ -284,6 +284,7 @@
       :title="editingNovel ? '编辑小说' : '新建小说'"
       :width="800"
       :body-style="{ padding: '0' }"
+      @close="handleSaveNovel"
     >
       <a-form
         class="h-full"
@@ -323,7 +324,7 @@
       </a-form>
       <template #footer>
         <div class="novel-drawer__footer">
-          <a-button @click="novelDrawerOpen = false">取消</a-button>
+          <a-button @click="handleCancelNovel">取消</a-button>
           <a-button
             type="primary"
             :loading="savingNovel"
@@ -397,9 +398,9 @@ const deletingMaterialKey = ref("");
 const novelFormRef = ref<FormInstance>();
 // 界面分项编辑，保存时统一组装为 Markdown content。
 const novelContentSections = [
+  { key: "storySynopsis", label: "故事梗概" },
   { key: "targetAudience", label: "目标读者" },
   { key: "storyBackground", label: "故事背景" },
-  { key: "storySynopsis", label: "故事梗概" },
   { key: "worldSetting", label: "世界观" },
   { key: "characterSetting", label: "人物设定" },
   { key: "objectSetting", label: "事物设定" },
@@ -569,6 +570,13 @@ const handleSaveNovel = async () => {
   } finally {
     savingNovel.value = false;
   }
+};
+
+// 取消按钮：先尝试保存当前表单内容，再关闭抽屉，避免已编辑的数据丢失。
+// 校验失败（如新建时名称为空）时静默关闭，不创建无效数据。
+const handleCancelNovel = async () => {
+  await handleSaveNovel();
+  novelDrawerOpen.value = false;
 };
 
 onMounted(async () => {

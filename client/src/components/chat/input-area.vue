@@ -21,9 +21,16 @@
           联网搜索
         </div> -->
       </div>
-      <div class="send-btn rounded-full flex items-center justify-center cursor-pointer" :class="{ sending: sending }" @click="handleClick">
+      <div
+        class="send-btn rounded-full flex items-center justify-center cursor-pointer"
+        :class="{ sending: sending }"
+        @click="handleClick"
+      >
         <!-- 发送中显示停止按钮 -->
-        <StopOutlined v-if="sending" :style="{ fontSize: '16px', color: '#fff' }" />
+        <StopOutlined
+          v-if="sending"
+          :style="{ fontSize: '16px', color: '#fff' }"
+        />
         <!-- 否则显示发送按钮 -->
         <ArrowUpOutlined v-else :style="{ fontSize: '16px', color: '#fff' }" />
       </div>
@@ -32,66 +39,66 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { ArrowUpOutlined, StopOutlined } from '@ant-design/icons-vue'
+import { ref } from "vue";
+import { ArrowUpOutlined, StopOutlined } from "@ant-design/icons-vue";
 
 interface Props {
-  sending?: boolean
+  sending?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  sending: false
-})
+  sending: false,
+});
 
-const inputMessage = ref('')
+const inputMessage = ref("");
 
 const emits = defineEmits<{
-  send: [text: string]
-  stop: []
-}>()
+  send: [text: string];
+  stop: [];
+}>();
 
 const handleClick = () => {
   if (props.sending) {
     // 如果正在发送,点击则停止
-    emits('stop')
+    emits("stop");
   } else {
     // 否则正常发送
-    handleSend()
+    handleSend();
   }
-}
+};
 
 /**
  * 处理键盘按下事件
  * @param e - 键盘事件对象
- * @description 
+ * @description
  * - 单独按回车:发送消息
  * - Shift+回车:换行
  */
 const handleKeydown = (e: KeyboardEvent) => {
   // 检测是否按下回车键
-  if (e.key === 'Enter') {
+  if (e.key === "Enter") {
     // 如果按下了 Shift 键,允许换行(不阻止默认行为)
     if (e.shiftKey) {
-      return
+      return;
     }
-    
+
     // 否则阻止默认行为并发送消息
-    e.preventDefault()
-    handleSend()
+    e.preventDefault();
+    handleSend();
   }
-}
+};
 
 /**
  * 发送消息
  * @description 将用户输入的消息发送出去,并清空输入框
  */
 const handleSend = () => {
-  if (props.sending || !inputMessage.value.trim()) return
+  if (props.sending || !inputMessage.value.trim()) return;
 
-  emits('send', inputMessage.value)
+  emits("send", inputMessage.value);
   // 消息交给聊天面板发送后，立即清空输入框，方便用户继续输入下一条消息。
-  inputMessage.value = ''
-}
+  inputMessage.value = "";
+};
 </script>
 
 <style lang="less" scoped>
