@@ -297,8 +297,8 @@
           tab-position="left"
           class="novel-form-tabs h-full"
         >
-          <a-tab-pane key="basic" tab="基本信息">
-            <a-form-item name="name">
+          <a-tab-pane key="basic" tab="小说名称">
+            <a-form-item name="name" class="p-24">
               <a-input
                 v-model:value="novelForm.name"
                 placeholder="小说名称"
@@ -311,11 +311,11 @@
             :key="section.key"
             :tab="section.label"
           >
-            <a-form-item :name="section.key">
+            <a-form-item :name="section.key" class="novel-content-form-item">
               <a-textarea
                 v-model:value="novelForm[section.key]"
                 :placeholder="`请输入${section.label}`"
-                :rows="24"
+                class="novel-content-textarea"
               />
             </a-form-item>
           </a-tab-pane>
@@ -399,6 +399,7 @@ const novelFormRef = ref<FormInstance>();
 const novelContentSections = [
   { key: "targetAudience", label: "目标读者" },
   { key: "storyBackground", label: "故事背景" },
+  { key: "storySynopsis", label: "故事梗概" },
   { key: "worldSetting", label: "世界观" },
   { key: "characterSetting", label: "人物设定" },
   { key: "objectSetting", label: "事物设定" },
@@ -703,8 +704,41 @@ onMounted(async () => {
   padding-top: 12px;
 }
 
+.novel-form-tabs :deep(.ant-tabs-content-holder),
+.novel-form-tabs :deep(.ant-tabs-content),
 .novel-form-tabs :deep(.ant-tabs-tabpane) {
-  padding: 24px !important;
+  height: 100%;
+  min-height: 0;
+}
+
+.novel-form-tabs :deep(.ant-tabs-tabpane) {
+  padding: 0 !important;
+}
+
+.novel-content-form-item {
+  height: 100%;
+  margin-bottom: 0;
+}
+
+// 内容编辑区逐层继承 Tab 高度，使文本域占满抽屉的可用空间。
+.novel-content-form-item :deep(.ant-form-item-row),
+.novel-content-form-item :deep(.ant-form-item-control),
+.novel-content-form-item :deep(.ant-form-item-control-input),
+.novel-content-form-item :deep(.ant-form-item-control-input-content) {
+  height: 100%;
+  min-height: 0;
+}
+
+.novel-form-tabs :deep(.novel-content-textarea) {
+  height: 100%;
+  border: 0;
+  box-shadow: none;
+  resize: none;
+  padding: 16px 22px;
+}
+
+.novel-form-tabs :deep(.novel-content-textarea::placeholder) {
+  font-size: 16px;
 }
 
 .novel-form-tabs :deep(.ant-form-item .ant-form-item-label) {
