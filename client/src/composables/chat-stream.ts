@@ -10,6 +10,7 @@ export interface ChatStreamOptions {
   sessionId?: string // 可选的会话ID
   type?: string // 可选的资源类型，用于动态构建 System Prompt
   resourceId?: string // 可选的资源ID，对应type类型的资源ID
+  temperature?: number // 可选的温度参数，控制生成随机性 (0-2)
   onChunk: (content: string) => void | Promise<void> // 接收每个数据块的回调函数
   onError?: (error: Error) => void // 错误处理回调函数
   onComplete?: () => void // 完成时的回调函数
@@ -30,13 +31,14 @@ export interface ChatStreamOptions {
  * @param options.signal 可选的中断信号，用于取消请求
  */
 export async function chatStreamApi(options: ChatStreamOptions): Promise<void> {
-  const { message, sessionId, type, resourceId, onChunk, onError, onComplete, signal } = options
+  const { message, sessionId, type, resourceId, temperature, onChunk, onError, onComplete, signal } = options
 
   // 构建请求体
-  const body: Record<string, string> = { message }
+  const body: Record<string, any> = { message }
   if (sessionId) body.sessionId = sessionId
   if (type) body.type = type
   if (resourceId) body.resourceId = resourceId
+  if (temperature !== undefined) body.aiApiOptions = { temperature }
 
   await fetchEventSource(`${BASE_PREFIX}/chat/stream-message`, {
     method: 'POST',

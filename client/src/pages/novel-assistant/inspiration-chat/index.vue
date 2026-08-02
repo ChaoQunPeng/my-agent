@@ -30,7 +30,7 @@ import NovelOperationPanel from "./components/novel-operation-panel.vue";
 const MODULE_KEY = "inspiration-chat";
 
 const store = useNovelAssistantStore();
-const { selectedNovelId } = storeToRefs(store);
+const { selectedNovelId, chatTemperature } = storeToRefs(store);
 const workspaceRef = ref<InstanceType<typeof SessionChatWorkspace> | null>(
   null,
 );
@@ -40,6 +40,7 @@ let sessionLoadVersion = 0;
 const chatApiParams = computed(() => ({
   type: MODULE_KEY,
   resourceId: selectedNovelId.value,
+  temperature: chatTemperature.value,
 }));
 
 const {

@@ -12,42 +12,145 @@
           class="novel-selector__select"
           @change="handleNovelChange"
         >
-          <a-select-option v-for="novel in novels" :key="novel.id" :value="novel.id" :label="novel.name">
+          <a-select-option
+            v-for="novel in novels"
+            :key="novel.id"
+            :value="novel.id"
+            :label="novel.name"
+          >
             {{ novel.name }}
           </a-select-option>
         </a-select>
         <a-tooltip title="新建小说">
-          <a-button type="primary" aria-label="新建小说" @click="handleOpenCreateNovel">
+          <a-button
+            type="primary"
+            aria-label="新建小说"
+            @click="handleOpenCreateNovel"
+          >
             <PlusOutlined />
           </a-button>
         </a-tooltip>
         <a-tooltip title="编辑小说">
-          <a-button aria-label="编辑小说" :disabled="!selectedNovel" @click="handleOpenEditNovel">
+          <a-button
+            aria-label="编辑小说"
+            :disabled="!selectedNovel"
+            @click="handleOpenEditNovel"
+          >
             <EditOutlined />
           </a-button>
         </a-tooltip>
       </div>
+      <div v-if="selectedNovelId" class="temperature-control">
+        <div class="temperature-control__header">
+          <span class="temperature-control__label">
+            温度（{{ chatTemperature }}）
+          </span>
+          <a-tooltip
+            placement="topRight"
+            overlay-class-name="temperature-tips-overlay"
+          >
+            <template #title>
+              <div class="temperature-tips">
+                <div class="temperature-tips__title">不同场景的推荐温度</div>
+                <table class="temperature-tips__table">
+                  <thead>
+                    <tr>
+                      <th>场景</th>
+                      <th width="100">推荐温度</th>
+                      <th>原因</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>代码生成、数学题、事实问答</td>
+                      <td>0~0.3</td>
+                      <td>需要准确、稳定，不要“发挥”</td>
+                    </tr>
+                    <tr>
+                      <td>翻译、摘要、分类任务</td>
+                      <td>0.3~0.5</td>
+                      <td>保持准确但稍微灵活</td>
+                    </tr>
+                    <tr>
+                      <td>创意写作、头脑风暴、闲聊</td>
+                      <td>0.7~1.2</td>
+                      <td>需要多样性和想象力</td>
+                    </tr>
+                    <tr>
+                      <td>诗歌、故事、广告语</td>
+                      <td>1.2~1.8</td>
+                      <td>鼓励大胆的联想和表达</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+            <QuestionCircleOutlined class="temperature-control__icon" />
+          </a-tooltip>
+        </div>
+        <a-slider
+          v-model:value="chatTemperature"
+          :min="0"
+          :max="2"
+          :step="0.1"
+          class="temperature-control__slider"
+        />
+      </div>
     </div>
 
     <a-spin :spinning="loadingMaterials">
-      <a-tabs v-if="selectedNovelId" v-model:activeKey="activeTab" class="material-tabs">
+      <a-input
+        v-if="selectedNovelId && activeTab === 'characters'"
+        v-model:value="characterKeyword"
+        placeholder="搜索人物姓名"
+        allow-clear
+        class="character-search"
+      >
+        <template #prefix>
+          <SearchOutlined />
+        </template>
+      </a-input>
+      <a-tabs
+        v-if="selectedNovelId"
+        v-model:activeKey="activeTab"
+        class="material-tabs"
+      >
         <a-tab-pane key="characters">
           <template #tab
-            >人物 <span class="tab-count">{{ characters.length }}</span></template
+            >人物
+            <span class="tab-count">{{ characters.length }}</span></template
           >
           <div class="material-toolbar">
             <span class="material-toolbar__title">人物</span>
-            <a-button type="primary" size="small" @click="handleCreateCharacter"> <PlusOutlined />新建 </a-button>
+            <a-button
+              type="primary"
+              size="small"
+              @click="handleCreateCharacter"
+            >
+              <PlusOutlined />新建
+            </a-button>
           </div>
           <div class="material-list">
-            <div v-for="character in characters" :key="character.id" class="material-item">
+            <div
+              v-for="character in filteredCharacters"
+              :key="character.id"
+              class="material-item"
+            >
               <div class="material-item__header">
                 <div class="material-item__main">
-                  <button type="button" class="material-item__name" @click="handleEditCharacter(character)">
+                  <button
+                    type="button"
+                    class="material-item__name"
+                    @click="handleEditCharacter(character)"
+                  >
                     {{ character.name }}
                   </button>
                   <div class="material-item__description">
-                    {{ character.description || character.background || '暂无简介' }}
+                    {{
+                      character.description ||
+                      character.background ||
+                      "暂无简介"
+                    }}
                   </div>
                 </div>
                 <a-popconfirm
@@ -65,7 +168,9 @@
                       danger
                       size="small"
                       aria-label="删除人物"
-                      :loading="deletingMaterialKey === `character:${character.id}`"
+                      :loading="
+                        deletingMaterialKey === `character:${character.id}`
+                      "
                     >
                       <DeleteOutlined />
                     </a-button>
@@ -77,27 +182,55 @@
                 <span>{{ character.age }}岁</span>
               </div>
             </div>
-            <a-empty v-if="characters.length === 0" description="暂无人物" :image="simpleImage" />
+            <a-empty
+              v-if="characters.length === 0"
+              description="暂无人物"
+              :image="simpleImage"
+            />
+            <a-empty
+              v-else-if="filteredCharacters.length === 0"
+              description="未找到匹配的人物"
+              :image="simpleImage"
+            />
           </div>
         </a-tab-pane>
 
         <a-tab-pane key="organizations">
           <template #tab
-            >组织 <span class="tab-count">{{ organizations.length }}</span></template
+            >组织
+            <span class="tab-count">{{ organizations.length }}</span></template
           >
           <div class="material-toolbar">
             <span class="material-toolbar__title">组织</span>
-            <a-button type="primary" size="small" @click="handleCreateOrganization"> <PlusOutlined />新建 </a-button>
+            <a-button
+              type="primary"
+              size="small"
+              @click="handleCreateOrganization"
+            >
+              <PlusOutlined />新建
+            </a-button>
           </div>
           <div class="material-list">
-            <div v-for="organization in organizations" :key="organization.id" class="material-item">
+            <div
+              v-for="organization in organizations"
+              :key="organization.id"
+              class="material-item"
+            >
               <div class="material-item__header">
                 <div class="material-item__main">
-                  <button type="button" class="material-item__name" @click="handleEditOrganization(organization)">
+                  <button
+                    type="button"
+                    class="material-item__name"
+                    @click="handleEditOrganization(organization)"
+                  >
                     {{ organization.name }}
                   </button>
                   <div class="material-item__description">
-                    {{ organization.description || organization.background || '暂无简介' }}
+                    {{
+                      organization.description ||
+                      organization.background ||
+                      "暂无简介"
+                    }}
                   </div>
                 </div>
                 <a-popconfirm
@@ -115,18 +248,28 @@
                       danger
                       size="small"
                       aria-label="删除组织"
-                      :loading="deletingMaterialKey === `organization:${organization.id}`"
+                      :loading="
+                        deletingMaterialKey ===
+                        `organization:${organization.id}`
+                      "
                     >
                       <DeleteOutlined />
                     </a-button>
                   </a-tooltip>
                 </a-popconfirm>
               </div>
-              <div v-if="organization.alias.length" class="material-item__aliases">
-                {{ organization.alias.join(' / ') }}
+              <div
+                v-if="organization.alias.length"
+                class="material-item__aliases"
+              >
+                {{ organization.alias.join(" / ") }}
               </div>
             </div>
-            <a-empty v-if="organizations.length === 0" description="暂无组织" :image="simpleImage" />
+            <a-empty
+              v-if="organizations.length === 0"
+              description="暂无组织"
+              :image="simpleImage"
+            />
           </div>
         </a-tab-pane>
       </a-tabs>
@@ -136,224 +279,304 @@
       </div>
     </a-spin>
 
-    <a-modal
-      v-model:open="novelModalOpen"
+    <a-drawer
+      v-model:open="novelDrawerOpen"
       :title="editingNovel ? '编辑小说' : '新建小说'"
-      :ok-text="editingNovel ? '保存' : '创建'"
-      cancel-text="取消"
-      :confirm-loading="savingNovel"
-      :body-style="{ maxHeight: '70vh', overflowY: 'auto' }"
-      @ok="handleSaveNovel"
+      :width="800"
+      :body-style="{ padding: '0' }"
     >
-      <a-form ref="novelFormRef" :model="novelForm" :rules="novelRules" layout="vertical">
-        <a-form-item label="小说名称" name="name">
-          <a-input v-model:value="novelForm.name" placeholder="小说名称" @press-enter="handleSaveNovel" />
-        </a-form-item>
-        <a-form-item v-for="section in novelContentSections" :key="section.key" :label="section.label" :name="section.key">
-          <a-textarea v-model:value="novelForm[section.key]" :placeholder="`请输入${section.label}`" :rows="3" />
-        </a-form-item>
+      <a-form
+        class="h-full"
+        ref="novelFormRef"
+        :model="novelForm"
+        :rules="novelRules"
+        layout="vertical"
+      >
+        <a-tabs
+          v-model:activeKey="novelTab"
+          tab-position="left"
+          class="novel-form-tabs h-full"
+        >
+          <a-tab-pane key="basic" tab="基本信息">
+            <a-form-item name="name">
+              <a-input
+                v-model:value="novelForm.name"
+                placeholder="小说名称"
+                @press-enter="handleSaveNovel"
+              />
+            </a-form-item>
+          </a-tab-pane>
+          <a-tab-pane
+            v-for="section in novelContentSections"
+            :key="section.key"
+            :tab="section.label"
+          >
+            <a-form-item :name="section.key">
+              <a-textarea
+                v-model:value="novelForm[section.key]"
+                :placeholder="`请输入${section.label}`"
+                :rows="24"
+              />
+            </a-form-item>
+          </a-tab-pane>
+        </a-tabs>
       </a-form>
-    </a-modal>
+      <template #footer>
+        <div class="novel-drawer__footer">
+          <a-button @click="novelDrawerOpen = false">取消</a-button>
+          <a-button
+            type="primary"
+            :loading="savingNovel"
+            @click="handleSaveNovel"
+          >
+            {{ editingNovel ? "保存" : "创建" }}
+          </a-button>
+        </div>
+      </template>
+    </a-drawer>
 
-    <CharacterCreateModal v-model:open="characterModalOpen" :character="selectedCharacter" />
-    <OrganizationCreateModal v-model:open="organizationModalOpen" :organization="selectedOrganization" />
+    <CharacterCreateModal
+      v-model:open="characterModalOpen"
+      :character="selectedCharacter"
+    />
+    <OrganizationCreateModal
+      v-model:open="organizationModalOpen"
+      :organization="selectedOrganization"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import type { FormInstance } from 'ant-design-vue'
-import type { NovelCharacter, NovelOrganization } from '@/api/novel'
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons-vue'
-import { Empty, message as antMessage } from 'ant-design-vue'
-import { useNovelAssistantStore } from '@/stores/novel-assistant'
-import CharacterCreateModal from './character-create-modal.vue'
-import OrganizationCreateModal from './organization-create-modal.vue'
+import type { FormInstance } from "ant-design-vue";
+import type { NovelCharacter, NovelOrganization } from "@/api/novel";
+import {
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  QuestionCircleOutlined,
+  SearchOutlined,
+} from "@ant-design/icons-vue";
+import { Empty, message as antMessage } from "ant-design-vue";
+import { useNovelAssistantStore } from "@/stores/novel-assistant";
+import CharacterCreateModal from "./character-create-modal.vue";
+import OrganizationCreateModal from "./organization-create-modal.vue";
 
-const store = useNovelAssistantStore()
-const { novels, characters, organizations, selectedNovelId, selectedNovel, loadingNovels, loadingMaterials } =
-  storeToRefs(store)
+const store = useNovelAssistantStore();
+const {
+  novels,
+  characters,
+  organizations,
+  selectedNovelId,
+  selectedNovel,
+  loadingNovels,
+  loadingMaterials,
+  chatTemperature,
+} = storeToRefs(store);
 
-const activeTab = ref('characters')
-const novelModalOpen = ref(false)
-const editingNovel = ref(false)
-const characterModalOpen = ref(false)
-const organizationModalOpen = ref(false)
-const selectedCharacter = ref<NovelCharacter | null>(null)
-const selectedOrganization = ref<NovelOrganization | null>(null)
-const savingNovel = ref(false)
-const deletingMaterialKey = ref('')
-const novelFormRef = ref<FormInstance>()
+const activeTab = ref("characters");
+const characterKeyword = ref("");
+
+// 按姓名关键字过滤人物列表，空关键字时展示全部人物。
+const filteredCharacters = computed(() => {
+  const keyword = characterKeyword.value.trim().toLowerCase();
+  if (!keyword) return characters.value;
+  return characters.value.filter((character) =>
+    character.name.toLowerCase().includes(keyword),
+  );
+});
+
+const novelDrawerOpen = ref(false);
+const novelTab = ref("basic");
+const editingNovel = ref(false);
+const characterModalOpen = ref(false);
+const organizationModalOpen = ref(false);
+const selectedCharacter = ref<NovelCharacter | null>(null);
+const selectedOrganization = ref<NovelOrganization | null>(null);
+const savingNovel = ref(false);
+const deletingMaterialKey = ref("");
+const novelFormRef = ref<FormInstance>();
 // 界面分项编辑，保存时统一组装为 Markdown content。
 const novelContentSections = [
-  { key: 'targetAudience', label: '目标读者' },
-  { key: 'storyBackground', label: '故事背景' },
-  { key: 'worldSetting', label: '世界观' },
-  { key: 'characterSetting', label: '人物设定' },
-  { key: 'objectSetting', label: '事物设定' },
-  { key: 'storyOutline', label: '故事大纲' },
-  { key: 'inspirationLibrary', label: '灵感库' },
-  { key: 'emotionalPoints', label: '情绪点' },
-  { key: 'storyMetaphor', label: '故事隐喻' },
-] as const
-type NovelContentSectionKey = (typeof novelContentSections)[number]['key']
+  { key: "targetAudience", label: "目标读者" },
+  { key: "storyBackground", label: "故事背景" },
+  { key: "worldSetting", label: "世界观" },
+  { key: "characterSetting", label: "人物设定" },
+  { key: "objectSetting", label: "事物设定" },
+  { key: "storyOutline", label: "故事大纲" },
+  { key: "inspirationLibrary", label: "灵感库" },
+  { key: "emotionalPoints", label: "情绪点" },
+  { key: "storyMetaphor", label: "故事隐喻" },
+] as const;
+type NovelContentSectionKey = (typeof novelContentSections)[number]["key"];
 
 const createEmptyNovelContent = () =>
-  Object.fromEntries(novelContentSections.map((section) => [section.key, ''])) as Record<NovelContentSectionKey, string>
+  Object.fromEntries(
+    novelContentSections.map((section) => [section.key, ""]),
+  ) as Record<NovelContentSectionKey, string>;
 
 const sectionKeyByHeading = new Map<string, NovelContentSectionKey>(
-  novelContentSections.map((section) => [`## ${section.label}`, section.key] as const),
-)
-const novelForm = reactive({ name: '', ...createEmptyNovelContent() })
-const simpleImage = Empty.PRESENTED_IMAGE_SIMPLE
+  novelContentSections.map(
+    (section) => [`## ${section.label}`, section.key] as const,
+  ),
+);
+const novelForm = reactive({ name: "", ...createEmptyNovelContent() });
+const simpleImage = Empty.PRESENTED_IMAGE_SIMPLE;
 const novelRules = {
-  name: [{ required: true, whitespace: true, message: '请输入小说名称' }],
-}
+  name: [{ required: true, whitespace: true, message: "请输入小说名称" }],
+};
 
 const serializeNovelContent = () =>
   novelContentSections
     .map((section) => {
-      const value = novelForm[section.key].trim()
-      return value ? `## ${section.label}\n\n${value}` : ''
+      const value = novelForm[section.key].trim();
+      return value ? `## ${section.label}\n\n${value}` : "";
     })
     .filter(Boolean)
-    .join('\n\n')
+    .join("\n\n");
 
 const parseNovelContent = (content: string) => {
-  const parsed = createEmptyNovelContent()
-  const legacyLines: string[] = []
-  let activeKey: NovelContentSectionKey | null = null
+  const parsed = createEmptyNovelContent();
+  const legacyLines: string[] = [];
+  let activeKey: NovelContentSectionKey | null = null;
 
   for (const line of content.split(/\r?\n/)) {
-    const sectionKey = sectionKeyByHeading.get(line.trim())
+    const sectionKey = sectionKeyByHeading.get(line.trim());
     if (sectionKey) {
-      activeKey = sectionKey
-      continue
+      activeKey = sectionKey;
+      continue;
     }
 
     if (activeKey) {
-      parsed[activeKey] += `${parsed[activeKey] ? '\n' : ''}${line}`
+      parsed[activeKey] += `${parsed[activeKey] ? "\n" : ""}${line}`;
     } else {
-      legacyLines.push(line)
+      legacyLines.push(line);
     }
   }
 
   novelContentSections.forEach((section) => {
-    parsed[section.key] = parsed[section.key].trim()
-  })
+    parsed[section.key] = parsed[section.key].trim();
+  });
 
   // 旧格式没有分段标题，放入故事大纲避免编辑时丢失。
-  const legacyContent = legacyLines.join('\n').trim()
+  const legacyContent = legacyLines.join("\n").trim();
   if (legacyContent) {
-    parsed.storyOutline = [legacyContent, parsed.storyOutline].filter(Boolean).join('\n\n')
+    parsed.storyOutline = [legacyContent, parsed.storyOutline]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
-  return parsed
-}
+  return parsed;
+};
 
 const handleOpenCreateNovel = () => {
-  editingNovel.value = false
-  Object.assign(novelForm, { name: '', ...createEmptyNovelContent() })
-  novelModalOpen.value = true
-}
+  editingNovel.value = false;
+  Object.assign(novelForm, { name: "", ...createEmptyNovelContent() });
+  novelTab.value = "basic";
+  novelDrawerOpen.value = true;
+};
 
 const handleOpenEditNovel = () => {
-  if (!selectedNovel.value) return
+  if (!selectedNovel.value) return;
 
   // 打开编辑弹窗时复制当前小说，取消编辑不会直接改变列表数据。
-  editingNovel.value = true
+  editingNovel.value = true;
   Object.assign(novelForm, {
     name: selectedNovel.value.name,
-    ...parseNovelContent(selectedNovel.value.content || ''),
-  })
-  novelModalOpen.value = true
-}
+    ...parseNovelContent(selectedNovel.value.content || ""),
+  });
+  novelTab.value = "basic";
+  novelDrawerOpen.value = true;
+};
 
 const handleCreateCharacter = () => {
-  selectedCharacter.value = null
-  characterModalOpen.value = true
-}
+  selectedCharacter.value = null;
+  characterModalOpen.value = true;
+};
 
 const handleEditCharacter = (character: NovelCharacter) => {
-  selectedCharacter.value = character
-  characterModalOpen.value = true
-}
+  selectedCharacter.value = character;
+  characterModalOpen.value = true;
+};
 
 const handleCreateOrganization = () => {
-  selectedOrganization.value = null
-  organizationModalOpen.value = true
-}
+  selectedOrganization.value = null;
+  organizationModalOpen.value = true;
+};
 
 const handleEditOrganization = (organization: NovelOrganization) => {
-  selectedOrganization.value = organization
-  organizationModalOpen.value = true
-}
+  selectedOrganization.value = organization;
+  organizationModalOpen.value = true;
+};
 
 const handleDeleteCharacter = async (character: NovelCharacter) => {
-  const materialKey = `character:${character.id}`
-  deletingMaterialKey.value = materialKey
+  const materialKey = `character:${character.id}`;
+  deletingMaterialKey.value = materialKey;
   try {
-    await store.removeCharacter(character.id)
-    antMessage.success('人物删除成功')
+    await store.removeCharacter(character.id);
+    antMessage.success("人物删除成功");
   } catch (error) {
-    antMessage.error('人物删除失败')
+    antMessage.error("人物删除失败");
   } finally {
-    if (deletingMaterialKey.value === materialKey) deletingMaterialKey.value = ''
+    if (deletingMaterialKey.value === materialKey)
+      deletingMaterialKey.value = "";
   }
-}
+};
 
 const handleDeleteOrganization = async (organization: NovelOrganization) => {
-  const materialKey = `organization:${organization.id}`
-  deletingMaterialKey.value = materialKey
+  const materialKey = `organization:${organization.id}`;
+  deletingMaterialKey.value = materialKey;
   try {
-    await store.removeOrganization(organization.id)
-    antMessage.success('组织删除成功')
+    await store.removeOrganization(organization.id);
+    antMessage.success("组织删除成功");
   } catch (error) {
-    antMessage.error('组织删除失败')
+    antMessage.error("组织删除失败");
   } finally {
-    if (deletingMaterialKey.value === materialKey) deletingMaterialKey.value = ''
+    if (deletingMaterialKey.value === materialKey)
+      deletingMaterialKey.value = "";
   }
-}
+};
 
 const handleNovelChange = async (value: unknown) => {
-  if (typeof value !== 'string') return
+  if (typeof value !== "string") return;
   try {
-    await store.selectNovel(value)
+    await store.selectNovel(value);
   } catch (error) {
-    antMessage.error('小说素材加载失败')
+    antMessage.error("小说素材加载失败");
   }
-}
+};
 
 const handleSaveNovel = async () => {
   try {
-    await novelFormRef.value?.validate()
-    savingNovel.value = true
+    await novelFormRef.value?.validate();
+    savingNovel.value = true;
     const novelData = {
       name: novelForm.name.trim(),
       content: serializeNovelContent(),
-    }
+    };
 
     if (editingNovel.value && selectedNovel.value) {
-      await store.editNovel({ id: selectedNovel.value.id, ...novelData })
+      await store.editNovel({ id: selectedNovel.value.id, ...novelData });
     } else {
-      await store.addNovel(novelData)
+      await store.addNovel(novelData);
     }
 
-    novelModalOpen.value = false
-    antMessage.success(editingNovel.value ? '小说更新成功' : '小说创建成功')
+    novelDrawerOpen.value = false;
+    antMessage.success(editingNovel.value ? "小说更新成功" : "小说创建成功");
   } catch (error: any) {
-    if (!error?.errorFields) antMessage.error(editingNovel.value ? '小说更新失败' : '小说创建失败')
+    if (!error?.errorFields)
+      antMessage.error(editingNovel.value ? "小说更新失败" : "小说创建失败");
   } finally {
-    savingNovel.value = false
+    savingNovel.value = false;
   }
-}
+};
 
 onMounted(async () => {
   try {
-    await store.fetchNovels()
+    await store.fetchNovels();
   } catch (error) {
-    antMessage.error('小说列表加载失败')
+    antMessage.error("小说列表加载失败");
   }
-})
+});
 </script>
 
 <style scoped lang="less">
@@ -387,6 +610,10 @@ onMounted(async () => {
 }
 
 .material-tabs :deep(.ant-tabs-nav) {
+  margin-bottom: 12px;
+}
+
+.character-search {
   margin-bottom: 12px;
 }
 
@@ -470,5 +697,85 @@ onMounted(async () => {
 
 .operation-panel__empty {
   padding: 72px 0;
+}
+
+.novel-form-tabs :deep(.ant-tabs-nav) {
+  padding-top: 12px;
+}
+
+.novel-form-tabs :deep(.ant-tabs-tabpane) {
+  padding: 24px !important;
+}
+
+.novel-form-tabs :deep(.ant-form-item .ant-form-item-label) {
+  margin-bottom: 8px;
+
+  label {
+    font-size: 16px;
+  }
+}
+
+.novel-drawer__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.temperature-control {
+  margin-top: 16px;
+  padding-bottom: 12px;
+}
+
+.temperature-control__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.temperature-control__label {
+  font-size: 14px;
+}
+
+.temperature-control__slider {
+  margin: 12px 4px 0 8px;
+}
+
+.temperature-control__icon {
+  font-size: 14px;
+  color: #a3aab8;
+  cursor: help;
+}
+
+.temperature-control__icon:hover {
+  color: #1677ff;
+}
+</style>
+
+<style lang="less">
+.temperature-tips-overlay {
+  max-width: 420px;
+
+  .temperature-tips__title {
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .temperature-tips__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    line-height: 1.6;
+
+    th,
+    td {
+      padding: 4px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      text-align: left;
+    }
+
+    th {
+      font-weight: 600;
+    }
+  }
 }
 </style>

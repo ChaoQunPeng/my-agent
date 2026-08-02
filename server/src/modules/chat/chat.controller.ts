@@ -10,6 +10,7 @@ import type { Response } from 'express';
 import { ChatService } from './chat.service';
 import { SessionService } from '../session/session.service';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
+import OpenAI from 'openai';
 
 @Controller('chat')
 export class ChatController {
@@ -34,14 +35,14 @@ export class ChatController {
       sessionId?: string;
       type?: string;
       resourceId?: string;
-      temperature?: number;
+      aiApiOptions?: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming;
     },
     @Res() res: Response,
   ): Promise<void> {
-    const { message, sessionId, type, resourceId, temperature } = body;
+    const { message, sessionId, type, resourceId, aiApiOptions } = body;
 
     console.log(
-      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, type: ${type}, resourceId: ${resourceId}, temperature: ${temperature}`,
+      `收到流式请求 - message: ${message}, sessionId: ${sessionId}, type: ${type}, resourceId: ${resourceId}, aiApiOptions: ${JSON.stringify(aiApiOptions)}`,
     );
 
     // 设置 SSE 响应头
@@ -58,6 +59,7 @@ export class ChatController {
         sessionId,
         type,
         resourceId,
+        aiApiOptions,
       );
 
       for await (const chunk of asyncGen) {

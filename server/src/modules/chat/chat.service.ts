@@ -202,6 +202,7 @@ export class ChatService {
     sessionId?: string,
     type?: string,
     resourceId?: string,
+    aiApiOptions?: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
   ): AsyncGenerator<string> {
     const currentMessage = userMessage?.trim();
     if (!currentMessage) throw new Error('Message content cannot be empty');
@@ -239,10 +240,11 @@ export class ChatService {
       model: this.openaiService.model,
       messages,
       stream: true,
-      temperature: 0.5,
-      frequency_penalty: 0.3,
-      presence_penalty: 0.3,
       tools: this.getTools(),
+      temperature: aiApiOptions?.temperature ?? 0.5,
+      frequency_penalty: aiApiOptions?.frequency_penalty ?? 0.3,
+      presence_penalty: aiApiOptions?.presence_penalty ?? 0.3,
+      ...aiApiOptions,
     });
 
     // Tool Call 参数可能分散在多个流式片段中，需要按 index 合并。
