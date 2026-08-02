@@ -735,6 +735,7 @@ onMounted(async () => {
   box-shadow: none;
   resize: none;
   padding: 16px 22px;
+  font-size: 16px;
 }
 
 .novel-form-tabs :deep(.novel-content-textarea::placeholder) {
